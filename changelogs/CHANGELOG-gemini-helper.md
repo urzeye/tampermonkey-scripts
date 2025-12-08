@@ -1,6 +1,6 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.4.4 (2024-12-08) - [e057454](https://github.com/urzeye/tampermonkey-scripts/commit/e057454)
+## 版本 1.4.4 (2024-12-08) - [75dd3e5](https://github.com/urzeye/tampermonkey-scripts/commit/75dd3e5)
 
 ### 修复问题：切换提示词时内容叠加
 

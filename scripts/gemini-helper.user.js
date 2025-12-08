@@ -1,7 +1,8 @@
+
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.4.4
+// @version      1.4.5
 // @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @match        https://gemini.google.com/*
@@ -827,9 +828,17 @@
 			const editor = this.textarea;
 			editor.focus();
 			try {
-				// 先清空内容：全选 + 删除
+				// 先全选
 				document.execCommand('selectAll', false, null);
-				document.execCommand('delete', false, null);
+
+				// 【关键 Trick】插入一个空格来“替换”旧内容
+				// 直接 delete 会破坏 DOM 结构导致多行失效
+				// 用 insertText 插入空格，既清空了旧文，又保留了段落标签 <p>
+				document.execCommand('insertText', false, ' ');
+
+				// 再次全选（为了选中刚才那个空格，准备覆盖它）
+				// 如果不加这步，提示词前面会多一个空格
+				document.execCommand('selectAll', false, null);
 
 				// 然后插入新内容
 				const success = document.execCommand('insertText', false, promptContent);
@@ -853,10 +862,17 @@
 			// 等待一小段时间后尝试插入
 			setTimeout(() => {
 				try {
-					// 先清空内容：全选 + 删除
+					// 先全选
 					document.execCommand('selectAll', false, null);
-					document.execCommand('delete', false, null);
 
+					// 【关键 Trick】插入一个空格来“替换”旧内容
+					// 直接 delete 会破坏 DOM 结构导致多行失效
+					// 用 insertText 插入空格，既清空了旧文，又保留了段落标签 <p>
+					document.execCommand('insertText', false, ' ');
+
+					// 再次全选（为了选中刚才那个空格，准备覆盖它）
+					// 如果不加这步，提示词前面会多一个空格
+					document.execCommand('selectAll', false, null);
 					// 然后插入新内容
 					const success = document.execCommand('insertText', false, promptContent);
 					if (!success) {
