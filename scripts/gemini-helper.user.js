@@ -1,4 +1,3 @@
-
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/

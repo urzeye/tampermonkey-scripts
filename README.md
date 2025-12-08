@@ -17,7 +17,7 @@
 - ✅ 支持 Gemini 标准版、企业版和 Genspark
 - ✅ 优化的拖动体验
 
-**最新版本**: v1.4.3
+**最新版本**: v1.4.5
 
 [查看详细文档](./docs/README-gemini-helper.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 

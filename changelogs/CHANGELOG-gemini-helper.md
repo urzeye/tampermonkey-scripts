@@ -1,6 +1,30 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.4.4 (2024-12-08) - [75dd3e5](https://github.com/urzeye/tampermonkey-scripts/commit/75dd3e5)
+## 版本 1.4.5 (2025-12-08) - [bd3df12](https://github.com/urzeye/tampermonkey-scripts/commit/bd3df12)
+
+### 修复问题：页面加载后首次插入提示词时，多行文本只能插入首行
+
+**问题描述**：页面加载后首次插入提示词时，多行文本只能插入首行
+
+`document.execCommand('delete')` 太彻底了。 它不仅删除了文字，还把编辑器内部用于维持段落格式的容器标签（如 `<p>`或 `<div>`）也给删掉了。 `当编辑器变成一个“光杆”容器时，Chrome` 的 `insertText` 命令在处理换行符 `\n` 时就会失效，因为它不知道该在哪里创建新段落，于是就丢弃了换行后的所有内容。
+
+### 修复方案
+
+```javascript
+// 先全选
+document.execCommand('selectAll', false, null);
+// 【关键 Trick】插入一个空格来“替换”旧内容
+// 直接 delete 会破坏 DOM 结构导致多行失效
+// 用 insertText 插入空格，既清空了旧文，又保留了段落标签 <p>
+document.execCommand('insertText', false, ' ');
+// 再次全选（为了选中刚才那个空格，准备覆盖它）
+// 如果不加这步，提示词前面会多一个空格
+document.execCommand('selectAll', false, null);
+// 然后插入新内容
+const success = document.execCommand('insertText', false, promptContent);
+```
+
+## 版本 1.4.4 (2025-12-08) - [75dd3e5](https://github.com/urzeye/tampermonkey-scripts/commit/75dd3e5)
 
 ### 修复问题：切换提示词时内容叠加
 
@@ -20,7 +44,7 @@
 
 ---
 
-## 版本 1.4.3 (2024-12-08) - [9887b4c](https://github.com/urzeye/tampermonkey-scripts/commit/9887b4c)
+## 版本 1.4.3 (2025-12-08) - [9887b4c](https://github.com/urzeye/tampermonkey-scripts/commit/9887b4c)
 
 ### 优化功能：拖动悬浮窗体验
 
@@ -35,7 +59,7 @@
 
 ---
 
-## 版本 1.4.2 (2024-12-08) - [7455551](https://github.com/urzeye/tampermonkey-scripts/commit/7455551)
+## 版本 1.4.2 (2025-12-08) - [7455551](https://github.com/urzeye/tampermonkey-scripts/commit/7455551)
 
 ### 新增功能：拖动排序
 
@@ -70,7 +94,7 @@ updatePromptOrder(); // 更新并保存提示词顺序
 
 ---
 
-## 版本 1.4.1 (2024-12-08) - [74b296e](https://github.com/urzeye/tampermonkey-scripts/commit/74b296e)
+## 版本 1.4.1 (2025-12-08) - [74b296e](https://github.com/urzeye/tampermonkey-scripts/commit/74b296e)
 
 ### 新增功能：复制提示词
 
@@ -85,7 +109,7 @@ updatePromptOrder(); // 更新并保存提示词顺序
 
 ---
 
-## 版本 1.4.0 (2024-12-08) - [98daaba](https://github.com/urzeye/tampermonkey-scripts/commit/98daaba)
+## 版本 1.4.0 (2025-12-08) - [98daaba](https://github.com/urzeye/tampermonkey-scripts/commit/98daaba)
 
 ### 新增功能：分类管理
 
@@ -145,7 +169,7 @@ updatePrompt(); // 添加 refreshCategories() 调用
 
 ---
 
-## 版本 1.3.0 (2024-12-08) - [e17b2a0](https://github.com/urzeye/tampermonkey-scripts/commit/e17b2a0)
+## 版本 1.3.0 (2025-12-08) - [e17b2a0](https://github.com/urzeye/tampermonkey-scripts/commit/e17b2a0)
 
 ### 优化功能：悬浮条逻辑改进
 
@@ -170,7 +194,7 @@ if (e.key === 'Enter' && !e.shiftKey) { ... }
 
 ---
 
-## 版本 1.2.0 (2024-12-08) - [6bffe6b](https://github.com/urzeye/tampermonkey-scripts/commit/6bffe6b)
+## 版本 1.2.0 (2025-12-08) - [6bffe6b](https://github.com/urzeye/tampermonkey-scripts/commit/6bffe6b)
 
 ### 新增功能：快捷跳转按钮
 
@@ -196,7 +220,7 @@ if (e.key === 'Enter' && !e.shiftKey) { ... }
 
 ---
 
-## 版本 1.1.0 (2024-12-08) - [a398a05](https://github.com/urzeye/tampermonkey-scripts/commit/a398a05)
+## 版本 1.1.0 (2025-12-08) - [a398a05](https://github.com/urzeye/tampermonkey-scripts/commit/a398a05)
 
 ### 新增功能：Gemini 商业版支持
 
