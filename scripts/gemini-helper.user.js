@@ -165,8 +165,8 @@
                     align-items: center;
                     cursor: move;
                 }
-                .prompt-panel-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-                .site-indicator { font-size: 12px; padding: 2px 6px; background: rgba(255,255,255,0.2); border-radius: 4px; margin-left: 8px; }
+                .prompt-panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
+                .site-indicator { font-size: 10px; padding: 2px 5px; background: rgba(255,255,255,0.2); border-radius: 4px; margin-left: 4px; white-space: nowrap; }
                 .prompt-panel-controls { display: flex; gap: 8px; }
                 .prompt-panel-btn {
                     background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px;
@@ -292,7 +292,7 @@
 			const title = createElementSafely('div', { className: 'prompt-panel-title' });
 			title.appendChild(createElementSafely('span', {}, '📝'));
 			title.appendChild(createElementSafely('span', {}, '提示词管理'));
-			title.appendChild(createElementSafely('span', { className: 'site-indicator' }, isGeminiBusiness ? 'Gemini Enterprise' : (isGemini ? 'Gemini' : 'Genspark')));
+			title.appendChild(createElementSafely('span', { className: 'site-indicator' }, isGeminiBusiness ? 'Enterprise' : (isGemini ? 'Gemini' : 'Genspark')));
 
 			const controls = createElementSafely('div', { className: 'prompt-panel-controls' });
 			const refreshBtn = createElementSafely('button', { className: 'prompt-panel-btn', id: 'refresh-prompts', title: '刷新' }, '⟳');
