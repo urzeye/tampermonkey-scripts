@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.3.3
+// @version      1.4.0
 // @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @match        https://gemini.google.com/*
@@ -103,6 +103,7 @@
 			this.prompts.push(prompt);
 			this.savePrompts();
 			this.refreshPromptList();
+			this.refreshCategories();
 		}
 
 		updatePrompt(id, updatedPrompt) {
@@ -111,6 +112,7 @@
 				this.prompts[index] = { ...this.prompts[index], ...updatedPrompt };
 				this.savePrompts();
 				this.refreshPromptList();
+				this.refreshCategories();
 			}
 		}
 
@@ -298,6 +300,32 @@
                     box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: transform 0.2s, box-shadow 0.2s;
                 }
                 .scroll-nav-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+                /* 分类管理按钮 */
+                .category-manage-btn {
+                    padding: 4px 8px; background: transparent; border: 1px dashed #9ca3af; border-radius: 12px;
+                    font-size: 12px; color: #6b7280; cursor: pointer; transition: all 0.2s; margin-left: 4px;
+                }
+                .category-manage-btn:hover { background: #f3f4f6; border-color: #6b7280; color: #374151; }
+                /* 分类管理弹窗 */
+                .category-modal-content { max-height: 400px; }
+                .category-list { max-height: 280px; overflow-y: auto; margin: 16px 0; }
+                .category-item {
+                    display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;
+                    background: #f9fafb; border-radius: 8px; margin-bottom: 8px; transition: all 0.2s;
+                }
+                .category-item:hover { background: #f3f4f6; }
+                .category-item-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+                .category-item-name { font-weight: 500; color: #1f2937; font-size: 14px; }
+                .category-item-count { font-size: 12px; color: #6b7280; background: #e5e7eb; padding: 2px 8px; border-radius: 10px; }
+                .category-item-actions { display: flex; gap: 8px; }
+                .category-action-btn {
+                    padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: none; transition: all 0.2s;
+                }
+                .category-action-btn.rename { background: #dbeafe; color: #1d4ed8; }
+                .category-action-btn.rename:hover { background: #bfdbfe; }
+                .category-action-btn.delete { background: #fee2e2; color: #dc2626; }
+                .category-action-btn.delete:hover { background: #fecaca; }
+                .category-empty { text-align: center; color: #9ca3af; padding: 40px 0; font-size: 14px; }
             `;
 			document.head.appendChild(style);
 		}
@@ -477,6 +505,103 @@
 			categories.forEach(cat => {
 				container.appendChild(createElementSafely('span', { className: 'category-tag', 'data-category': cat }, cat));
 			});
+			// 添加分类管理按钮
+			const manageBtn = createElementSafely('button', { className: 'category-manage-btn', title: '管理分类' }, '⚙ 管理');
+			manageBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				this.showCategoryModal();
+			});
+			container.appendChild(manageBtn);
+		}
+
+		// 显示分类管理弹窗
+		showCategoryModal() {
+			const categories = this.getCategories();
+			const modal = createElementSafely('div', { className: 'prompt-modal' });
+			const modalContent = createElementSafely('div', { className: 'prompt-modal-content category-modal-content' });
+
+			const modalHeader = createElementSafely('div', { className: 'prompt-modal-header' }, '分类管理');
+			modalContent.appendChild(modalHeader);
+
+			const categoryList = createElementSafely('div', { className: 'category-list' });
+
+			if (categories.length === 0) {
+				categoryList.appendChild(createElementSafely('div', { className: 'category-empty' }, '暂无分类，添加提示词时会自动创建分类'));
+			} else {
+				categories.forEach(cat => {
+					const count = this.prompts.filter(p => p.category === cat).length;
+					const item = createElementSafely('div', { className: 'category-item' });
+
+					const info = createElementSafely('div', { className: 'category-item-info' });
+					info.appendChild(createElementSafely('span', { className: 'category-item-name' }, cat));
+					info.appendChild(createElementSafely('span', { className: 'category-item-count' }, `${count} 个提示词`));
+
+					const actions = createElementSafely('div', { className: 'category-item-actions' });
+					const renameBtn = createElementSafely('button', { className: 'category-action-btn rename' }, '重命名');
+					const deleteBtn = createElementSafely('button', { className: 'category-action-btn delete' }, '删除');
+
+					renameBtn.addEventListener('click', () => {
+						const newName = prompt('请输入新的分类名称：', cat);
+						if (newName && newName.trim() && newName !== cat) {
+							this.renameCategory(cat, newName.trim());
+							modal.remove();
+							this.showCategoryModal();
+						}
+					});
+
+					deleteBtn.addEventListener('click', () => {
+						if (confirm(`确定要删除分类"${cat}"吗？\n该分类下的 ${count} 个提示词将被移至"未分类"。`)) {
+							this.deleteCategory(cat);
+							modal.remove();
+							this.showCategoryModal();
+						}
+					});
+
+					actions.appendChild(renameBtn);
+					actions.appendChild(deleteBtn);
+					item.appendChild(info);
+					item.appendChild(actions);
+					categoryList.appendChild(item);
+				});
+			}
+
+			modalContent.appendChild(categoryList);
+
+			const btnGroup = createElementSafely('div', { className: 'prompt-modal-btns' });
+			const closeBtn = createElementSafely('button', { className: 'prompt-modal-btn secondary' }, '关闭');
+			closeBtn.addEventListener('click', () => modal.remove());
+			btnGroup.appendChild(closeBtn);
+			modalContent.appendChild(btnGroup);
+
+			modal.appendChild(modalContent);
+			modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+			document.body.appendChild(modal);
+		}
+
+		// 重命名分类
+		renameCategory(oldName, newName) {
+			this.prompts.forEach(p => {
+				if (p.category === oldName) {
+					p.category = newName;
+				}
+			});
+			this.savePrompts();
+			this.refreshCategories();
+			this.refreshPromptList();
+			this.showToast(`分类已重命名为"${newName}"`);
+		}
+
+		// 删除分类（将关联提示词移至"未分类"）
+		deleteCategory(name) {
+			this.prompts.forEach(p => {
+				if (p.category === name) {
+					p.category = '未分类';
+				}
+			});
+			this.savePrompts();
+			this.refreshCategories();
+			this.refreshPromptList();
+			this.showToast(`分类"${name}"已删除`);
 		}
 
 		refreshPromptList(filter = '') {
