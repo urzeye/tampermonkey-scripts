@@ -1,6 +1,6 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.4.3 (2024-12-08)
+## 版本 1.4.3 (2024-12-08) - [9887b4c](https://github.com/urzeye/tampermonkey-scripts/commit/9887b4c)
 
 ### 优化功能：拖动悬浮窗体验
 
@@ -15,7 +15,7 @@
 
 ---
 
-## 版本 1.4.2 (2024-12-08)
+## 版本 1.4.2 (2024-12-08) - [7455551](https://github.com/urzeye/tampermonkey-scripts/commit/7455551)
 
 ### 新增功能：拖动排序
 
@@ -50,7 +50,7 @@ updatePromptOrder(); // 更新并保存提示词顺序
 
 ---
 
-## 版本 1.4.1 (2024-12-08)
+## 版本 1.4.1 (2024-12-08) - [74b296e](https://github.com/urzeye/tampermonkey-scripts/commit/74b296e)
 
 ### 新增功能：复制提示词
 
@@ -65,7 +65,7 @@ updatePromptOrder(); // 更新并保存提示词顺序
 
 ---
 
-## 版本 1.4.0 (2024-12-08)
+## 版本 1.4.0 (2024-12-08) - [98daaba](https://github.com/urzeye/tampermonkey-scripts/commit/98daaba)
 
 ### 新增功能：分类管理
 
@@ -125,7 +125,7 @@ updatePrompt(); // 添加 refreshCategories() 调用
 
 ---
 
-## 版本 1.3.0 (2024-12-08)
+## 版本 1.3.0 (2024-12-08) - [e17b2a0](https://github.com/urzeye/tampermonkey-scripts/commit/e17b2a0)
 
 ### 优化功能：悬浮条逻辑改进
 
@@ -150,7 +150,7 @@ if (e.key === 'Enter' && !e.shiftKey) { ... }
 
 ---
 
-## 版本 1.2.0 (2024-12-08)
+## 版本 1.2.0 (2024-12-08) - [6bffe6b](https://github.com/urzeye/tampermonkey-scripts/commit/6bffe6b)
 
 ### 新增功能：快捷跳转按钮
 
@@ -176,7 +176,7 @@ if (e.key === 'Enter' && !e.shiftKey) { ... }
 
 ---
 
-## 版本 1.1.0 (2024-12-08)
+## 版本 1.1.0 (2024-12-08) - [a398a05](https://github.com/urzeye/tampermonkey-scripts/commit/a398a05)
 
 ### 新增功能：Gemini 商业版支持
 
