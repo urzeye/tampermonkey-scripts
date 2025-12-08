@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.4.1
+// @version      1.4.2
 // @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @match        https://gemini.google.com/*
@@ -223,6 +223,7 @@
                     box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 12px;
                 }
                 .prompt-action-btn:hover { background: #f3f4f6; transform: scale(1.1); }
+                .prompt-item.dragging { opacity: 0.5; }
                 .add-prompt-btn {
                     margin: 12px; padding: 10px; background: ${isAnyGemini ? 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
                     color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;
@@ -620,8 +621,10 @@
 				return;
 			}
 
-			filteredPrompts.forEach(prompt => {
-				const item = createElementSafely('div', { className: 'prompt-item' });
+			filteredPrompts.forEach((prompt, index) => {
+				const item = createElementSafely('div', { className: 'prompt-item', draggable: 'true' });
+				item.dataset.promptId = prompt.id;
+				item.dataset.index = index;
 				if (this.selectedPrompt?.id === prompt.id) item.classList.add('selected');
 
 				const itemHeader = createElementSafely('div', { className: 'prompt-item-header' });
@@ -630,6 +633,9 @@
 
 				const itemContent = createElementSafely('div', { className: 'prompt-item-content' }, prompt.content);
 				const itemActions = createElementSafely('div', { className: 'prompt-item-actions' });
+				const dragBtn = createElementSafely('button', { className: 'prompt-action-btn drag-prompt', 'data-id': prompt.id, title: '拖动排序' }, '☰');
+				dragBtn.style.cursor = 'grab';
+				itemActions.appendChild(dragBtn);
 				itemActions.appendChild(createElementSafely('button', { className: 'prompt-action-btn copy-prompt', 'data-id': prompt.id, title: '复制' }, '📋'));
 				itemActions.appendChild(createElementSafely('button', { className: 'prompt-action-btn edit-prompt', 'data-id': prompt.id, title: '编辑' }, '✏'));
 				itemActions.appendChild(createElementSafely('button', { className: 'prompt-action-btn delete-prompt', 'data-id': prompt.id, title: '删除' }, '🗑'));
@@ -642,8 +648,54 @@
 				item.addEventListener('click', (e) => {
 					if (!e.target.closest('.prompt-item-actions')) this.selectPrompt(prompt, item);
 				});
+
+				// 拖拽事件处理
+				item.addEventListener('dragstart', (e) => {
+					item.classList.add('dragging');
+					e.dataTransfer.effectAllowed = 'move';
+					e.dataTransfer.setData('text/html', item.innerHTML);
+				});
+
+				item.addEventListener('dragover', (e) => {
+					e.preventDefault();
+					e.dataTransfer.dropEffect = 'move';
+					const draggingItem = container.querySelector('.dragging');
+					if (draggingItem && draggingItem !== item) {
+						const rect = item.getBoundingClientRect();
+						const midpoint = rect.top + rect.height / 2;
+						if (e.clientY < midpoint) {
+							container.insertBefore(draggingItem, item);
+						} else {
+							container.insertBefore(draggingItem, item.nextSibling);
+						}
+					}
+				});
+
+				item.addEventListener('dragend', () => {
+					item.classList.remove('dragging');
+					this.updatePromptOrder();
+				});
+
 				container.appendChild(item);
 			});
+		}
+
+		// 更新提示词顺序
+		updatePromptOrder() {
+			const container = document.getElementById('prompt-list');
+			const items = Array.from(container.querySelectorAll('.prompt-item'));
+			const newOrder = items.map(item => item.dataset.promptId);
+
+			// 重新排列 prompts 数组
+			const orderedPrompts = [];
+			newOrder.forEach(id => {
+				const prompt = this.prompts.find(p => p.id === id);
+				if (prompt) orderedPrompts.push(prompt);
+			});
+
+			this.prompts = orderedPrompts;
+			this.savePrompts();
+			this.showToast('已更新排序');
 		}
 
 		selectPrompt(prompt, itemElement) {
