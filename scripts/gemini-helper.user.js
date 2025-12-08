@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini 提示词管理器
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.3.0
 // @description  为 Gemini、Gemini Enterprise 和 Genspark 添加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @match        https://gemini.google.com/*
@@ -519,6 +519,14 @@
 			document.querySelectorAll('.prompt-item').forEach(item => item.classList.remove('selected'));
 			itemElement.classList.add('selected');
 
+			// 显示当前提示词悬浮条
+			const selectedBar = document.querySelector('.selected-prompt-bar');
+			const selectedText = document.getElementById('selected-prompt-text');
+			if (selectedBar && selectedText) {
+				selectedText.textContent = prompt.title;
+				selectedBar.classList.add('show');
+			}
+
 			this.insertPromptToTextarea(prompt.content);
 			this.showToast(`已插入提示词: ${prompt.title}`);
 		}
@@ -890,6 +898,24 @@
 					const editor = e.target.closest('.ProseMirror') || e.target;
 					if (editor.getAttribute('contenteditable') === 'true' || editor.classList.contains('ProseMirror')) {
 						this.textarea = editor;
+					}
+				}
+
+				// 监听发送按钮点击，自动隐藏悬浮条
+				if (this.selectedPrompt && e.target.closest('button[aria-label*="Send"], button[aria-label*="发送"], .send-button, [data-testid*="send"]')) {
+					setTimeout(() => this.clearSelectedPrompt(), 100);
+				}
+			});
+
+			// 监听 Enter 键发送（Ctrl+Enter 或直接 Enter）
+			document.addEventListener('keydown', (e) => {
+				if (this.selectedPrompt && e.key === 'Enter' && !e.shiftKey) {
+					// 检查是否在输入框内
+					const inEditor = e.target.getAttribute('contenteditable') === 'true' ||
+						e.target.closest('.ProseMirror') ||
+						e.target.tagName === 'TEXTAREA';
+					if (inEditor) {
+						setTimeout(() => this.clearSelectedPrompt(), 100);
 					}
 				}
 			});
