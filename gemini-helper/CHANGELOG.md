@@ -1,6 +1,6 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.5.4 (2025-12-09) - [1314b25](https://github.com/urzeye/tampermonkey-scripts/commit/1314b25)
+## 版本 1.5.4 (2025-12-09) - [944f03f](https://github.com/urzeye/tampermonkey-scripts/commit/944f03f)
 
 ### 修复问题：Gemini Business 中文输入首字母自动转换为英文
 
