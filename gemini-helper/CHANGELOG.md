@@ -1,5 +1,13 @@
 # Gemini 提示词管理器 - 变更日志
 
+## 版本 1.5.4 (2025-12-09) - [1314b25](https://github.com/urzeye/tampermonkey-scripts/commit/1314b25)
+
+### 修复问题：Gemini Business 中文输入首字母自动转换为英文
+
+#### 修复方案
+
+- 在 `afterPropertiesSet` 中，先全选，再插入空格，再全选，再插入新内容
+
 ## 版本 1.5.3 (2025-12-09) - [1314b25](https://github.com/urzeye/tampermonkey-scripts/commit/1314b25)
 
 ### 紧急修复

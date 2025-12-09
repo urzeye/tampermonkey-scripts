@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.5.3
+// @version      1.5.4
 // @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
@@ -186,6 +186,13 @@
 				}
 			}
 			return null;
+		}
+
+		/**
+		 * 页面加载完成后执行
+		 */
+		afterPropertiesSet() {
+			// default do nothing
 		}
 	}
 
@@ -431,6 +438,17 @@
 				document.execCommand('delete', false, null);
 			}
 		}
+
+		afterPropertiesSet() {
+			// fixed: gemini business 在使用中文输入时，首字母会自动转换为英文，多一个字母
+			if (this.textarea) {
+				this.textarea.focus();
+				// 先全选
+				document.execCommand('selectAll', false, null);
+				// 插入空格替换旧内容
+				document.execCommand('insertText', false, ' ');
+			}
+		}
 	}
 
 	/**
@@ -601,6 +619,7 @@
 			this.createUI();
 			this.bindEvents();
 			this.siteAdapter.findTextarea();
+			this.siteAdapter.afterPropertiesSet();
 		}
 
 		createStyles() {
