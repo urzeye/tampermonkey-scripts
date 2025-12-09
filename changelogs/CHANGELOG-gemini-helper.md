@@ -1,6 +1,6 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.5.3 (2025-12-09) - [371a906](https://github.com/urzeye/tampermonkey-scripts/commit/371a906)
+## 版本 1.5.3 (2025-12-09) - [1314b25](https://github.com/urzeye/tampermonkey-scripts/commit/1314b25)
 
 ### 紧急修复
 
