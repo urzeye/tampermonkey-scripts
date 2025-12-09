@@ -55,7 +55,7 @@
 | Enter 发送  | 自动隐藏悬浮条    |
 | ⬆ / ⬇ 按钮  | 跳转页面顶部/底部 |
 
-## 📋 [更新日志](../changelogs/CHANGELOG-gemini-helper.md)
+## 📋 [更新日志](./changelog.md)
 
 ### v1.5.3
 

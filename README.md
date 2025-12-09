@@ -19,7 +19,7 @@
 
 **最新版本**: v1.5.3
 
-[查看详细文档](./docs/README-gemini-helper.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
+[查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 
 ## 📝 开发计划
 
