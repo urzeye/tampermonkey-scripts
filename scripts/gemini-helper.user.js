@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.5.2
+// @version      1.5.3
 // @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @match        https://gemini.google.com/*
@@ -213,8 +213,14 @@
 		}
 
 		isValidTextarea(element) {
-			return element.offsetParent !== null ||
-				element.classList.contains('ql-editor');
+			// 必须是可见的 contenteditable 元素
+			if (element.offsetParent === null) return false;
+			const isContentEditable = element.getAttribute('contenteditable') === 'true';
+			const isTextbox = element.getAttribute('role') === 'textbox';
+			// 排除脚本自身的 UI
+			if (element.closest('#universal-prompt-panel')) return false;
+
+			return (isContentEditable || isTextbox) || element.classList.contains('ql-editor');
 		}
 
 		insertPrompt(content) {
@@ -291,9 +297,14 @@
 			// 排除脚本自己的 UI
 			if (element.classList.contains('prompt-search-input')) return false;
 			if (element.id === 'prompt-search') return false;
+			if (element.closest('#universal-prompt-panel')) return false;
 
-			return element.offsetParent !== null ||
-				element.classList.contains('ProseMirror');
+			// 必须是 contenteditable 或者 ProseMirror
+			const isVisible = element.offsetParent !== null;
+			const isContentEditable = element.getAttribute('contenteditable') === 'true';
+			const isProseMirror = element.classList.contains('ProseMirror');
+
+			return isVisible && (isContentEditable || isProseMirror || element.tagName === 'TEXTAREA');
 		}
 
 		findTextarea() {
