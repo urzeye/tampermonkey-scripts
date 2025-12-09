@@ -1,0 +1,68 @@
+name: Deploy to GreasyFork
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/gemini-helper.user.js"
+  workflow_dispatch:
+
+jobs:
+  notify-greasyfork:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Webhook to GreasyFork
+        env:
+          WEBHOOK_URL: ${{ secrets.GREASYFORK_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.GREASYFORK_WEBHOOK_SECRET }}
+        run: |
+          python3 -c "
+          import os
+          import hmac
+          import hashlib
+          import json
+          import urllib.request
+
+          webhook_url = os.environ.get('WEBHOOK_URL')
+          webhook_secret = os.environ.get('WEBHOOK_SECRET')
+          event_path = os.environ.get('GITHUB_EVENT_PATH')
+
+          if not webhook_url or not webhook_secret:
+              print('::error::Missing GREASYFORK_WEBHOOK_URL or GREASYFORK_WEBHOOK_SECRET secrets')
+              exit(1)
+
+          with open(event_path, 'rb') as f:
+              payload = f.read()
+
+          # Calculate HMAC signature
+          signature = hmac.new(
+              webhook_secret.encode('utf-8'),
+              payload,
+              hashlib.sha256
+          ).hexdigest()
+
+          headers = {
+              'Content-Type': 'application/json',
+              'X-GitHub-Event': 'push',
+              'X-Hub-Signature-256': f'sha256={signature}',
+              'User-Agent': 'GitHub-Hookshot/custom-action'
+          }
+
+          req = urllib.request.Request(webhook_url, data=payload, headers=headers, method='POST')
+
+          try:
+              with urllib.request.urlopen(req) as response:
+                  print(f'Successfully sent webhook. Status: {response.status}')
+                  print(response.read().decode('utf-8'))
+          except urllib.error.HTTPError as e:
+              print(f'::error::Failed to send webhook. Status: {e.code}')
+              print(e.read().decode('utf-8'))
+              exit(1)
+          except Exception as e:
+              print(f'::error::Error sending webhook: {e}')
+              exit(1)
+          "
