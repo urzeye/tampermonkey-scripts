@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.5.0
+// @version      1.5.1
 // @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部
 // @author       urzeye
 // @match        https://gemini.google.com/*
@@ -535,6 +535,7 @@
 			this.selectedPrompt = null;
 			this.isCollapsed = false;
 			this.siteAdapter = siteAdapter;
+			this.isScrolling = false; // 滚动状态锁
 			this.init();
 		}
 
@@ -832,9 +833,9 @@
 
 			document.body.appendChild(panel);
 
-			const selectedBar = createElementSafely('div', { className: 'selected-prompt-bar' });
-			selectedBar.appendChild(createElementSafely('span', {}, '当前提示词：'));
-			selectedBar.appendChild(createElementSafely('span', { className: 'selected-prompt-text', id: 'selected-prompt-text' }));
+			const selectedBar = createElementSafely('div', { className: 'selected-prompt-bar', style: 'user-select: none;' });
+			selectedBar.appendChild(createElementSafely('span', { style: 'user-select: none;' }, '当前提示词：'));
+			selectedBar.appendChild(createElementSafely('span', { className: 'selected-prompt-text', id: 'selected-prompt-text', style: 'user-select: none;' }));
 			const clearBtn = createElementSafely('button', { className: 'clear-prompt-btn', id: 'clear-prompt' }, '×');
 			selectedBar.appendChild(clearBtn);
 			document.body.appendChild(selectedBar);
@@ -889,17 +890,25 @@
 
 		// 滚动到页面顶部
 		scrollToTop() {
+			if (this.isScrolling) return;
 			const scrollContainer = this.siteAdapter.getScrollContainer();
 			if (scrollContainer) {
+				this.isScrolling = true;
 				scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+				// 锁定 1 秒禁止操作，防止焦点漂移
+				setTimeout(() => { this.isScrolling = false; }, 1000);
 			}
 		}
 
 		// 滚动到页面底部
 		scrollToBottom() {
+			if (this.isScrolling) return;
 			const scrollContainer = this.siteAdapter.getScrollContainer();
 			if (scrollContainer) {
+				this.isScrolling = true;
 				scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+				// 锁定 1 秒禁止操作
+				setTimeout(() => { this.isScrolling = false; }, 1000);
 			}
 		}
 
@@ -1104,6 +1113,10 @@
 		}
 
 		selectPrompt(prompt, itemElement) {
+			if (this.isScrolling) {
+				this.showToast('页面正在滚动，请稍后...');
+				return;
+			}
 			this.selectedPrompt = prompt;
 			document.querySelectorAll('.prompt-item').forEach(item => item.classList.remove('selected'));
 			itemElement.classList.add('selected');
@@ -1121,6 +1134,10 @@
 		}
 
 		insertPromptToTextarea(promptContent) {
+			if (this.isScrolling) {
+				this.showToast('页面正在滚动，请稍后再选择提示词');
+				return;
+			}
 			const promiseOrResult = this.siteAdapter.insertPrompt(promptContent);
 
 			// 处理异步返回 (Gemini Business 是异步的)

@@ -57,6 +57,10 @@
 
 ## 📋 [更新日志](../changelogs/CHANGELOG-gemini-helper.md)
 
+### v1.5.1
+
+- 🔧 **优化**：新增滚动锁定机制，防止滚动期间误触提示词导致错乱
+
 ### v1.5.0
 
 - ⚡️ **重构**：引入站点适配器模式 (Site Adapter Pattern)，大幅提升代码扩展性

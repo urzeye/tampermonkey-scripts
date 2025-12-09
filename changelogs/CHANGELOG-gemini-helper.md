@@ -1,6 +1,19 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.5.0 (2025-12-09) - [aad4ddc](https://github.com/urzeye/tampermonkey-scripts/commit/aad4ddc)
+## 版本 1.5.1 (2025-12-09)
+
+### 交互优化：滚动期间锁定操作
+
+**问题描述**：用户反馈在使用“跳转到顶部/底部”功能时，如果此时点击提示词，可能会因为页面滚动导致的焦点漂移，将提示词插入到错误的位置。
+
+**修复方案**：
+
+1. **滚动操作锁 (Scroll Lock)**：当点击滚动按钮时，脚本会暂时锁定 UI 操作（约 1 秒）。
+2. **防误触机制**：在滚动锁定期间，点击插入提示词将被拦截，并提示“页面正在滚动”。
+
+---
+
+## 版本 1.5.0 (2025-12-09) - [63eff8d](https://github.com/urzeye/tampermonkey-scripts/commit/63eff8d)
 
 ### 重构：引入站点适配器模式 (Site Adapter Pattern)
 
