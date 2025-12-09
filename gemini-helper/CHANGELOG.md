@@ -1,6 +1,6 @@
 # Gemini 提示词管理器 - 变更日志
 
-## 版本 1.5.5 (2025-12-10) - []()
+## 版本 1.5.5 (2025-12-10) - [431525d](https://github.com/urzeye/tampermonkey-scripts/commit/431525d)
 
 ### 修复问题：Gemini Business 提示词发送后，悬浮条不隐藏问题
 
