@@ -1,5 +1,28 @@
 # Gemini 助手 - 变更日志
 
+## 版本 1.6.1 (2025-12-10)
+
+### 新功能：页面加宽
+
+#### 问题描述
+
+1. **普通版 Gemini**：用户消息在页面加宽后没有正确右对齐
+2. **Gemini Business (px 模式)**：优化了容器宽度处理
+
+#### 修复方案
+
+**普通版 Gemini**：
+
+- 为 `user-query` 和 `.user-query-container` 添加 `display: flex; justify-content: flex-end` 样式
+- 确保用户消息在宽页面下保持右对齐
+
+**架构优化**：
+
+- 新增 `noCenter` 配置选项，支持容器元素不应用自动居中
+- 优化 `generateCSS()` 和 `generateShadowCSS()` 方法支持条件性居中
+
+---
+
 ## 版本 1.6.0 (2025-12-10) - [6ac436d](https://github.com/urzeye/tampermonkey-scripts/commit/6ac436d)
 
 ### 新功能：Tab 切换架构与设置面板

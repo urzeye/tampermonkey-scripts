@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.6.0
-// @description  为 Gemini、Gemini Enterprise 增加提示词管理功能，支持增删改查和快速插入；支持快速到页面顶部、底部；多语言支持（简中/繁中/英语）
+// @version      1.6.1
+// @description  Gemini 多功能助手：提示词管理（增删改查/分类/拖拽排序）、页面加宽、快捷导航、多语言支持，兼容 Gemini 标准版/企业版
 // @author       urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
 // @match        https://gemini.google.com/*
@@ -35,7 +35,8 @@
 
 	const SETTING_KEYS = {
 		CLEAR_TEXTAREA_ON_SEND: 'gemini_business_clear_on_send',
-		LANGUAGE: 'ui_language'
+		LANGUAGE: 'ui_language',
+		PAGE_WIDTH: 'page_width_settings'
 	};
 
 	const I18N = {
@@ -97,7 +98,15 @@
 			languageAuto: '跟随系统',
 			languageZhCN: '简体中文',
 			languageZhTW: '繁體中文',
-			languageEn: 'English'
+			languageEn: 'English',
+			// 页面宽度设置
+			pageWidthLabel: '页面宽度',
+			pageWidthDesc: '调整聊天页面的宽度，即时生效',
+			enablePageWidth: '启用页面加宽',
+			widthValue: '宽度值',
+			widthUnit: '单位',
+			unitPx: '像素 (px)',
+			unitPercent: '百分比 (%)'
 		},
 		'zh-TW': {
 			panelTitle: 'Gemini 助手',
@@ -157,7 +166,15 @@
 			languageAuto: '跟隨系統',
 			languageZhCN: '简体中文',
 			languageZhTW: '繁體中文',
-			languageEn: 'English'
+			languageEn: 'English',
+			// 頁面寬度設置
+			pageWidthLabel: '頁面寬度',
+			pageWidthDesc: '調整聊天頁面的寬度，即時生效',
+			enablePageWidth: '啟用頁面加寬',
+			widthValue: '寬度值',
+			widthUnit: '單位',
+			unitPx: '像素 (px)',
+			unitPercent: '百分比 (%)'
 		},
 		'en': {
 			panelTitle: 'Gemini Helper',
@@ -217,7 +234,15 @@
 			languageAuto: 'Auto',
 			languageZhCN: '简体中文',
 			languageZhTW: '繁體中文',
-			languageEn: 'English'
+			languageEn: 'English',
+			// Page width settings
+			pageWidthLabel: 'Page Width',
+			pageWidthDesc: 'Adjust chat page width, takes effect immediately',
+			enablePageWidth: 'Enable Page Widening',
+			widthValue: 'Width Value',
+			widthUnit: 'Unit',
+			unitPx: 'Pixels (px)',
+			unitPercent: 'Percentage (%)'
 		}
 	};
 
@@ -236,6 +261,13 @@
 			category: '翻译'
 		},
 	];
+
+	// ============= 页面宽度默认配置 =============
+	const DEFAULT_WIDTH_SETTINGS = {
+		'gemini': { enabled: false, value: '70', unit: '%' },
+		'gemini-business': { enabled: false, value: '1600', unit: 'px' },
+		'genspark': { enabled: false, value: '70', unit: '%' }
+	};
 
 	// 语言检测函数（支持手动设置）
 	function detectLanguage() {
@@ -273,6 +305,12 @@
 		match() { throw new Error('必须实现 match()'); }
 
 		/**
+ * 返回站点标识符(用于配置存储)
+ * @returns {string}
+ */
+		getSiteId() { throw new Error('必须实现 getSiteId()'); }
+
+		/**
 		 * 返回站点显示名称
 		 * @returns {string}
 		 */
@@ -283,6 +321,12 @@
 		 * @returns {{primary: string, secondary: string}}
 		 */
 		getThemeColors() { throw new Error('必须实现 getThemeColors()'); }
+
+		/**
+		 * 返回需要加宽的CSS选择器列表
+		 * @returns {Array<{selector: string, property: string}>}
+		 */
+		getWidthSelectors() { return []; }
 
 		/**
 		 * 返回输入框选择器列表
@@ -412,6 +456,14 @@
 		afterPropertiesSet() {
 			// default do nothing
 		}
+
+		/**
+		 * 判断是否应该将样式注入到指定的 Shadow Host 中
+		 * 用于解决 Shadow DOM 样式污染问题
+		 */
+		shouldInjectIntoShadow(host) {
+			return true;
+		}
 	}
 
 	/**
@@ -423,10 +475,22 @@
 				!window.location.hostname.includes('business.gemini.google');
 		}
 
+		getSiteId() { return 'gemini'; }
+
 		getName() { return 'Gemini'; }
 
 		getThemeColors() {
 			return { primary: '#4285f4', secondary: '#34a853' };
+		}
+
+		getWidthSelectors() {
+			return [
+				{ selector: '.conversation-container', property: 'max-width' },
+				{ selector: '.input-area-container', property: 'max-width' },
+				// 用户消息右对齐
+				{ selector: 'user-query', property: 'max-width', value: '100%', noCenter: true, extraCss: 'display: flex !important; justify-content: flex-end !important;' },
+				{ selector: '.user-query-container', property: 'max-width', value: '100%', noCenter: true, extraCss: 'justify-content: flex-end !important;' }
+			];
 		}
 
 		getTextareaSelectors() {
@@ -498,10 +562,47 @@
 			return window.location.hostname.includes('business.gemini.google');
 		}
 
+		getSiteId() { return 'gemini-business'; }
+
 		getName() { return 'Enterprise'; }
 
 		getThemeColors() {
 			return { primary: '#4285f4', secondary: '#34a853' };
+		}
+
+		// 排除侧边栏 (mat-sidenav, mat-drawer) 中的 Shadow DOM
+		shouldInjectIntoShadow(host) {
+			if (host.closest('mat-sidenav') || host.closest('mat-drawer') || host.closest('[class*="bg-sidebar"]')) return false;
+			return true;
+		}
+
+		getWidthSelectors() {
+			// 辅助函数：生成带 scoped globalSelector 的配置
+			// noCenter: 不添加 margin-left/right: auto（用于容器类元素）
+			const config = (selector, value, extraCss, noCenter = false) => ({
+				selector,
+				globalSelector: `mat-sidenav-content ${selector}`, // 全局样式只针对主内容区
+				property: 'max-width',
+				value,
+				extraCss,
+				noCenter
+			});
+
+			return [
+				// 容器强制 100%，不需要居中（它们应该填充可用空间）
+				config('mat-sidenav-content', '100%', undefined, true),
+				config('.main.chat-mode', '100%', undefined, true),
+
+				// 内容区域跟随配置（需要居中）
+				config('ucs-summary'),
+				config('ucs-conversation'),
+				config('ucs-search-bar'),
+				config('.summary-container.expanded'),
+				config('.conversation-container'),
+
+				// 输入框容器：不居中，使用 left/right 定位
+				config('.input-area-container', undefined, 'left: 0 !important; right: 0 !important;', true)
+			];
 		}
 
 		getTextareaSelectors() {
@@ -688,10 +789,17 @@
 			return window.location.hostname.includes('genspark.ai');
 		}
 
+		getSiteId() { return 'genspark'; }
+
 		getName() { return 'Genspark'; }
 
 		getThemeColors() {
 			return { primary: '#667eea', secondary: '#764ba2' };
+		}
+
+		getWidthSelectors() {
+			// Genspark 暂时不实现加宽，预留接口
+			return [];
 		}
 
 		getTextareaSelectors() {
@@ -796,6 +904,171 @@
 		}
 	}
 
+	/**
+	 * 页面宽度样式管理器
+	 * 负责动态注入和移除页面宽度样式
+	 */
+	/**
+	 * 页面宽度样式管理器
+	 * 负责动态注入和移除页面宽度样式，支持 Shadow DOM
+	 */
+	class WidthStyleManager {
+		constructor(siteAdapter, widthConfig) {
+			this.siteAdapter = siteAdapter;
+			this.widthConfig = widthConfig;
+			this.styleElement = null;
+			this.processedShadowRoots = new WeakSet();
+			this.observer = null;
+			this.shadowCheckInterval = null;
+		}
+
+		apply() {
+			// 1. 处理主文档样式
+			if (this.styleElement) {
+				this.styleElement.remove();
+				this.styleElement = null;
+			}
+
+			const css = this.generateCSS();
+
+			if (this.widthConfig && this.widthConfig.enabled) {
+				this.styleElement = document.createElement('style');
+				this.styleElement.id = 'gemini-helper-width-styles';
+				this.styleElement.textContent = css;
+				document.head.appendChild(this.styleElement);
+
+				// 启动 Shadow DOM 注入逻辑
+				this.startShadowInjection(css);
+			} else {
+				// 如果禁用了，也要清理 Shadow DOM 中的样式
+				this.stopShadowInjection();
+				this.clearShadowStyles();
+			}
+		}
+
+		generateCSS() {
+			const globalWidth = `${this.widthConfig.value}${this.widthConfig.unit}`;
+			const selectors = this.siteAdapter.getWidthSelectors();
+			return selectors.map((config) => {
+				const { selector, globalSelector, property, value, extraCss, noCenter } = config;
+				const params = {
+					finalWidth: value || globalWidth,
+					targetSelector: globalSelector || selector, // 优先使用全局特定选择器
+					property,
+					extra: extraCss || '',
+					centerCss: noCenter ? '' : 'margin-left: auto !important; margin-right: auto !important;'
+				};
+				return `${params.targetSelector} { ${params.property}: ${params.finalWidth} !important; ${params.centerCss} ${params.extra} }`;
+			}).join('\n');
+		}
+
+		updateConfig(widthConfig) {
+			this.widthConfig = widthConfig;
+			this.apply();
+		}
+
+		// ============= Shadow DOM 支持 =============
+
+		startShadowInjection(css) {
+			// Shadow CSS 需要重新生成，因为不能使用带 ancestor 的 globalSelector
+			// Shadow DOM 内部必须使用原始 selector，但包含同样的样式规则
+			const shadowCss = this.generateShadowCSS();
+
+			// 立即执行一次全量检查
+			this.injectToAllShadows(shadowCss);
+
+			// 使用定时器定期检查
+			if (this.shadowCheckInterval) clearInterval(this.shadowCheckInterval);
+			this.shadowCheckInterval = setInterval(() => {
+				this.injectToAllShadows(shadowCss);
+			}, 1000);
+		}
+
+		generateShadowCSS() {
+			const globalWidth = `${this.widthConfig.value}${this.widthConfig.unit}`;
+			const selectors = this.siteAdapter.getWidthSelectors();
+			return selectors.map((config) => {
+				const { selector, property, value, extraCss, noCenter } = config;
+				// Shadow DOM 中只使用原始 selector (不带父级限定)，靠 JS 过滤来保证安全
+				const finalWidth = value || globalWidth;
+				const extra = extraCss || '';
+				const centerCss = noCenter ? '' : 'margin-left: auto !important; margin-right: auto !important;';
+				return `${selector} { ${property}: ${finalWidth} !important; ${centerCss} ${extra} }`;
+			}).join('\n');
+		}
+
+		stopShadowInjection() {
+			if (this.shadowCheckInterval) {
+				clearInterval(this.shadowCheckInterval);
+				this.shadowCheckInterval = null;
+			}
+		}
+
+		injectToAllShadows(css) {
+			if (!document.body) return;
+
+			const walk = (root) => {
+				// 如果是 Element 且有 shadowRoot，注入样式
+				if (root.shadowRoot) {
+					this.injectToShadowRoot(root.shadowRoot, css);
+					walk(root.shadowRoot); // 递归遍历 Shadow DOM 内部
+				}
+
+				// 遍历子节点
+				const children = root.children || root.childNodes; // 兼容 ShadowRoot 和 Element
+				for (let i = 0; i < children.length; i++) {
+					walk(children[i]);
+				}
+			};
+
+			walk(document.body);
+		}
+
+		injectToShadowRoot(shadowRoot, css) {
+			// 检查是否应该注入到该 Shadow DOM（通过 Adapter 过滤，例如排除侧边栏）
+			if (shadowRoot.host && !this.siteAdapter.shouldInjectIntoShadow(shadowRoot.host)) {
+				return;
+			}
+
+			if (this.processedShadowRoots.has(shadowRoot)) {
+				// 即使已处理过，也要检查样式内容是否需要更新（如果是配置变更）
+				const existingStyle = shadowRoot.getElementById('gemini-helper-width-shadow-style');
+				if (existingStyle && existingStyle.textContent !== css) {
+					existingStyle.textContent = css;
+				}
+				return;
+			}
+
+			try {
+				const style = document.createElement('style');
+				style.id = 'gemini-helper-width-shadow-style';
+				style.textContent = css;
+				shadowRoot.appendChild(style);
+				this.processedShadowRoots.add(shadowRoot);
+			} catch (e) {
+				// 忽略 closed shadow root 错误（虽然我们通常拿不到 closed 的引用）
+			}
+		}
+
+		clearShadowStyles() {
+			if (!document.body) return;
+
+			const walk = (root) => {
+				if (root.shadowRoot) {
+					const style = root.shadowRoot.getElementById('gemini-helper-width-shadow-style');
+					if (style) style.remove();
+					this.processedShadowRoots.delete(root.shadowRoot);
+					walk(root.shadowRoot);
+				}
+				const children = root.children || root.childNodes;
+				for (let i = 0; i < children.length; i++) {
+					walk(children[i]);
+				}
+			};
+			walk(document.body);
+		}
+	}
+
 	// ==================== 核心管理类 ====================
 
 	/**
@@ -836,14 +1109,20 @@
 
 		// 加载设置
 		loadSettings() {
+			const widthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
 			return {
-				clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false) // 默认关闭
+				clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false), // 默认关闭
+				pageWidth: widthSettings[this.siteAdapter.getSiteId()] || DEFAULT_WIDTH_SETTINGS[this.siteAdapter.getSiteId()]
 			};
 		}
 
 		// 保存设置
 		saveSettings() {
 			GM_setValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, this.settings.clearTextareaOnSend);
+			// 保存页面宽度设置
+			const allWidthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
+			allWidthSettings[this.siteAdapter.getSiteId()] = this.settings.pageWidth;
+			GM_setValue(SETTING_KEYS.PAGE_WIDTH, allWidthSettings);
 		}
 
 		addPrompt(prompt) {
@@ -888,6 +1167,9 @@
 				? this.settings.clearTextareaOnSend
 				: false;
 			this.siteAdapter.afterPropertiesSet(shouldClearOnInit);
+			// 创建并应用页面宽度样式
+			this.widthStyleManager = new WidthStyleManager(this.siteAdapter, this.settings.pageWidth);
+			this.widthStyleManager.apply();
 		}
 
 		createStyles() {
@@ -1136,6 +1418,22 @@
                 .settings-empty {
                     text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px;
                 }
+                /* 设置面板样式 */
+                .settings-content { padding: 16px; overflow-y: auto; max-height: calc(70vh - 60px); }
+                .settings-section { margin-bottom: 24px; }
+                .settings-section-title { font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; padding-left: 4px; }
+                .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px; border: 1px solid #f3f4f6; transition: all 0.2s; }
+                .setting-item:hover { border-color: ${colors.primary}; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+                .setting-item-info { flex: 1; margin-right: 12px; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+                .setting-item-label { font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 2px; white-space: nowrap; }
+                .setting-item-desc { font-size: 12px; color: #9ca3af; line-height: 1.3; }
+                .setting-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+                .setting-select { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; color: #374151; background: white; outline: none; transition: all 0.2s; height: 32px; box-sizing: border-box; }
+                .setting-select:focus { border-color: ${colors.primary}; box-shadow: 0 0 0 2px rgba(66,133,244,0.1); }
+                .setting-toggle { width: 46px; height: 24px; background: #d1d5db; border-radius: 12px; position: relative; cursor: pointer; transition: all 0.3s; flex-shrink: 0; }
+                .setting-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: all 0.3s; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+                .setting-toggle.active { background: ${colors.primary}; }
+                .setting-toggle.active::after { left: 24px; }
             `;
 			document.head.appendChild(style);
 		}
@@ -1302,6 +1600,122 @@
 			langItem.appendChild(langSelect);
 			generalSection.appendChild(langItem);
 
+			// 页面宽度设置
+			const widthSection = createElementSafely('div', { className: 'settings-section' });
+			widthSection.appendChild(createElementSafely('div', { className: 'settings-section-title' }, this.t('pageWidthLabel')));
+			// 启用页面加宽开关
+			const enableWidthItem = createElementSafely('div', { className: 'setting-item' });
+			const enableWidthInfo = createElementSafely('div', { className: 'setting-item-info' });
+			enableWidthInfo.appendChild(createElementSafely('div', { className: 'setting-item-label' }, this.t('enablePageWidth')));
+			enableWidthInfo.appendChild(createElementSafely('div', { className: 'setting-item-desc' }, this.t('pageWidthDesc')));
+			const enableToggle = createElementSafely('div', {
+				className: 'setting-toggle' + (this.settings.pageWidth && this.settings.pageWidth.enabled ? ' active' : ''),
+				id: 'toggle-page-width'
+			});
+			enableToggle.addEventListener('click', () => {
+				this.settings.pageWidth.enabled = !this.settings.pageWidth.enabled;
+				enableToggle.classList.toggle('active', this.settings.pageWidth.enabled);
+				this.saveSettings();
+				// 应用宽度样式
+				if (this.widthStyleManager) {
+					this.widthStyleManager.updateConfig(this.settings.pageWidth);
+				}
+				this.showToast(this.settings.pageWidth.enabled ? this.t('settingOn') : this.t('settingOff'));
+			});
+			enableWidthItem.appendChild(enableWidthInfo);
+			enableWidthItem.appendChild(enableToggle);
+			widthSection.appendChild(enableWidthItem);
+			// 宽度值和单位设置
+			const widthValueItem = createElementSafely('div', { className: 'setting-item' });
+			const widthValueInfo = createElementSafely('div', { className: 'setting-item-info' });
+			widthValueInfo.appendChild(createElementSafely('div', { className: 'setting-item-label' }, this.t('widthValue')));
+
+			const widthControls = createElementSafely('div', { className: 'setting-controls' });
+
+			const widthInput = createElementSafely('input', {
+				type: 'number',
+				className: 'setting-select',
+				id: 'width-value-input',
+				value: this.settings.pageWidth ? this.settings.pageWidth.value : '70',
+				style: 'width: 70px; text-align: right;'
+			});
+
+			const unitSelect = createElementSafely('select', {
+				className: 'setting-select',
+				id: 'width-unit-select',
+				style: 'width: 65px;'
+			});
+			['%', 'px'].forEach(unit => {
+				const option = createElementSafely('option', { value: unit }, unit);
+				if (this.settings.pageWidth && this.settings.pageWidth.unit === unit) {
+					option.selected = true;
+				}
+				unitSelect.appendChild(option);
+			});
+
+			// 限制值逻辑
+			const validateAndSave = () => {
+				let val = parseFloat(widthInput.value);
+				const unit = unitSelect.value;
+
+				if (unit === '%') {
+					if (val > 100) val = 100;
+					if (val < 10) val = 10; // 最小限制
+				} else {
+					if (val < 400) val = 400; // 像素最小限制
+				}
+
+				// 如果值被修正了，更新输入框
+				if (val !== parseFloat(widthInput.value)) {
+					widthInput.value = val;
+				}
+
+				this.settings.pageWidth.value = val.toString();
+				this.settings.pageWidth.unit = unit;
+				this.saveSettings();
+
+				if (this.widthStyleManager) {
+					this.widthStyleManager.updateConfig(this.settings.pageWidth);
+				}
+			};
+
+			// 输入变化事件（防抖）
+			let timeout;
+			widthInput.addEventListener('input', () => {
+				// 实时限制输入长度，避免太长
+				if (widthInput.value.length > 5) widthInput.value = widthInput.value.slice(0, 5);
+
+				// 实时限制百分比逻辑
+				if (unitSelect.value === '%' && parseFloat(widthInput.value) > 100) {
+					widthInput.value = '100';
+				}
+
+				clearTimeout(timeout);
+				timeout = setTimeout(validateAndSave, 500);
+			});
+
+			widthInput.addEventListener('change', validateAndSave); // 失去焦点或回车立即保存
+
+			unitSelect.addEventListener('change', () => {
+				// 切换单位时，提供合理的默认转换或限制
+				if (unitSelect.value === '%' && parseFloat(widthInput.value) > 100) {
+					widthInput.value = '70'; // 切换到%时，默认给个舒服的宽度
+				} else if (unitSelect.value === 'px' && parseFloat(widthInput.value) <= 100) {
+					widthInput.value = '1200'; // 切换到px时，默认给个舒服的宽度
+				}
+				validateAndSave();
+				this.showToast(`${this.t('widthValue')}: ${widthInput.value}${unitSelect.value}`);
+			});
+
+			widthControls.appendChild(widthInput);
+			widthControls.appendChild(unitSelect);
+
+			widthValueItem.appendChild(widthValueInfo);
+			widthValueItem.appendChild(widthControls);
+			widthSection.appendChild(widthValueItem);
+			content.appendChild(generalSection);
+			content.appendChild(widthSection);
+
 			// 只在 Gemini Business 时添加清空输入框设置
 			if (this.siteAdapter instanceof GeminiBusinessAdapter) {
 				const clearItem = createElementSafely('div', { className: 'setting-item' });
@@ -1325,7 +1739,6 @@
 				generalSection.appendChild(clearItem);
 			}
 
-			content.appendChild(generalSection);
 			container.appendChild(content);
 		}
 

@@ -6,18 +6,17 @@
 
 ### <img src="https://raw.githubusercontent.com/gist/urzeye/8d1d3afbbcd0193dbc8a2019b1ba54d3/raw/f7113d329a259963ed1b1ab8cb981e8f635d4cea/gemini.svg" height="24" alt="Gemini" /> [Gemini Helper](./gemini-helper/README.md)
 
-> 为 Gemini 和 Gemini Enterprise 打造的提示词管理器
+> Gemini 多功能助手：提示词管理、页面加宽、快捷导航、多语言支持
 
 **主要功能**：
 
-- ✅ 提示词快速插入和管理
-- ✅ 分类管理（重命名、删除）
-- ✅ 复制、拖动排序
-- ✅ 快捷跳转（顶部/底部）
-- ✅ 支持 Gemini 标准版、企业版和 Genspark
-- ✅ 优化的拖动体验
+- ✅ 提示词管理（快速插入、分类、搜索、拖动排序）
+- ✅ 页面加宽（支持 px/% 单位，即时生效）
+- ✅ 快捷导航（跳转顶部/底部）
+- ✅ 设置面板（语言切换、中文输入修复）
+- ✅ 多站点支持（Gemini 标准版/企业版、Genspark）
 
-**最新版本**: v1.6.0
+**最新版本**: v1.6.1
 
 [查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 
