@@ -305,9 +305,9 @@
 		match() { throw new Error('必须实现 match()'); }
 
 		/**
- * 返回站点标识符(用于配置存储)
- * @returns {string}
- */
+		 * 返回站点标识符(用于配置存储)
+		 * @returns {string}
+		 */
 		getSiteId() { throw new Error('必须实现 getSiteId()'); }
 
 		/**
