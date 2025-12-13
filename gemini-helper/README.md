@@ -1,8 +1,8 @@
 # Gemini-helper
 
-> Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
+> Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、智能锚点恢复、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
 
-> Gemini Helper: Supports conversation outline (search/jump/detail), prompt management (category/group/drag), auto page width, auto model locking, Chinese input fix (Enterprise), multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
+> Gemini Helper: Supports conversation outline (search/jump/detail), prompt management (category/group/drag), auto page width, auto model locking, smart anchor restoration, Chinese input fix (Enterprise), multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
 
 ## ✨ 功能特性
 
@@ -33,6 +33,12 @@
 - **自定义宽度**：支持像素（px）和百分比（%）两种单位
 - **即时生效**：调整后立即应用，无需刷新页面
 - **独立配置**：不同站点可单独设置
+
+### ⚓ 智能锚点系统
+
+- **精准定位**：基于内容指纹定位，即使在懒加载或内容变化时也能精准还原阅读位置
+- **历史回溯**：自动检测并加载历史消息，解决刷新后无法跳转到高楼层对话的问题
+- **持久化记忆**：自动记录每个会话的阅读进度，并在下次打开时自动恢复
 
 ### ⚙️ 设置面板
 
@@ -81,6 +87,13 @@
 
 ## 📋 [更新日志](./changelog.md)
 
+### v1.7.2
+
+- ✨ **智能锚点系统**：
+  - **精准定位**：弃用不稳定像素定位，改用内容指纹算法，精准还原阅读位置
+  - **自动回溯**：自动检测并加载未显示的历史消息，彻底解决长对话刷新后进度丢失问题
+- 🎨 **体验优化**：优化大纲设置文案，新增锚点清理时间选项
+
 ### v1.7.1
 
 - ✨ **新功能**：支持全站点模型自动化锁定
@@ -88,8 +101,8 @@
 
 ### v1.7.0
 
-- ✨ **新功能**：对话大纲 - 自动提取 AI 回复中的标题结构，支持快速跳转
-- ✨ **新功能**：大纲设置 - 启用/禁用开关、标题级别过滤
+- ✨ **新功能**：对话大纲 - 自动提取 AI 回复中的标题结构，支持快速跳转、关键字检索智能匹配、一键展开/恢复全部、展开到指定层级、自动刷新
+- ✨ **新功能**：大纲设置 - 启用/禁用开关、标题级别过滤、自动刷新配置
 - 🎯 **UI**：Tab 栏新增"大纲"标签页
 
 ### v1.6.1

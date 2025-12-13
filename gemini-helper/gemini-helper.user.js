@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.7.1
-// @description  Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
-// @description:en Gemini Helper: Supports conversation outline (search/jump/detail), prompt management (category/group/drag), auto page width, auto model locking, Chinese input fix (Enterprise), multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
+// @version      1.7.2
+// @description  Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、智能锚点恢复、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
+// @description:en Gemini Helper: Supports conversation outline (search/jump/detail), prompt management (category/group/drag), auto page width, auto model locking, smart anchor restoration, Chinese input fix (Enterprise), multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
 // @author       urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
 // @match        https://gemini.google.com/*
@@ -42,11 +42,17 @@
 		TAB_ORDER: 'gemini_tab_order',
 		MODEL_LOCK: 'gemini_model_lock',
 		PROMPTS_SETTINGS: 'gemini_prompts_settings',
+		ANCHOR: 'gemini_anchor_settings',
 	};
 
 	// 默认 Tab 顺序
 	const DEFAULT_TAB_ORDER = ['prompts', 'outline', 'settings'];
 	const DEFAULT_PROMPTS_SETTINGS = { enabled: true };
+	const DEFAULT_ANCHOR_SETTINGS = {
+		persistence: true,
+		autoRestore: false,
+		cleanupDays: 30
+	};
 
 	// Tab 定义（用于渲染和显示）
 	const TAB_DEFINITIONS = {
@@ -76,6 +82,8 @@
 			save: '保存',
 			cancel: '取消',
 			add: '添加',
+			anchorPoint: '锚点',
+			updateAnchor: '更新锚点',
 			title: '标题',
 			category: '分类',
 			categoryPlaceholder: '例如：编程、翻译',
@@ -145,6 +153,9 @@
 			refreshPrompts: '刷新提示词',
 			refreshOutline: '刷新大纲',
 			refreshSettings: '刷新设置',
+			refreshSettings: '刷新设置',
+			jumpToAnchor: '跳转到上次阅读位置',
+			anchorUpdated: '锚点已更新',
 			// 大纲高级工具栏
 			outlineScrollBottom: '滚动到底部',
 			outlineScrollTop: '滚动到顶部',
@@ -157,7 +168,22 @@
 			tabOrderSettings: '界面排版',
 			tabOrderDesc: '调整面板 Tab 的显示顺序',
 			moveUp: '上移',
-			moveDown: '下移'
+			tabOrderSettings: '界面排版',
+			tabOrderDesc: '调整面板 Tab 的显示顺序',
+			moveUp: '上移',
+			moveDown: '下移',
+			// 锚点设置
+			anchorSettings: '锚点设置',
+			anchorPersistence: '持久化存储',
+			anchorPersistenceDesc: '记住每个会话的阅读位置',
+			anchorAutoRestore: '自动恢复阅读进度',
+			anchorAutoRestoreDesc: '打开页面时自动跳转到上次位置',
+			anchorCleanup: '过期数据清理',
+			anchorCleanupDesc: '自动清理超过指定天数的记录 (-1 为永不清理)',
+			daysSuffix: '天',
+			cleanupInfinite: '永不清理',
+			restoredPosition: '已恢复上次阅读位置',
+			cleanupDone: '已清理过期锚点数据'
 		},
 		'zh-TW': {
 			panelTitle: 'Gemini 助手',
@@ -446,6 +472,17 @@
 		getName() { throw new Error('必须实现 getName()'); }
 
 		/**
+		 * 获取当前会话ID (用于锚点持久化)
+		 * @returns {string} Session ID
+		 */
+		getSessionId() {
+			// 优化实现：先去除 URL 中的查询参数 (?及后面内容)，再获取最后一段
+			const urlWithoutQuery = window.location.href.split('?')[0];
+			const parts = urlWithoutQuery.split('/').filter(p => p);
+			return parts.length > 0 ? parts[parts.length - 1] : 'default';
+		}
+
+		/**
 		 * 返回站点主题色
 		 * @returns {{primary: string, secondary: string}}
 		 */
@@ -577,6 +614,86 @@
 				}
 			}
 			return null;
+		}
+
+
+		/**
+		 * 获取当前视口中可见的锚点元素信息 (用于精准定位)
+		 * @returns {Object|null} { selector, offset, index }
+		 */
+		getVisibleAnchorElement() {
+			const container = this.getScrollContainer();
+			if (!container) return null;
+
+			const scrollTop = container.scrollTop;
+			const selectors = this.getChatContentSelectors();
+			if (!selectors.length) return null;
+
+			// 查找所有候选元素
+			const candidates = Array.from(container.querySelectorAll(selectors.join(', ')));
+			if (!candidates.length) return null;
+
+			let bestElement = null;
+
+			for (let i = 0; i < candidates.length; i++) {
+				const el = candidates[i];
+				const top = el.offsetTop;
+
+				// 策略：找到最后一个"顶部"位于视口上方(或刚露出)的元素 = 用户当前正在阅读的起始元素
+				if (top <= scrollTop + 100) {
+					bestElement = el;
+				} else {
+					// 后续元素都在视口下方，停止
+					break;
+				}
+			}
+
+			if (!bestElement && candidates.length > 0) bestElement = candidates[0];
+
+			if (bestElement) {
+				const offset = scrollTop - bestElement.offsetTop;
+				let selector = '';
+				let id = bestElement.getAttribute('data-message-id') || bestElement.id;
+
+				if (id) {
+					selector = `[data-message-id="${id}"]`;
+					if (!bestElement.matches(selector)) selector = `#${id}`;
+					return { type: 'selector', selector: selector, offset: offset };
+				} else {
+					const globalIndex = candidates.indexOf(bestElement);
+					if (globalIndex !== -1) {
+						return { type: 'index', index: globalIndex, offset: offset };
+					}
+				}
+			}
+			return null;
+		}
+
+		/**
+		 * 根据保存的锚点信息恢复滚动
+		 * @param {Object} anchorData 
+		 * @returns {boolean} 是否成功恢复
+		 */
+		restoreScroll(anchorData) {
+			const container = this.getScrollContainer();
+			if (!container || !anchorData) return false;
+
+			let targetElement = null;
+
+			if (anchorData.type === 'selector' && anchorData.selector) {
+				targetElement = container.querySelector(anchorData.selector);
+			} else if (anchorData.type === 'index' && typeof anchorData.index === 'number') {
+				const selectors = this.getChatContentSelectors();
+				const candidates = Array.from(container.querySelectorAll(selectors.join(', ')));
+				targetElement = candidates[anchorData.index];
+			}
+
+			if (targetElement) {
+				const targetTop = targetElement.offsetTop + (anchorData.offset || 0);
+				container.scrollTo({ top: targetTop, behavior: 'instant' });
+				return true;
+			}
+			return false;
 		}
 
 		/**
@@ -2726,6 +2843,7 @@
 			this.selectedPrompt = null;
 			this.isCollapsed = false;
 			this.isScrolling = false; // 滚动状态锁
+			this.anchorScrollTop = null; // 阅读锚点位置
 			this.lang = detectLanguage(); // 当前语言
 			this.i18n = I18N[this.lang]; // 当前语言文本
 			this.settings = this.loadSettings(); // 加载设置
@@ -2815,7 +2933,9 @@
 				outline: mergedOutlineSettings,
 				prompts: promptsSettings,
 				tabOrder: tabOrder,
-				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false)
+				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
+				showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
+				anchor: { ...DEFAULT_ANCHOR_SETTINGS, ...GM_getValue(SETTING_KEYS.ANCHOR, {}) }
 			};
 		}
 
@@ -2838,6 +2958,8 @@
 			GM_setValue(SETTING_KEYS.TAB_ORDER, this.settings.tabOrder);
 			// 保存防滚动设置
 			GM_setValue('gemini_prevent_auto_scroll', this.settings.preventAutoScroll);
+			// 保存锚点设置
+			GM_setValue(SETTING_KEYS.ANCHOR, this.settings.anchor);
 		}
 
 		addPrompt(prompt) {
@@ -2907,6 +3029,15 @@
 			});
 
 			this.siteAdapter.afterPropertiesSet(adapterOptions);
+			// 初始化时执行锚点恢复和清理
+			if (this.settings.anchor.persistence) {
+				// 延迟触发以确保页面加载完成
+				setTimeout(() => {
+					this.restoreAnchorPosition();
+					this.cleanupAnchorData();
+				}, 2000);
+			}
+
 			// 创建并应用页面宽度样式
 			this.widthStyleManager = new WidthStyleManager(this.siteAdapter, this.settings.pageWidth);
 			this.widthStyleManager.apply();
@@ -3096,6 +3227,15 @@
                     box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: transform 0.2s, box-shadow 0.2s;
                 }
                 .scroll-nav-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+                .scroll-nav-btn.icon-only {
+                    flex: 0 0 32px; width: 32px; border-radius: 50%; padding: 0;
+                }
+                .scroll-nav-btn.icon-only span {
+                    display: inline-block; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                .scroll-nav-btn.icon-only:hover span {
+                    transform: rotate(360deg) scale(1.2);
+                }
                 /* 分类管理按钮 */
                 .category-manage-btn {
                     padding: 4px 8px; background: transparent; border: 1px dashed #9ca3af; border-radius: 12px;
@@ -3428,15 +3568,24 @@
 			selectedBar.appendChild(clearBtn);
 			document.body.appendChild(selectedBar);
 
-			// 快捷按钮组（收起时显示）
 			const quickBtnGroup = createElement('div', { className: 'quick-btn-group hidden', id: 'quick-btn-group' });
 			const quickBtn = createElement('button', { className: 'quick-prompt-btn', title: this.t('panelTitle') }, '✨');
 			const quickScrollTop = createElement('button', { className: 'quick-prompt-btn', title: this.t('scrollTop') }, '⬆');
+			const quickAnchor = createElement('button', {
+				className: 'quick-prompt-btn',
+				id: 'quick-anchor-btn',
+				title: this.t('jumpToAnchor'),
+				style: this.settings.showCollapsedAnchor ? 'display: flex;' : 'display: none;'
+			}, '⚓');
 			const quickScrollBottom = createElement('button', { className: 'quick-prompt-btn', title: this.t('scrollBottom') }, '⬇');
+
 			quickBtn.addEventListener('click', () => { this.togglePanel(); });
 			quickScrollTop.addEventListener('click', () => this.scrollToTop());
+			quickAnchor.addEventListener('click', () => this.handleAnchorClick());
 			quickScrollBottom.addEventListener('click', () => this.scrollToBottom());
+
 			quickBtnGroup.appendChild(quickScrollTop);
+			quickBtnGroup.appendChild(quickAnchor);
 			quickBtnGroup.appendChild(quickBtn);
 			quickBtnGroup.appendChild(quickScrollBottom);
 			document.body.appendChild(quickBtnGroup);
@@ -3446,12 +3595,21 @@
 			const scrollTopBtn = createElement('button', { className: 'scroll-nav-btn', id: 'scroll-top-btn', title: this.t('scrollTop') });
 			scrollTopBtn.appendChild(createElement('span', {}, '⬆'));
 			scrollTopBtn.appendChild(createElement('span', {}, this.t('scrollTop')));
+
+			const anchorBtn = createElement('button', { className: 'scroll-nav-btn icon-only', id: 'scroll-anchor-btn', title: this.t('jumpToAnchor') });
+			anchorBtn.appendChild(createElement('span', {}, '⚓'));
+			// anchorBtn.appendChild(createElement('span', {}, this.t('anchorPoint')));
+
 			const scrollBottomBtn = createElement('button', { className: 'scroll-nav-btn', id: 'scroll-bottom-btn', title: this.t('scrollBottom') });
 			scrollBottomBtn.appendChild(createElement('span', {}, '⬇'));
 			scrollBottomBtn.appendChild(createElement('span', {}, this.t('scrollBottom')));
+
 			scrollTopBtn.addEventListener('click', () => this.scrollToTop());
+			anchorBtn.addEventListener('click', () => this.handleAnchorClick());
 			scrollBottomBtn.addEventListener('click', () => this.scrollToBottom());
+
 			scrollNavContainer.appendChild(scrollTopBtn);
+			scrollNavContainer.appendChild(anchorBtn);
 			scrollNavContainer.appendChild(scrollBottomBtn);
 			panel.appendChild(scrollNavContainer);
 
@@ -3739,6 +3897,7 @@
 			widthInput.addEventListener('input', () => {
 				if (widthInput.value.length > 5) widthInput.value = widthInput.value.slice(0, 5);
 				if (unitSelect.value === '%' && parseFloat(widthInput.value) > 100) widthInput.value = '100';
+				else if (unitSelect.value === 'px' && parseFloat(widthInput.value) <= 100) widthInput.value = '1200';
 				clearTimeout(timeout);
 				timeout = setTimeout(validateAndSave, 500);
 			});
@@ -3903,6 +4062,110 @@
 			const layoutSection = this.createCollapsibleSection(this.t('tabOrderSettings'), layoutContainer);
 			content.appendChild(layoutSection);
 
+			// 4.5 锚点设置 (新增独立版块)
+			const anchorContainer = createElement('div', {});
+
+			// 持久化开关
+			const anchorPersistenceItem = createElement('div', { className: 'setting-item' });
+			const anchorPersistenceInfo = createElement('div', { className: 'setting-item-info' });
+			anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('anchorPersistence')));
+			anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('anchorPersistenceDesc')));
+
+			const anchorPersistenceToggle = createElement('div', {
+				className: 'setting-toggle' + (this.settings.anchor.persistence ? ' active' : ''),
+				id: 'toggle-anchor-persistence'
+			});
+
+			// 自动恢复开关
+			const anchorAutoRestoreItem = createElement('div', { className: 'setting-item' });
+			const anchorAutoRestoreInfo = createElement('div', { className: 'setting-item-info' });
+			anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('anchorAutoRestore')));
+			anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('anchorAutoRestoreDesc')));
+			const anchorAutoRestoreToggle = createElement('div', {
+				className: 'setting-toggle' + (this.settings.anchor.autoRestore ? ' active' : ''),
+				id: 'toggle-anchor-auto-restore'
+			});
+
+			// 清理时间设置
+			const anchorCleanupItem = createElement('div', { className: 'setting-item' });
+			const anchorCleanupInfo = createElement('div', { className: 'setting-item-info' });
+			anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('anchorCleanup')));
+			anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('anchorCleanupDesc')));
+
+			const anchorCleanupControls = createElement('div', { className: 'setting-controls' });
+			const anchorCleanupInput = createElement('select', { className: 'setting-select' });
+
+			// 填充清理选项
+			const cleanupOptions = [
+				{ val: 1, label: `1 ${this.t('daysSuffix')}` },
+				{ val: 3, label: `3 ${this.t('daysSuffix')}` },
+				{ val: 7, label: `7 ${this.t('daysSuffix')}` },
+				{ val: 30, label: `30 ${this.t('daysSuffix')}` },
+				{ val: 90, label: `90 ${this.t('daysSuffix')}` },
+				{ val: -1, label: this.t('cleanupInfinite') }
+			];
+			cleanupOptions.forEach(opt => {
+				const option = createElement('option', { value: opt.val }, opt.label);
+				if (this.settings.anchor.cleanupDays == opt.val) option.selected = true;
+				anchorCleanupInput.appendChild(option);
+			});
+
+			// 联动逻辑函数
+			const updateDependency = (enabled) => {
+				if (enabled) {
+					anchorAutoRestoreItem.style.opacity = '1';
+					anchorAutoRestoreItem.style.pointerEvents = 'auto';
+					anchorCleanupItem.style.opacity = '1';
+					anchorCleanupItem.style.pointerEvents = 'auto';
+				} else {
+					anchorAutoRestoreItem.style.opacity = '0.5';
+					anchorAutoRestoreItem.style.pointerEvents = 'none';
+					anchorCleanupItem.style.opacity = '0.5';
+					anchorCleanupItem.style.pointerEvents = 'none';
+				}
+			};
+
+			// 初始化联动
+			updateDependency(this.settings.anchor.persistence);
+
+			anchorPersistenceToggle.addEventListener('click', () => {
+				this.settings.anchor.persistence = !this.settings.anchor.persistence;
+				anchorPersistenceToggle.classList.toggle('active', this.settings.anchor.persistence);
+				this.saveSettings();
+				updateDependency(this.settings.anchor.persistence);
+				this.showToast(this.settings.anchor.persistence ? this.t('settingOn') : this.t('settingOff'));
+			});
+
+			anchorAutoRestoreToggle.addEventListener('click', () => {
+				this.settings.anchor.autoRestore = !this.settings.anchor.autoRestore;
+				anchorAutoRestoreToggle.classList.toggle('active', this.settings.anchor.autoRestore);
+				this.saveSettings();
+				this.showToast(this.settings.anchor.autoRestore ? this.t('settingOn') : this.t('settingOff'));
+			});
+
+			anchorCleanupInput.addEventListener('change', () => {
+				this.settings.anchor.cleanupDays = parseInt(anchorCleanupInput.value);
+				this.saveSettings();
+				this.showToast(`${this.t('anchorCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
+			});
+
+			anchorPersistenceItem.appendChild(anchorPersistenceInfo);
+			anchorPersistenceItem.appendChild(anchorPersistenceToggle);
+
+			anchorAutoRestoreItem.appendChild(anchorAutoRestoreInfo);
+			anchorAutoRestoreItem.appendChild(anchorAutoRestoreToggle);
+
+			anchorCleanupControls.appendChild(anchorCleanupInput);
+			anchorCleanupItem.appendChild(anchorCleanupInfo);
+			anchorCleanupItem.appendChild(anchorCleanupControls);
+
+			anchorContainer.appendChild(anchorPersistenceItem);
+			anchorContainer.appendChild(anchorAutoRestoreItem);
+			anchorContainer.appendChild(anchorCleanupItem);
+
+			const anchorSection = this.createCollapsibleSection(this.t('anchorSettings'), anchorContainer);
+			content.appendChild(anchorSection);
+
 			// 5. 大纲详细设置 (高级配置)
 			const outlineSettingsContainer = createElement('div', {});
 
@@ -3953,14 +4216,43 @@
 			updateIntervalItem.appendChild(updateIntervalControls);
 			outlineSettingsContainer.appendChild(updateIntervalItem);
 
-			const outlineSettingsSection = this.createCollapsibleSection('大纲高级设置', outlineSettingsContainer, { defaultExpanded: false });
+			const outlineSettingsSection = this.createCollapsibleSection('大纲设置', outlineSettingsContainer, { defaultExpanded: false });
 			content.appendChild(outlineSettingsSection);
 
 
 			// 6. 其他设置 (折叠面板)
 			const otherSettingsContainer = createElement('div', {});
 
-			// 防止自动滚动开关
+			// 6.1 锚点按钮 (折叠时显示)
+			const anchorToggleItem = createElement('div', { className: 'setting-item' });
+			const anchorToggleInfo = createElement('div', { className: 'setting-item-info' });
+			anchorToggleInfo.appendChild(createElement('div', { className: 'setting-item-label' }, '折叠面板显示锚点'));
+			anchorToggleInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, '当面板收起时，在侧边浮动条中显示锚点按钮'));
+
+			const anchorToggle = createElement('div', {
+				className: 'setting-toggle' + (this.settings.showCollapsedAnchor ? ' active' : ''),
+				id: 'toggle-show-collapsed-anchor'
+			});
+			anchorToggle.addEventListener('click', () => {
+				this.settings.showCollapsedAnchor = !this.settings.showCollapsedAnchor;
+				anchorToggle.classList.toggle('active', this.settings.showCollapsedAnchor);
+				this.saveSettings();
+
+				// 实时更新UI
+				GM_setValue('gemini_show_collapsed_anchor', this.settings.showCollapsedAnchor);
+				const quickAnchor = document.getElementById('quick-anchor-btn');
+				if (quickAnchor) {
+					quickAnchor.style.display = this.settings.showCollapsedAnchor ? 'flex' : 'none';
+				}
+
+				this.showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
+			});
+			anchorToggleItem.appendChild(anchorToggleInfo);
+			anchorToggleItem.appendChild(anchorToggle);
+			otherSettingsContainer.appendChild(anchorToggleItem);
+
+
+			// 6.2 防止自动滚动开关
 			const scrollLockItem = createElement('div', { className: 'setting-item' });
 			const scrollLockInfo = createElement('div', { className: 'setting-item-info' });
 			scrollLockInfo.appendChild(createElement('div', { className: 'setting-item-label' }, '防止自动滚动'));
@@ -4029,11 +4321,197 @@
 			}
 		}
 
+		// 获取当前会话的锚点存储键 (sessionId)
+		getAnchorKey() {
+			return this.siteAdapter.getSessionId();
+		}
+
+		// 保存锚点位置到持久化存储
+		saveAnchorPosition(scrollTop) {
+			if (!this.settings.anchor.persistence) return;
+
+			const key = this.getAnchorKey();
+			const allData = GM_getValue('gemini_anchor_data', {});
+
+			// 获取基于内容的锚点信息
+			let anchorInfo = {};
+			try {
+				anchorInfo = this.siteAdapter.getVisibleAnchorElement();
+			} catch (err) {
+				console.error('Error getting visible anchor element:', err);
+			}
+
+			allData[key] = {
+				top: scrollTop,
+				ts: Date.now(),
+				// 扩展保存内容定位信息
+				...((anchorInfo) ? anchorInfo : {})
+			};
+
+			GM_setValue('gemini_anchor_data', allData);
+		}
+
+		// 恢复锚点位置
+		restoreAnchorPosition() {
+			if (!this.settings.anchor.persistence || !this.settings.anchor.autoRestore) return;
+
+			const key = this.getAnchorKey();
+			const allData = GM_getValue('gemini_anchor_data', {});
+			const data = allData[key];
+
+			if (data) {
+				const scrollContainer = this.siteAdapter.getScrollContainer();
+				if (scrollContainer) {
+					let historyLoadAttempts = 0;
+					const maxHistoryLoadAttempts = 5; // 增加到 5 次
+
+					// 增加重试机制，支持历史记录加载
+					const tryScroll = (attempts = 0) => {
+						if (attempts > 25) return; // 总重试次数上限大幅增加，给予足够时间
+
+						// 1. 优先尝试基于内容的精准恢复
+						let contentRestored = false;
+						try {
+							if (data.type) {
+								contentRestored = this.siteAdapter.restoreScroll(data);
+							}
+						} catch (err) { console.error('Error restoring content anchor:', err); }
+
+						if (contentRestored) {
+							this.anchorScrollTop = scrollContainer.scrollTop;
+							this.showToast(this.t('restoredPosition'));
+							return;
+						}
+
+						// 2. 降级方案：基于像素位置恢复
+						if (data.top !== undefined) {
+							// 关键修正：如果目标是特定内容(selector/index)且还有重试机会，不要轻易满足于像素位置(可能是未加载完的)，强制继续回溯
+							const forceBacktracking = (data.type && historyLoadAttempts < maxHistoryLoadAttempts);
+
+							if (!forceBacktracking && scrollContainer.scrollHeight >= data.top) {
+								scrollContainer.scrollTo({ top: data.top, behavior: 'instant' });
+								this.anchorScrollTop = data.top;
+								this.showToast(this.t('restoredPosition'));
+							} else {
+								// 高度不够，或者需要强制回溯历史记录
+								if (historyLoadAttempts < maxHistoryLoadAttempts) {
+									// 智能回溯机制 (Smart Backtracking)
+									this.showToast(`正在回溯历史记录 (${historyLoadAttempts + 1}/${maxHistoryLoadAttempts})...`);
+
+									// 尝试触发加载：通常滚动到顶部会触发
+									// 先记录当前位置防止跳动太厉害（虽然马上要滚到0）
+									const currentPos = scrollContainer.scrollTop;
+									scrollContainer.scrollTo({ top: 0, behavior: 'instant' });
+
+									historyLoadAttempts++;
+									// 给更多时间让历史记录加载渲染 (2秒)
+									setTimeout(() => {
+										// 尝试滚回刚才的位置以免用户迷失
+										// scrollContainer.scrollTo({ top: currentPos, behavior: 'instant' }); 
+										tryScroll(attempts + 1);
+									}, 2000);
+								} else {
+									// 即使加载了历史也就这样了，或者本来就没历史了，稍后快速重试几次看是否刚好渲染完
+									setTimeout(() => tryScroll(attempts + 1), 500);
+								}
+							}
+						}
+					};
+					// 延迟一点启动，等待页面基本框架就绪
+					setTimeout(() => tryScroll(), 500);
+				}
+			}
+		}
+
+		// 清理过期数据
+		cleanupAnchorData() {
+			if (!this.settings.anchor.persistence) return;
+
+			const lastRun = GM_getValue('gemini_anchor_cleanup_last_run', 0);
+			const now = Date.now();
+
+			// 每天运行一次
+			if (now - lastRun < 24 * 60 * 60 * 1000) return;
+
+			const cleanupDays = this.settings.anchor.cleanupDays;
+			if (cleanupDays === -1) return; // 永不清理
+
+			const expireTime = cleanupDays * 24 * 60 * 60 * 1000;
+			const allData = GM_getValue('gemini_anchor_data', {});
+			let changed = false;
+
+			Object.keys(allData).forEach(key => {
+				const item = allData[key];
+				if (now - item.ts > expireTime) {
+					delete allData[key];
+					changed = true;
+				}
+			});
+
+			if (changed) {
+				GM_setValue('gemini_anchor_data', allData);
+				// this.showToast(this.t('cleanupDone')); // 静默清理
+			}
+
+			GM_setValue('gemini_anchor_cleanup_last_run', now);
+		}
+
+		// 锚点跳转逻辑
+		handleAnchorClick() {
+			if (this.isScrolling) return;
+			const scrollContainer = this.siteAdapter.getScrollContainer();
+			if (!scrollContainer) return;
+
+			const currentInfo = {
+				scrollTop: scrollContainer.scrollTop,
+				scrollHeight: scrollContainer.scrollHeight,
+				clientHeight: scrollContainer.clientHeight
+			};
+
+			// 阈值：只有当距离上次记录点超过半屏高度时，才视为需要跳转
+			const threshold = currentInfo.clientHeight * 0.5;
+
+			// 如果有记录，跳转到记录点
+			// 优先尝试从内存获取，如果内存为空且开启了持久化，则尝试从存储获取
+			let targetTop = this.anchorScrollTop;
+			if (targetTop === null && this.settings.anchor.persistence) {
+				const key = this.getAnchorKey();
+				const allData = GM_getValue('gemini_anchor_data', {});
+				if (allData[key] && allData[key].top !== undefined) {
+					targetTop = allData[key].top;
+				}
+			}
+
+			if (targetTop !== null) {
+				const distance = Math.abs(currentInfo.scrollTop - targetTop);
+				// 优化逻辑：不再自动更新锚点。按钮只负责“回跳”。
+				// 如果距离很远，跳回去。
+				if (distance > threshold) {
+					this.isScrolling = true;
+					scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+					this.anchorScrollTop = targetTop; // 更新内存状态
+					setTimeout(() => { this.isScrolling = false; }, 1000);
+					this.showToast(this.t('jumpToAnchor'));
+					return;
+				} else {
+					// 距离很近，没必要跳
+					this.showToast('已在标记位置附近');
+				}
+			} else {
+				// 无记录
+				this.showToast('暂无阅读锚点，请先点击顶部/底部按钮');
+			}
+		}
+
 		// 滚动到页面顶部
 		scrollToTop() {
 			if (this.isScrolling) return;
 			const scrollContainer = this.siteAdapter.getScrollContainer();
 			if (scrollContainer) {
+				// 自动保存当前位置为锚点
+				this.anchorScrollTop = scrollContainer.scrollTop;
+				this.saveAnchorPosition(this.anchorScrollTop);
+
 				this.isScrolling = true;
 				scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
 				// 锁定 1 秒禁止操作，防止焦点漂移
@@ -4046,6 +4524,11 @@
 			if (this.isScrolling) return;
 			const scrollContainer = this.siteAdapter.getScrollContainer();
 			if (scrollContainer) {
+				// 自动保存当前位置为锚点
+				this.anchorScrollTop = scrollContainer.scrollTop;
+				this.saveAnchorPosition(this.anchorScrollTop);
+				// this.showToast(this.t('anchorUpdated'));
+
 				this.isScrolling = true;
 				scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
 				// 锁定 1 秒禁止操作
@@ -4488,6 +4971,8 @@
 			document.getElementById('toggle-panel')?.addEventListener('click', () => this.togglePanel());
 			this.makeDraggable();
 
+
+			// 2. 按钮点击监听
 			document.addEventListener('click', (e) => {
 				// 委托适配器检查是否为输入框，自动更新引用
 				if (this.siteAdapter.isValidTextarea(e.target)) {
@@ -4529,67 +5014,50 @@
 				}
 			});
 
-			// 监听 Enter 键发送（Ctrl+Enter 或直接 Enter），兼容 Shadow DOM：从事件传播路径查找真实输入元素
-			document.addEventListener('keydown', (e) => {
-				// 只在按下 Enter（非 Shift+Enter）时处理
-				if (!(e.key === 'Enter' && !e.shiftKey)) return;
+			document.getElementById('toggle-panel')?.addEventListener('click', () => this.togglePanel());
+			this.makeDraggable();
 
-				// 获取事件传播路径，兼容 composedPath 或 e.path
-				const path = typeof e.composedPath === 'function' ? e.composedPath() : (e.path || [e.target]);
-				let foundEditor = null;
-				for (const node of path) {
-					if (!node || !(node instanceof Element)) continue;
+			// 初始化 URL 监听 (处理 SPA 页面跳转)
+			this.initUrlChangeObserver();
+		}
 
-					// 严格判定：先检查显式的可编辑特征（contenteditable / role=textbox / ProseMirror / TEXTAREA）
-					try {
-						const isStrictEditable = (
-							(typeof node.getAttribute === 'function' && node.getAttribute('contenteditable') === 'true') ||
-							(typeof node.getAttribute === 'function' && node.getAttribute('role') === 'textbox') ||
-							(node.classList && node.classList.contains && node.classList.contains('ProseMirror')) ||
-							(node.tagName === 'TEXTAREA')
-						);
-						if (isStrictEditable) {
-							foundEditor = node;
-							break;
-						}
-					} catch (err) {
-						// 忽略检测错误，继续后续判定
-					}
+		initUrlChangeObserver() {
+			let lastUrl = window.location.href;
 
-					// 次级判定：调用适配器的 isValidTextarea（适配器可能有更严格或特殊逻辑）
-					try {
-						if (this.siteAdapter.isValidTextarea(node)) {
-							foundEditor = node;
-							break;
-						}
-					} catch (err) {
-						// 忽略 isValidTextarea 抛出的意外错误
-					}
+			const checkUrl = () => {
+				const currentUrl = window.location.href;
+				if (currentUrl !== lastUrl) {
+					lastUrl = currentUrl;
 
-					// 最后的兜底：检查常见选择器匹配
-					try {
-						if (node.matches && node.matches('[contenteditable="true"], .ProseMirror, textarea')) {
-							foundEditor = node;
-							break;
-						}
-					} catch (err) {
-						// 忽略 matches 抛出的错误
-					}
+					// URL 变化时，重置内存中的锚点状态，并尝试恢复新页面的锚点
+					this.anchorScrollTop = null;
+
+					// 给予页面渲染一点时间
+					setTimeout(() => {
+						this.restoreAnchorPosition();
+					}, 1500);
 				}
+			};
 
-				if (foundEditor) {
-					// 更新适配器的 textarea 引用，防止后续操作找不到元素
-					try { this.siteAdapter.textarea = foundEditor; } catch (err) { /* 忽略 */ }
-					// 如果有选中的提示词，清除悬浮条
-					if (this.selectedPrompt) {
-						setTimeout(() => { this.clearSelectedPrompt(); }, 100);
-					}
-					// 针对 Gemini Business 适配器，根据设置决定是否调用 clearTextarea 修复中文输入问题
-					if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
-						setTimeout(() => { this.siteAdapter.clearTextarea(); }, 200);
-					}
-				}
-			});
+			// 1. 监听 popstate (后退/前进)
+			window.addEventListener('popstate', checkUrl);
+
+			// 2. Monkey patch pushState/replaceState
+			const originalPushState = history.pushState;
+			const originalReplaceState = history.replaceState;
+
+			history.pushState = function () {
+				originalPushState.apply(this, arguments);
+				checkUrl();
+			};
+
+			history.replaceState = function () {
+				originalReplaceState.apply(this, arguments);
+				checkUrl();
+			};
+
+			// 3. 定时器兜底 (防止某些框架绕过 history API)
+			setInterval(checkUrl, 1000);
 		}
 
 		makeDraggable() {
