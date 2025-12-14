@@ -5296,7 +5296,7 @@
 					if (this.selectedPrompt) {
 						setTimeout(() => { this.clearSelectedPrompt(); }, 100);
 					}
-					// 针对 Gemini Business 适配器，根据设置决定是否调用 clearTextarea 修复中文输入问题
+					// 针对 Gemini Business：无论是否使用提示词，发送后都修复中文输入
 					if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
 						setTimeout(() => { this.siteAdapter.clearTextarea(); }, 200);
 					}
@@ -5316,10 +5316,11 @@
 
 				if (!isFromTextarea) return;
 
-				// 与点击发送按钮相同的清理逻辑
+				// 清理逻辑
 				if (this.selectedPrompt) {
 					setTimeout(() => { this.clearSelectedPrompt(); }, 100);
 				}
+				// 针对 Gemini Business：无论是否使用提示词，发送后都修复中文输入
 				if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
 					setTimeout(() => { this.siteAdapter.clearTextarea(); }, 200);
 				}
@@ -5350,6 +5351,10 @@
 					// 给予页面渲染一点时间后尝试恢复
 					setTimeout(() => {
 						this.restoreReadingProgress();
+						// 针对 Gemini Business：切换会话后修复中文输入
+						if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
+							this.siteAdapter.clearTextarea();
+						}
 					}, 1500);
 				}
 			};
