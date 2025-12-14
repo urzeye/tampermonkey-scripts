@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.7.2
-// @description  Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、智能锚点恢复、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
-// @description:en Gemini Helper: Supports conversation outline (search/jump/detail), prompt management (category/group/drag), auto page width, auto model locking, smart anchor restoration, Chinese input fix (Enterprise), multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
+// @version      1.7.3
+// @description  Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、阅读历史自动恢复、双向锚点快速定位、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
+// @description:en Gemini Helper: Supports conversation outline, prompt management, auto page width, model locking, reading history auto-restore, bidirectional anchor navigation, Chinese input fix, multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
 // @author       urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
 // @match        https://gemini.google.com/*
@@ -42,13 +42,13 @@
 		TAB_ORDER: 'gemini_tab_order',
 		MODEL_LOCK: 'gemini_model_lock',
 		PROMPTS_SETTINGS: 'gemini_prompts_settings',
-		ANCHOR: 'gemini_anchor_settings',
+		READING_HISTORY: 'gemini_reading_history_settings',
 	};
 
 	// 默认 Tab 顺序
 	const DEFAULT_TAB_ORDER = ['prompts', 'outline', 'settings'];
 	const DEFAULT_PROMPTS_SETTINGS = { enabled: true };
-	const DEFAULT_ANCHOR_SETTINGS = {
+	const DEFAULT_READING_HISTORY_SETTINGS = {
 		persistence: true,
 		autoRestore: false,
 		cleanupDays: 30
@@ -154,7 +154,7 @@
 			refreshOutline: '刷新大纲',
 			refreshSettings: '刷新设置',
 			refreshSettings: '刷新设置',
-			jumpToAnchor: '跳转到上次阅读位置',
+			jumpToAnchor: '返回跳转前位置',
 			anchorUpdated: '锚点已更新',
 			// 大纲高级工具栏
 			outlineScrollBottom: '滚动到底部',
@@ -172,18 +172,18 @@
 			tabOrderDesc: '调整面板 Tab 的显示顺序',
 			moveUp: '上移',
 			moveDown: '下移',
-			// 锚点设置
-			anchorSettings: '锚点设置',
-			anchorPersistence: '持久化存储',
-			anchorPersistenceDesc: '记住每个会话的阅读位置',
-			anchorAutoRestore: '自动恢复阅读进度',
-			anchorAutoRestoreDesc: '打开页面时自动跳转到上次位置',
-			anchorCleanup: '过期数据清理',
-			anchorCleanupDesc: '自动清理超过指定天数的记录 (-1 为永不清理)',
+			// 阅读历史设置
+			readingHistorySettings: '阅读历史',
+			readingHistoryPersistence: '启用阅读历史',
+			readingHistoryPersistenceDesc: '自动记录阅读位置，下次打开时恢复',
+			autoRestore: '自动跳转',
+			autoRestoreDesc: '打开页面时自动跳转到上次位置',
+			readingHistoryCleanup: '历史保留时间',
+			readingHistoryCleanupDesc: '只保留最近几天的阅读进度 (-1 为永久)',
 			daysSuffix: '天',
-			cleanupInfinite: '永不清理',
+			cleanupInfinite: '永久',
 			restoredPosition: '已恢复上次阅读位置',
-			cleanupDone: '已清理过期锚点数据'
+			cleanupDone: '已清理过期数据'
 		},
 		'zh-TW': {
 			panelTitle: 'Gemini 助手',
@@ -286,7 +286,19 @@
 			tabOrderSettings: '介面排版',
 			tabOrderDesc: '調整面板 Tab 的顯示順序',
 			moveUp: '上移',
-			moveDown: '下移'
+			moveDown: '下移',
+			// 阅读历史设置
+			readingHistorySettings: '閱讀歷史',
+			readingHistoryPersistence: '啟用閱讀歷史',
+			readingHistoryPersistenceDesc: '自動記錄閱讀位置，下次開啟時恢復',
+			autoRestore: '自動跳轉',
+			autoRestoreDesc: '開啟頁面時自動跳轉到上次位置',
+			readingHistoryCleanup: '歷史保留時間',
+			readingHistoryCleanupDesc: '只保留最近幾天的閱讀進度 (-1 為永久)',
+			daysSuffix: '天',
+			cleanupInfinite: '永久',
+			restoredPosition: '已恢復上次閱讀位置',
+			cleanupDone: '已清理過期數據'
 		},
 		'en': {
 			panelTitle: 'Gemini Helper',
@@ -389,7 +401,19 @@
 			tabOrderSettings: 'Interface Layout',
 			tabOrderDesc: 'Adjust the display order of panel tabs',
 			moveUp: 'Move Up',
-			moveDown: 'Move Down'
+			moveDown: 'Move Down',
+			// Reading History Settings
+			anchorSettings: 'Reading History',
+			anchorPersistence: 'Enable Reading History',
+			anchorPersistenceDesc: 'Automatically remember reading position',
+			anchorAutoRestore: 'Auto-Resume',
+			anchorAutoRestoreDesc: 'Jump to last position on load',
+			anchorCleanup: 'Retention Period',
+			anchorCleanupDesc: 'Keep reading progress for days (-1 for infinite)',
+			daysSuffix: 'Days',
+			cleanupInfinite: 'Infinite',
+			restoredPosition: 'Resumed last position',
+			cleanupDone: 'Expired data cleaned'
 		}
 	};
 
@@ -662,7 +686,9 @@
 				} else {
 					const globalIndex = candidates.indexOf(bestElement);
 					if (globalIndex !== -1) {
-						return { type: 'index', index: globalIndex, offset: offset };
+						// 增强：记录文本指纹，防止历史加载导致索引偏移
+						const textSignature = (bestElement.textContent || '').trim().substring(0, 50);
+						return { type: 'index', index: globalIndex, offset: offset, textSignature: textSignature };
 					}
 				}
 			}
@@ -685,7 +711,29 @@
 			} else if (anchorData.type === 'index' && typeof anchorData.index === 'number') {
 				const selectors = this.getChatContentSelectors();
 				const candidates = Array.from(container.querySelectorAll(selectors.join(', ')));
-				targetElement = candidates[anchorData.index];
+
+				// 优先尝试使用索引
+				if (candidates[anchorData.index]) {
+					targetElement = candidates[anchorData.index];
+
+					// 如果有文本指纹，进行校验
+					if (anchorData.textSignature) {
+						const currentText = (targetElement.textContent || '').trim().substring(0, 50);
+						// 如果文本不匹配，说明索引可能偏移了（例如加载了历史消息）
+						// 此时尝试全列表搜索
+						if (currentText !== anchorData.textSignature) {
+							// console.log('Anchor index mismatch, searching by text signature...');
+							const found = candidates.find(c => (c.textContent || '').trim().substring(0, 50) === anchorData.textSignature);
+							if (found) targetElement = found;
+						}
+					}
+				} else {
+					// 索引越界（可能消息被删了？），尝试文本搜索
+					if (anchorData.textSignature) {
+						const found = candidates.find(c => (c.textContent || '').trim().substring(0, 50) === anchorData.textSignature);
+						if (found) targetElement = found;
+					}
+				}
 			}
 
 			if (targetElement) {
@@ -2036,6 +2084,369 @@
 	// ==================== 核心管理类 ====================
 
 	/**
+	 * 滚动管理器
+	 * 抽象不同站点的滚动容器差异
+	 */
+	class ScrollManager {
+		constructor(siteAdapter) {
+			this.siteAdapter = siteAdapter;
+		}
+
+		get container() {
+			// 确保获取的是最新的容器实例
+			return this.siteAdapter.getScrollContainer();
+		}
+
+		get scrollTop() {
+			return this.container ? this.container.scrollTop : 0;
+		}
+
+		set scrollTop(val) {
+			if (this.container) this.container.scrollTop = val;
+		}
+
+		get scrollHeight() {
+			return this.container ? this.container.scrollHeight : 0;
+		}
+
+		get clientHeight() {
+			return this.container ? this.container.clientHeight : 0;
+		}
+
+		scrollTo(options) {
+			if (this.container) {
+				try {
+					this.container.scrollTo(options);
+				} catch (e) {
+					// 兼容部分旧浏览器不支持 options 对象
+					if (options.top !== undefined) {
+						this.container.scrollTop = options.top;
+					}
+				}
+			}
+		}
+
+		// 检查是否在底部区域
+		isAtBottom(threshold = 100) {
+			const c = this.container;
+			if (!c) return false;
+			return c.scrollHeight - c.scrollTop - c.clientHeight <= threshold;
+		}
+	}
+
+	/**
+	 * 阅读进度管理器 (Auto-Resume)
+	 * 负责自动保存和恢复阅读位置
+	 */
+	class ReadingProgressManager {
+		constructor(settings, scrollManager, i18nFunc) {
+			this.settings = settings; // 引用传递，保持最新
+			this.scrollManager = scrollManager;
+			this.t = i18nFunc;
+			this.lastSaveTime = 0;
+			this.isRecording = false; // 默认为 false，通过 startRecording 开启
+		}
+
+		startRecording() {
+			if (this.isRecording) return;
+			this.isRecording = true;
+
+			this.scrollHandler = () => this.handleScroll();
+
+			// 监听真正的滚动容器（各站点通过 SiteAdapter 适配）
+			const container = this.scrollManager.container;
+			if (container) {
+				container.addEventListener('scroll', this.scrollHandler, { passive: true });
+				this.listeningContainer = container; // 保存引用以便移除
+			}
+			// 同时保留 window 监听作为兜底（某些站点可能用 window 滚动）
+			window.addEventListener('scroll', this.scrollHandler, { capture: true, passive: true });
+		}
+
+		stopRecording() {
+			if (!this.isRecording) return;
+			this.isRecording = false;
+			if (this.scrollHandler) {
+				// 移除容器监听
+				if (this.listeningContainer) {
+					this.listeningContainer.removeEventListener('scroll', this.scrollHandler);
+					this.listeningContainer = null;
+				}
+				// 移除 window 监听
+				window.removeEventListener('scroll', this.scrollHandler, { capture: true });
+				this.scrollHandler = null;
+			}
+		}
+
+		handleScroll() {
+			if (!this.settings || !this.settings.readingHistory || !this.settings.readingHistory.persistence) return;
+
+			const now = Date.now();
+			if (now - this.lastSaveTime > 1000) {
+				this.saveProgress();
+				this.lastSaveTime = now;
+			}
+		}
+
+		getKey() {
+			// 使用 siteAdapter 提供的统一 Session ID，保持 Key 简洁且与其他功能逻辑一致
+			const sessionId = this.scrollManager.siteAdapter.getSessionId();
+			const siteId = this.scrollManager.siteAdapter.getSiteId();
+			return `${siteId}:${sessionId}`;
+		}
+
+		saveProgress() {
+			if (!this.isRecording) return;
+			const scrollTop = this.scrollManager.scrollTop;
+			if (scrollTop < 0) return;
+
+			const key = this.getKey();
+
+			// 获取基于内容的锚点信息 (增强准确性)
+			let anchorInfo = {};
+			try {
+				if (this.scrollManager.siteAdapter.getVisibleAnchorElement) {
+					anchorInfo = this.scrollManager.siteAdapter.getVisibleAnchorElement();
+				}
+			} catch (err) {
+				// console.error('Error getting visible anchor element:', err);
+			}
+
+			const data = {
+				top: scrollTop,
+				ts: Date.now(),
+				...((anchorInfo) ? anchorInfo : {})
+			};
+
+			const allData = GM_getValue('gemini_reading_progress', {});
+			allData[key] = data;
+			GM_setValue('gemini_reading_progress', allData);
+		}
+
+		/**
+		 * 恢复阅读进度 (包含智能回溯逻辑)
+		 * @param {Function} showToastFunc - 用于显示进度提示的回调
+		 * @returns {Promise<boolean>} 是否恢复成功
+		 */
+		async restoreProgress(showToastFunc) {
+			if (!this.settings.readingHistory.autoRestore) return false;
+
+			const key = this.getKey();
+			const allData = GM_getValue('gemini_reading_progress', {});
+			const data = allData[key];
+
+			if (!data) return false;
+
+			// scrollManager.container 是 getter，每次访问自动获取最新容器
+			const scrollContainer = this.scrollManager.container;
+			if (!scrollContainer) return false;
+
+			// 智能回溯恢复逻辑
+			return new Promise((resolve) => {
+				let historyLoadAttempts = 0;
+				const maxHistoryLoadAttempts = 5;
+				let lastScrollHeight = 0; // 用于检测历史是否加载成功
+
+				const tryScroll = (attempts = 0) => {
+					if (attempts > 30) {
+						// 超过最大尝试次数，使用像素位置作为最终降级
+						if (data.top !== undefined && scrollContainer.scrollHeight >= data.top) {
+							this.scrollManager.scrollTo({ top: data.top, behavior: 'instant' });
+							this.restoredTop = data.top;
+							resolve(true);
+						} else {
+							resolve(false);
+						}
+						return;
+					}
+
+					// 1. 尝试基于内容的精准恢复
+					let contentRestored = false;
+					try {
+						if (data.type && this.scrollManager.siteAdapter.restoreScroll) {
+							contentRestored = this.scrollManager.siteAdapter.restoreScroll(data);
+						}
+					} catch (err) { console.error('Error restoring content anchor:', err); }
+
+					if (contentRestored) {
+						// 内容恢复成功
+						this.restoredTop = scrollContainer.scrollTop;
+						resolve(true);
+						return;
+					}
+
+					// 2. 内容恢复失败，需要尝试加载更多历史
+					const currentScrollHeight = scrollContainer.scrollHeight;
+					const heightChanged = currentScrollHeight !== lastScrollHeight;
+					lastScrollHeight = currentScrollHeight;
+
+					// 判断是否需要/可以继续加载历史
+					const hasContentAnchor = data.type && (data.textSignature || data.selector);
+					const needsMoreHistory = hasContentAnchor || (data.top !== undefined && currentScrollHeight < data.top);
+					const canLoadMore = historyLoadAttempts < maxHistoryLoadAttempts;
+
+					if (needsMoreHistory && canLoadMore) {
+						// 触发历史加载
+						if (showToastFunc) showToastFunc(`正在加载历史会话 (${historyLoadAttempts + 1}/${maxHistoryLoadAttempts})...`);
+
+						// 滚动到顶部触发懒加载
+						this.scrollManager.scrollTo({ top: 0, behavior: 'instant' });
+
+						historyLoadAttempts++;
+						// 等待页面加载新内容
+						setTimeout(() => tryScroll(attempts + 1), 2000);
+					} else if (data.top !== undefined && currentScrollHeight >= data.top) {
+						// 没有内容锚点或已用尽回溯机会，但像素位置可用
+						this.scrollManager.scrollTo({ top: data.top, behavior: 'instant' });
+						this.restoredTop = data.top;
+						resolve(true);
+					} else if (!canLoadMore && hasContentAnchor) {
+						// 回溯机会用尽但仍有内容锚点，尝试最后一次快速重试
+						setTimeout(() => tryScroll(attempts + 1), 500);
+					} else {
+						// 无法恢复
+						resolve(false);
+					}
+				};
+
+				tryScroll();
+			});
+		}
+
+		// 清理逻辑
+		cleanup() {
+			const lastRun = GM_getValue('gemini_progress_cleanup_last_run', 0);
+			const now = Date.now();
+			if (now - lastRun < 24 * 60 * 60 * 1000) return; // 每天一次
+
+			const days = this.settings.readingHistory.cleanupDays || 7;
+			if (days === -1) return;
+
+			const expireTime = days * 24 * 60 * 60 * 1000;
+			const allData = GM_getValue('gemini_reading_progress', {});
+			let changed = false;
+
+			Object.keys(allData).forEach(k => {
+				if (now - allData[k].ts > expireTime) {
+					delete allData[k];
+					changed = true;
+				}
+			});
+
+			if (changed) GM_setValue('gemini_reading_progress', allData);
+			GM_setValue('gemini_progress_cleanup_last_run', now);
+		}
+	}
+
+	/**
+	 * 智能锚点管理器 (Smart Session Anchor)
+	 * 负责会话内的临时跳转锚点
+	 */
+	/**
+	 * 智能锚点管理器 (Smart Session Anchor)
+	 * 负责会话内的临时跳转锚点
+	 */
+	class AnchorManager {
+		constructor(scrollManager, i18nFunc) {
+			this.scrollManager = scrollManager;
+			this.t = i18nFunc;
+			// 双位置交换：类似 git switch -
+			this.previousAnchor = null; // 上一个位置（跳转前）
+			this.currentAnchor = null;  // 当前锚点（跳转目标）
+			this.onAnchorChange = null; // UI 更新回调
+		}
+
+		// 设置回调
+		bindUI(callback) {
+			this.onAnchorChange = callback;
+		}
+
+		// 获取当前位置的完整锚点信息
+		_captureCurrentPosition() {
+			let anchorInfo = {};
+			try {
+				if (this.scrollManager.siteAdapter.getVisibleAnchorElement) {
+					anchorInfo = this.scrollManager.siteAdapter.getVisibleAnchorElement();
+				}
+			} catch (err) { }
+
+			return {
+				top: this.scrollManager.scrollTop,
+				ts: Date.now(),
+				...anchorInfo
+			};
+		}
+
+		// 记录锚点 (跳转前调用，保存当前位置)
+		setAnchor(top) {
+			let anchorInfo = {};
+			try {
+				if (this.scrollManager.siteAdapter.getVisibleAnchorElement) {
+					anchorInfo = this.scrollManager.siteAdapter.getVisibleAnchorElement();
+				}
+			} catch (err) { }
+
+			// 保存当前位置为"上一个锚点"
+			this.previousAnchor = {
+				top: top,
+				ts: Date.now(),
+				...anchorInfo
+			};
+
+			if (this.onAnchorChange) this.onAnchorChange(true);
+		}
+
+		// 跳转到锚点（同时实现位置交换，支持来回跳转）
+		backToAnchor() {
+			if (!this.previousAnchor) return false;
+
+			const scrollContainer = this.scrollManager.container;
+			if (!scrollContainer) return false;
+
+			// 1. 先保存当前位置（跳转后可以再跳回来）
+			const currentPos = this._captureCurrentPosition();
+
+			// 2. 尝试跳转到 previousAnchor
+			let jumped = false;
+
+			// 2.1 尝试基于内容的精准恢复
+			try {
+				if (this.previousAnchor.type && this.scrollManager.siteAdapter.restoreScroll) {
+					jumped = this.scrollManager.siteAdapter.restoreScroll(this.previousAnchor);
+				}
+			} catch (err) { console.error('Error restoring anchor:', err); }
+
+			// 2.2 降级：像素位置
+			if (!jumped && this.previousAnchor.top !== undefined) {
+				this.scrollManager.scrollTo({ top: this.previousAnchor.top, behavior: 'smooth' });
+				jumped = true;
+			}
+
+			if (jumped) {
+				// 3. 交换位置：实现来回跳转
+				// 原来的 previousAnchor 变成 currentAnchor（备用）
+				// 刚才的位置变成新的 previousAnchor（下次跳回去）
+				this.currentAnchor = this.previousAnchor;
+				this.previousAnchor = currentPos;
+			}
+
+			return jumped;
+		}
+
+		// 检查是否有锚点
+		hasAnchor() {
+			return this.previousAnchor !== null;
+		}
+
+		// 重置锚点（用于会话切换）
+		reset() {
+			this.previousAnchor = null;
+			this.currentAnchor = null;
+			if (this.onAnchorChange) this.onAnchorChange(false);
+		}
+	}
+
+	/**
 	 * 通用大纲管理器
 	 * 负责大纲的 UI 渲染、交互和状态管理
 	 * 数据源由外部适配器提供
@@ -2045,6 +2456,7 @@
 			this.container = config.container;
 			this.settings = config.settings;
 			this.onSettingsChange = config.onSettingsChange;
+			this.onJumpBefore = config.onJumpBefore; // 跳转前回调，用于保存锚点
 			this.t = config.i18n || ((k) => k);
 
 			this.state = {
@@ -2635,6 +3047,10 @@
 					}
 
 					if (targetElement && targetElement.isConnected) {
+						// 跳转前回调（用于保存当前位置为锚点）
+						if (this.onJumpBefore) {
+							this.onJumpBefore();
+						}
 						// 传入 __bypassLock: true 以绕过 ScrollLockManager 的拦截
 						// 恢复 behavior: 'smooth'，因为我们已经处理了元素重新查找，应该可以兼容
 						targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', __bypassLock: true });
@@ -2867,6 +3283,14 @@
 				this.currentTab = availableTab || 'settings';
 			}
 
+			// 初始化核心功能管理器
+			this.scrollManager = new ScrollManager(this.siteAdapter);
+			this.readingProgressManager = new ReadingProgressManager(this.settings, this.scrollManager, (k) => this.t(k));
+			this.anchorManager = new AnchorManager(this.scrollManager, (k) => this.t(k));
+
+			// 绑定锚点状态变化更新 UI
+			this.anchorManager.bindUI((hasAnchor) => this.updateAnchorButtonState(hasAnchor));
+
 			// 初始化滚动锁定管理器
 			this.scrollLockManager = new ScrollLockManager(this.siteAdapter);
 			// 根据设置初始化状态，前提是当前站点支持
@@ -2935,7 +3359,7 @@
 				tabOrder: tabOrder,
 				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
 				showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
-				anchor: { ...DEFAULT_ANCHOR_SETTINGS, ...GM_getValue(SETTING_KEYS.ANCHOR, {}) }
+				readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) }
 			};
 		}
 
@@ -2958,8 +3382,8 @@
 			GM_setValue(SETTING_KEYS.TAB_ORDER, this.settings.tabOrder);
 			// 保存防滚动设置
 			GM_setValue('gemini_prevent_auto_scroll', this.settings.preventAutoScroll);
-			// 保存锚点设置
-			GM_setValue(SETTING_KEYS.ANCHOR, this.settings.anchor);
+			// 保存阅读历史设置
+			GM_setValue(SETTING_KEYS.READING_HISTORY, this.settings.readingHistory);
 		}
 
 		addPrompt(prompt) {
@@ -2998,6 +3422,8 @@
 			this.createStyles();
 			this.createUI();
 			this.bindEvents();
+			// 初始化锚点按钮状态（初始时没有锚点，应置灰）
+			this.updateAnchorButtonState(false);
 			this.siteAdapter.findTextarea();
 			// 对于 Gemini Business，根据设置决定是否在初始化时插入零宽字符
 			const currentSiteId = this.siteAdapter.getSiteId();
@@ -3030,11 +3456,11 @@
 
 			this.siteAdapter.afterPropertiesSet(adapterOptions);
 			// 初始化时执行锚点恢复和清理
-			if (this.settings.anchor.persistence) {
+			if (this.settings.readingHistory.persistence) {
 				// 延迟触发以确保页面加载完成
 				setTimeout(() => {
-					this.restoreAnchorPosition();
-					this.cleanupAnchorData();
+					this.restoreReadingProgress();
+					this.cleanupReadingHistory();
 				}, 2000);
 			}
 
@@ -3454,7 +3880,22 @@
 
 			const controls = createElement('div', { className: 'prompt-panel-controls' });
 			const refreshBtn = createElement('button', { className: 'prompt-panel-btn', id: 'refresh-prompts', title: this.t('refreshPrompts') }, '⟳');
+			refreshBtn.addEventListener('click', () => {
+				refreshBtn.classList.add('loading');
+				// 根据当前 Tab 智能刷新
+				if (this.currentTab === 'outline') {
+					this.refreshOutline();
+					this.showToast(this.t('refreshed'));
+				} else if (this.currentTab === 'prompts') {
+					this.refreshPromptList();
+					this.showToast(this.t('refreshed'));
+				} else {
+					this.showToast(this.t('refreshed'));
+				}
+				setTimeout(() => refreshBtn.classList.remove('loading'), 500);
+			});
 			const toggleBtn = createElement('button', { className: 'prompt-panel-btn', id: 'toggle-panel', title: this.t('collapse') }, '−');
+			// 注意：toggleBtn 的事件监听在 bindEvents 中统一绑定，避免重复绑定
 			controls.appendChild(refreshBtn);
 			controls.appendChild(toggleBtn);
 
@@ -3541,6 +3982,7 @@
 				container: outlineContent,
 				settings: this.settings,
 				onSettingsChange: () => this.saveSettings(),
+				onJumpBefore: () => this.anchorManager.setAnchor(this.scrollManager.scrollTop),
 				i18n: (k) => this.t(k)
 			});
 
@@ -3574,8 +4016,8 @@
 			const quickAnchor = createElement('button', {
 				className: 'quick-prompt-btn',
 				id: 'quick-anchor-btn',
-				title: this.t('jumpToAnchor'),
-				style: this.settings.showCollapsedAnchor ? 'display: flex;' : 'display: none;'
+				title: '暂无锚点',
+				style: (this.settings.showCollapsedAnchor ? 'display: flex;' : 'display: none;') + ' opacity: 0.4; cursor: default;'
 			}, '⚓');
 			const quickScrollBottom = createElement('button', { className: 'quick-prompt-btn', title: this.t('scrollBottom') }, '⬇');
 
@@ -3596,7 +4038,12 @@
 			scrollTopBtn.appendChild(createElement('span', {}, '⬆'));
 			scrollTopBtn.appendChild(createElement('span', {}, this.t('scrollTop')));
 
-			const anchorBtn = createElement('button', { className: 'scroll-nav-btn icon-only', id: 'scroll-anchor-btn', title: this.t('jumpToAnchor') });
+			const anchorBtn = createElement('button', {
+				className: 'scroll-nav-btn icon-only',
+				id: 'scroll-anchor-btn',
+				title: '暂无锚点',
+				style: 'opacity: 0.4; cursor: default;'
+			});
 			anchorBtn.appendChild(createElement('span', {}, '⚓'));
 			// anchorBtn.appendChild(createElement('span', {}, this.t('anchorPoint')));
 
@@ -3615,6 +4062,9 @@
 
 			this.refreshCategories();
 			this.refreshPromptList();
+
+			// 初始化锚点按钮状态
+			setTimeout(() => this.updateAnchorButtonState(this.anchorManager.hasAnchor()), 0);
 		}
 
 		// Tab 切换
@@ -4062,35 +4512,35 @@
 			const layoutSection = this.createCollapsibleSection(this.t('tabOrderSettings'), layoutContainer);
 			content.appendChild(layoutSection);
 
-			// 4.5 锚点设置 (新增独立版块)
+			// 4.5 阅读历史设置 (新增独立版块)
 			const anchorContainer = createElement('div', {});
 
 			// 持久化开关
 			const anchorPersistenceItem = createElement('div', { className: 'setting-item' });
 			const anchorPersistenceInfo = createElement('div', { className: 'setting-item-info' });
-			anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('anchorPersistence')));
-			anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('anchorPersistenceDesc')));
+			anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('readingHistoryPersistence')));
+			anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('readingHistoryPersistenceDesc')));
 
 			const anchorPersistenceToggle = createElement('div', {
-				className: 'setting-toggle' + (this.settings.anchor.persistence ? ' active' : ''),
+				className: 'setting-toggle' + (this.settings.readingHistory.persistence ? ' active' : ''),
 				id: 'toggle-anchor-persistence'
 			});
 
 			// 自动恢复开关
 			const anchorAutoRestoreItem = createElement('div', { className: 'setting-item' });
 			const anchorAutoRestoreInfo = createElement('div', { className: 'setting-item-info' });
-			anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('anchorAutoRestore')));
-			anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('anchorAutoRestoreDesc')));
+			anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('autoRestore')));
+			anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('autoRestoreDesc')));
 			const anchorAutoRestoreToggle = createElement('div', {
-				className: 'setting-toggle' + (this.settings.anchor.autoRestore ? ' active' : ''),
+				className: 'setting-toggle' + (this.settings.readingHistory.autoRestore ? ' active' : ''),
 				id: 'toggle-anchor-auto-restore'
 			});
 
 			// 清理时间设置
 			const anchorCleanupItem = createElement('div', { className: 'setting-item' });
 			const anchorCleanupInfo = createElement('div', { className: 'setting-item-info' });
-			anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('anchorCleanup')));
-			anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('anchorCleanupDesc')));
+			anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('readingHistoryCleanup')));
+			anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('readingHistoryCleanupDesc')));
 
 			const anchorCleanupControls = createElement('div', { className: 'setting-controls' });
 			const anchorCleanupInput = createElement('select', { className: 'setting-select' });
@@ -4106,7 +4556,7 @@
 			];
 			cleanupOptions.forEach(opt => {
 				const option = createElement('option', { value: opt.val }, opt.label);
-				if (this.settings.anchor.cleanupDays == opt.val) option.selected = true;
+				if (this.settings.readingHistory.cleanupDays == opt.val) option.selected = true;
 				anchorCleanupInput.appendChild(option);
 			});
 
@@ -4126,27 +4576,27 @@
 			};
 
 			// 初始化联动
-			updateDependency(this.settings.anchor.persistence);
+			updateDependency(this.settings.readingHistory.persistence);
 
 			anchorPersistenceToggle.addEventListener('click', () => {
-				this.settings.anchor.persistence = !this.settings.anchor.persistence;
-				anchorPersistenceToggle.classList.toggle('active', this.settings.anchor.persistence);
+				this.settings.readingHistory.persistence = !this.settings.readingHistory.persistence;
+				anchorPersistenceToggle.classList.toggle('active', this.settings.readingHistory.persistence);
 				this.saveSettings();
-				updateDependency(this.settings.anchor.persistence);
-				this.showToast(this.settings.anchor.persistence ? this.t('settingOn') : this.t('settingOff'));
+				updateDependency(this.settings.readingHistory.persistence);
+				this.showToast(this.settings.readingHistory.persistence ? this.t('settingOn') : this.t('settingOff'));
 			});
 
 			anchorAutoRestoreToggle.addEventListener('click', () => {
-				this.settings.anchor.autoRestore = !this.settings.anchor.autoRestore;
-				anchorAutoRestoreToggle.classList.toggle('active', this.settings.anchor.autoRestore);
+				this.settings.readingHistory.autoRestore = !this.settings.readingHistory.autoRestore;
+				anchorAutoRestoreToggle.classList.toggle('active', this.settings.readingHistory.autoRestore);
 				this.saveSettings();
-				this.showToast(this.settings.anchor.autoRestore ? this.t('settingOn') : this.t('settingOff'));
+				this.showToast(this.settings.readingHistory.autoRestore ? this.t('settingOn') : this.t('settingOff'));
 			});
 
 			anchorCleanupInput.addEventListener('change', () => {
-				this.settings.anchor.cleanupDays = parseInt(anchorCleanupInput.value);
+				this.settings.readingHistory.cleanupDays = parseInt(anchorCleanupInput.value);
 				this.saveSettings();
-				this.showToast(`${this.t('anchorCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
+				this.showToast(`${this.t('readingHistoryCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
 			});
 
 			anchorPersistenceItem.appendChild(anchorPersistenceInfo);
@@ -4163,7 +4613,7 @@
 			anchorContainer.appendChild(anchorAutoRestoreItem);
 			anchorContainer.appendChild(anchorCleanupItem);
 
-			const anchorSection = this.createCollapsibleSection(this.t('anchorSettings'), anchorContainer);
+			const anchorSection = this.createCollapsibleSection(this.t('readingHistorySettings'), anchorContainer);
 			content.appendChild(anchorSection);
 
 			// 5. 大纲详细设置 (高级配置)
@@ -4321,220 +4771,80 @@
 			}
 		}
 
-		// 获取当前会话的锚点存储键 (sessionId)
-		getAnchorKey() {
-			return this.siteAdapter.getSessionId();
-		}
 
-		// 保存锚点位置到持久化存储
-		saveAnchorPosition(scrollTop) {
-			if (!this.settings.anchor.persistence) return;
+		// ==================== Auto-Resume & Anchor Logic ====================
 
-			const key = this.getAnchorKey();
-			const allData = GM_getValue('gemini_anchor_data', {});
+		// 恢复阅读历史 (Auto-Resume)
+		async restoreReadingProgress() {
+			// 将 showToast 传给 manager 以显示加载进度
+			const success = await this.readingProgressManager.restoreProgress((msg) => this.showToast(msg));
 
-			// 获取基于内容的锚点信息
-			let anchorInfo = {};
-			try {
-				anchorInfo = this.siteAdapter.getVisibleAnchorElement();
-			} catch (err) {
-				console.error('Error getting visible anchor element:', err);
-			}
-
-			allData[key] = {
-				top: scrollTop,
-				ts: Date.now(),
-				// 扩展保存内容定位信息
-				...((anchorInfo) ? anchorInfo : {})
+			const onRestorationComplete = () => {
+				// 延迟一点开启记录，避开惯性滚动等干扰，确保后续的用户滚动能被正确记录
+				setTimeout(() => {
+					this.readingProgressManager.startRecording();
+				}, 500);
 			};
 
-			GM_setValue('gemini_anchor_data', allData);
+			if (success) {
+				// 恢复成功，获取恢复的位置设为“初始锚点”
+				const restoredTop = this.readingProgressManager.restoredTop;
+				if (restoredTop !== undefined) {
+					this.anchorManager.setAnchor(restoredTop);
+				}
+				this.showToast(this.t('restoredPosition'));
+			}
+
+			// 无论成功失败，最后都开启记录
+			onRestorationComplete();
 		}
 
-		// 恢复锚点位置
-		restoreAnchorPosition() {
-			if (!this.settings.anchor.persistence || !this.settings.anchor.autoRestore) return;
+		// 清理过期阅读历史
+		cleanupReadingHistory() {
+			this.readingProgressManager.cleanup();
+		}
 
-			const key = this.getAnchorKey();
-			const allData = GM_getValue('gemini_anchor_data', {});
-			const data = allData[key];
-
-			if (data) {
-				const scrollContainer = this.siteAdapter.getScrollContainer();
-				if (scrollContainer) {
-					let historyLoadAttempts = 0;
-					const maxHistoryLoadAttempts = 5; // 增加到 5 次
-
-					// 增加重试机制，支持历史记录加载
-					const tryScroll = (attempts = 0) => {
-						if (attempts > 25) return; // 总重试次数上限大幅增加，给予足够时间
-
-						// 1. 优先尝试基于内容的精准恢复
-						let contentRestored = false;
-						try {
-							if (data.type) {
-								contentRestored = this.siteAdapter.restoreScroll(data);
-							}
-						} catch (err) { console.error('Error restoring content anchor:', err); }
-
-						if (contentRestored) {
-							this.anchorScrollTop = scrollContainer.scrollTop;
-							this.showToast(this.t('restoredPosition'));
-							return;
-						}
-
-						// 2. 降级方案：基于像素位置恢复
-						if (data.top !== undefined) {
-							// 关键修正：如果目标是特定内容(selector/index)且还有重试机会，不要轻易满足于像素位置(可能是未加载完的)，强制继续回溯
-							const forceBacktracking = (data.type && historyLoadAttempts < maxHistoryLoadAttempts);
-
-							if (!forceBacktracking && scrollContainer.scrollHeight >= data.top) {
-								scrollContainer.scrollTo({ top: data.top, behavior: 'instant' });
-								this.anchorScrollTop = data.top;
-								this.showToast(this.t('restoredPosition'));
-							} else {
-								// 高度不够，或者需要强制回溯历史记录
-								if (historyLoadAttempts < maxHistoryLoadAttempts) {
-									// 智能回溯机制 (Smart Backtracking)
-									this.showToast(`正在回溯历史记录 (${historyLoadAttempts + 1}/${maxHistoryLoadAttempts})...`);
-
-									// 尝试触发加载：通常滚动到顶部会触发
-									// 先记录当前位置防止跳动太厉害（虽然马上要滚到0）
-									const currentPos = scrollContainer.scrollTop;
-									scrollContainer.scrollTo({ top: 0, behavior: 'instant' });
-
-									historyLoadAttempts++;
-									// 给更多时间让历史记录加载渲染 (2秒)
-									setTimeout(() => {
-										// 尝试滚回刚才的位置以免用户迷失
-										// scrollContainer.scrollTo({ top: currentPos, behavior: 'instant' }); 
-										tryScroll(attempts + 1);
-									}, 2000);
-								} else {
-									// 即使加载了历史也就这样了，或者本来就没历史了，稍后快速重试几次看是否刚好渲染完
-									setTimeout(() => tryScroll(attempts + 1), 500);
-								}
-							}
-						}
-					};
-					// 延迟一点启动，等待页面基本框架就绪
-					setTimeout(() => tryScroll(), 500);
-				}
+		// 锚点按钮点击 (Back functionality)
+		handleAnchorClick() {
+			if (this.anchorManager.hasAnchor()) {
+				this.anchorManager.backToAnchor();
+				this.showToast(this.t('jumpToAnchor'));
+			} else {
+				this.showToast('暂无阅读锚点 (点击顶部/底部按钮可自动生成)');
 			}
 		}
 
-		// 清理过期数据
-		cleanupAnchorData() {
-			if (!this.settings.anchor.persistence) return;
-
-			const lastRun = GM_getValue('gemini_anchor_cleanup_last_run', 0);
-			const now = Date.now();
-
-			// 每天运行一次
-			if (now - lastRun < 24 * 60 * 60 * 1000) return;
-
-			const cleanupDays = this.settings.anchor.cleanupDays;
-			if (cleanupDays === -1) return; // 永不清理
-
-			const expireTime = cleanupDays * 24 * 60 * 60 * 1000;
-			const allData = GM_getValue('gemini_anchor_data', {});
-			let changed = false;
-
-			Object.keys(allData).forEach(key => {
-				const item = allData[key];
-				if (now - item.ts > expireTime) {
-					delete allData[key];
-					changed = true;
+		// 更新锚点按钮状态 (UI)
+		updateAnchorButtonState(hasAnchor) {
+			[document.getElementById('quick-anchor-btn'), document.getElementById('scroll-anchor-btn')].forEach(btn => {
+				if (btn) {
+					if (hasAnchor) {
+						btn.style.opacity = '1';
+						btn.style.cursor = 'pointer';
+						btn.title = this.t('jumpToAnchor');
+					} else {
+						btn.style.opacity = '0.4';
+						btn.style.cursor = 'default';
+						btn.title = "暂无锚点";
+					}
 				}
 			});
-
-			if (changed) {
-				GM_setValue('gemini_anchor_data', allData);
-				// this.showToast(this.t('cleanupDone')); // 静默清理
-			}
-
-			GM_setValue('gemini_anchor_cleanup_last_run', now);
-		}
-
-		// 锚点跳转逻辑
-		handleAnchorClick() {
-			if (this.isScrolling) return;
-			const scrollContainer = this.siteAdapter.getScrollContainer();
-			if (!scrollContainer) return;
-
-			const currentInfo = {
-				scrollTop: scrollContainer.scrollTop,
-				scrollHeight: scrollContainer.scrollHeight,
-				clientHeight: scrollContainer.clientHeight
-			};
-
-			// 阈值：只有当距离上次记录点超过半屏高度时，才视为需要跳转
-			const threshold = currentInfo.clientHeight * 0.5;
-
-			// 如果有记录，跳转到记录点
-			// 优先尝试从内存获取，如果内存为空且开启了持久化，则尝试从存储获取
-			let targetTop = this.anchorScrollTop;
-			if (targetTop === null && this.settings.anchor.persistence) {
-				const key = this.getAnchorKey();
-				const allData = GM_getValue('gemini_anchor_data', {});
-				if (allData[key] && allData[key].top !== undefined) {
-					targetTop = allData[key].top;
-				}
-			}
-
-			if (targetTop !== null) {
-				const distance = Math.abs(currentInfo.scrollTop - targetTop);
-				// 优化逻辑：不再自动更新锚点。按钮只负责“回跳”。
-				// 如果距离很远，跳回去。
-				if (distance > threshold) {
-					this.isScrolling = true;
-					scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
-					this.anchorScrollTop = targetTop; // 更新内存状态
-					setTimeout(() => { this.isScrolling = false; }, 1000);
-					this.showToast(this.t('jumpToAnchor'));
-					return;
-				} else {
-					// 距离很近，没必要跳
-					this.showToast('已在标记位置附近');
-				}
-			} else {
-				// 无记录
-				this.showToast('暂无阅读锚点，请先点击顶部/底部按钮');
-			}
 		}
 
 		// 滚动到页面顶部
 		scrollToTop() {
-			if (this.isScrolling) return;
-			const scrollContainer = this.siteAdapter.getScrollContainer();
-			if (scrollContainer) {
-				// 自动保存当前位置为锚点
-				this.anchorScrollTop = scrollContainer.scrollTop;
-				this.saveAnchorPosition(this.anchorScrollTop);
-
-				this.isScrolling = true;
-				scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-				// 锁定 1 秒禁止操作，防止焦点漂移
-				setTimeout(() => { this.isScrolling = false; }, 1000);
-			}
+			// 点击去顶部时，自动记录当前位置为锚点
+			this.anchorManager.setAnchor(this.scrollManager.scrollTop);
+			this.scrollManager.scrollTo({ top: 0, behavior: 'smooth' });
 		}
 
 		// 滚动到页面底部
 		scrollToBottom() {
-			if (this.isScrolling) return;
-			const scrollContainer = this.siteAdapter.getScrollContainer();
-			if (scrollContainer) {
-				// 自动保存当前位置为锚点
-				this.anchorScrollTop = scrollContainer.scrollTop;
-				this.saveAnchorPosition(this.anchorScrollTop);
-				// this.showToast(this.t('anchorUpdated'));
-
-				this.isScrolling = true;
-				scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
-				// 锁定 1 秒禁止操作
-				setTimeout(() => { this.isScrolling = false; }, 1000);
-			}
+			// 点击去底部时，自动记录当前位置为锚点
+			this.anchorManager.setAnchor(this.scrollManager.scrollTop);
+			this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth' });
 		}
+
 
 		refreshCategories() {
 			const container = document.getElementById('prompt-categories');
@@ -4946,29 +5256,7 @@
 				this.showToast(this.t('cleared'));
 			});
 
-			document.getElementById('refresh-prompts')?.addEventListener('click', () => {
-				// 根据当前 Tab 智能刷新
-				if (this.currentTab === 'outline') {
-					this.refreshOutline();
-					this.showToast(this.t('refreshed'));
-				} else if (this.currentTab === 'prompts') {
-					this.refreshPromptList();
-					this.siteAdapter.findTextarea();
-					this.showToast(this.t('refreshed'));
-				} else {
-					// 设置 Tab：重新加载设置
-					this.settings = this.loadSettings();
-					this.siteAdapter.findTextarea();
-					// 重新渲染 UI 以反映新设置
-					this.createStyles();
-					this.createUI();
-					this.bindEvents();
-					this.switchTab('settings');
-					this.showToast(this.t('refreshed'));
-				}
-			});
 
-			document.getElementById('toggle-panel')?.addEventListener('click', () => this.togglePanel());
 			this.makeDraggable();
 
 
@@ -5029,12 +5317,16 @@
 				if (currentUrl !== lastUrl) {
 					lastUrl = currentUrl;
 
-					// URL 变化时，重置内存中的锚点状态，并尝试恢复新页面的锚点
-					this.anchorScrollTop = null;
+					// URL 变化时，先停止录制（防止错误覆盖新会话的持久化数据）
+					this.readingProgressManager.stopRecording();
 
-					// 给予页面渲染一点时间
+					// 重置内存中的锚点状态
+					this.anchorScrollTop = null;
+					this.anchorManager.reset();
+
+					// 给予页面渲染一点时间后尝试恢复
 					setTimeout(() => {
-						this.restoreAnchorPosition();
+						this.restoreReadingProgress();
 					}, 1500);
 				}
 			};

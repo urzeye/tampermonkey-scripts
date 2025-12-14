@@ -1,8 +1,8 @@
 # Gemini-helper
 
-> Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、智能锚点恢复、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
+> Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、阅读历史自动恢复、双向锚点快速定位、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
 
-> Gemini Helper: Supports conversation outline (search/jump/detail), prompt management (category/group/drag), auto page width, auto model locking, smart anchor restoration, Chinese input fix (Enterprise), multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
+> Gemini Helper: Supports conversation outline, prompt management, auto page width, model locking, reading history auto-restore, bidirectional anchor navigation, Chinese input fix, multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
 
 ## ✨ 功能特性
 
@@ -34,11 +34,20 @@
 - **即时生效**：调整后立即应用，无需刷新页面
 - **独立配置**：不同站点可单独设置
 
-### ⚓ 智能锚点系统
+### ⚓ 智能定位系统
 
-- **精准定位**：基于内容指纹定位，即使在懒加载或内容变化时也能精准还原阅读位置
-- **历史回溯**：自动检测并加载历史消息，解决刷新后无法跳转到高楼层对话的问题
-- **持久化记忆**：自动记录每个会话的阅读进度，并在下次打开时自动恢复
+本脚本拥有两套独立的位置记录系统：
+
+- **阅读历史 (Reading Progress)**：
+
+  - 长期“阅读进度记忆”，支持跨刷新/跨会话恢复
+  - 用户滚动时自动记录，持久化到 GM_storage
+  - 页面加载或切换会话时自动恢复
+
+- **双向锚点 (Bidirectional Anchor)**：
+  - 短期“返回点”，类似浏览器后退或 `git switch -`
+  - 点击大纲/顶部/底部按钮跳转时自动保存当前位置
+  - 支持在两个位置间来回切换
 
 ### ⚙️ 设置面板
 
@@ -86,6 +95,13 @@
 | ⬆ / ⬇ 按钮  | 跳转页面顶部/底部 |
 
 ## 📋 [更新日志](./changelog.md)
+
+### v1.7.3
+
+- ✨ **架构升级**：
+  - **阅读历史与锚点分离**：两套独立系统各司其职，功能边界更清晰
+  - **双向锚点跳转**：支持在两个位置间来回切换，类似 `git switch -`
+- 🛠 **技术优化**：滚动监听改为实际容器，修复锚点按钮初始状态
 
 ### v1.7.2
 
