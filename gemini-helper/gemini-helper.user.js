@@ -5353,6 +5353,8 @@
 						this.restoreReadingProgress();
 						// 针对 Gemini Business：切换会话后修复中文输入
 						if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
+							// 切换会话后 textarea 引用可能失效，需要重新查找
+							this.siteAdapter.findTextarea();
 							this.siteAdapter.clearTextarea();
 						}
 					}, 1500);
