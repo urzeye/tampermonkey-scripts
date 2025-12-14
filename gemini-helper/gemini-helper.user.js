@@ -3705,7 +3705,8 @@
                 .prompt-panel-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 280px; }
                 .prompt-panel-content.hidden { display: none; }
                 /* 设置面板样式 - 合并优化 */
-                .settings-content { padding: 16px; overflow-y: auto; flex: 1; }
+                .settings-content { padding: 16px; overflow-y: auto; flex: 1; scrollbar-width: none; -ms-overflow-style: none; }
+                .settings-content::-webkit-scrollbar { display: none; }
                 .settings-section { margin-bottom: 24px; }
                 .settings-section-title {
                     font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 8px;
