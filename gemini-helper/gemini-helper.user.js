@@ -5,6 +5,7 @@
 // @description  Gemini 助手：支持对话大纲（搜索/跳转/详情）、提示词管理（分类/分组/拖拽）、自动加宽页面、模型自动锁定、阅读历史自动恢复、双向锚点快速定位、中文输入修复（企业版）、多语言支持，智能适配 Gemini 标准版/企业版/Genspark
 // @description:en Gemini Helper: Supports conversation outline, prompt management, auto page width, model locking, reading history auto-restore, bidirectional anchor navigation, Chinese input fix, multi-language support, smart adaptation for Gemini Standard/Enterprise/Genspark
 // @author       urzeye
+// @homepage     https://github.com/urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
 // @match        https://gemini.google.com/*
 // @match        https://business.gemini.google/*
