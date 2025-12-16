@@ -4053,6 +4053,7 @@
 			this.prompts = this.prompts.filter(p => p.id !== id);
 			this.savePrompts();
 			this.refreshPromptList();
+			this.refreshCategories();
 		}
 
 		getCategories() {
