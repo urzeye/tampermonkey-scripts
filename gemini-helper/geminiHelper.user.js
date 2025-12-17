@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.8.1
+// @version      1.8.2
 // @description  Gemini 助手：支持对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版/Genspark
 // @description:en Gemini Helper: Supports outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart adaptation for Gemini Standard/Enterprise/Genspark
 // @author       urzeye
@@ -21,6 +21,7 @@
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
+// @require      https://update.greasyfork.org/scripts/559176/1715343/domToolkit.js
 // @license      MIT
 // @downloadURL https://update.greasyfork.org/scripts/558318/gemini-helper.user.js
 // @updateURL https://update.greasyfork.org/scripts/558318/gemini-helper.meta.js
@@ -796,62 +797,16 @@
 		 * @returns {HTMLElement}
 		 */
 		getScrollContainer() {
-			// 1. 优先查找 Shadow DOM 中的滚动容器
-			const scrollContainerFromShadow = this.findScrollContainerInShadowDOM(document);
-			if (scrollContainerFromShadow) {
-				return scrollContainerFromShadow;
-			}
-
-			// 2. 尝试查找常见的滚动容器
-			const selectors = [
-				'.chat-mode-scroller',
-				'main',
-				'[role="main"]',
-				'.conversation-container',
-				'.chat-container'
-			];
-
-			for (const selector of selectors) {
-				const el = document.querySelector(selector);
-				if (el && el.scrollHeight > el.clientHeight) {
-					return el;
-				}
-			}
-
-			// 3. 回退到 document.documentElement 或 body
-			if (document.documentElement.scrollHeight > document.documentElement.clientHeight) {
-				return document.documentElement;
-			}
-			return document.body;
-		}
-
-		/**
-		 * 在 Shadow DOM 中递归查找滚动容器
-		 * @param {Node} root
-		 * @param {number} depth
-		 * @returns {HTMLElement|null}
-		 */
-		findScrollContainerInShadowDOM(root, depth = 0) {
-			if (depth > 10) return null;
-
-			const allElements = root.querySelectorAll('*');
-			for (const el of allElements) {
-				// 检查是否是可滚动元素
-				if (el.scrollHeight > el.clientHeight + 100) {
-					const style = window.getComputedStyle(el);
-					if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
-						style.overflow === 'auto' || style.overflow === 'scroll') {
-						return el;
-					}
-				}
-
-				// 递归检查 Shadow DOM
-				if (el.shadowRoot) {
-					const found = this.findScrollContainerInShadowDOM(el.shadowRoot, depth + 1);
-					if (found) return found;
-				}
-			}
-			return null;
+			// 使用 DOMToolkit 查找滚动容器，传入站点特定选择器
+			return DOMToolkit.findScrollContainer({
+				selectors: [
+					'.chat-mode-scroller',
+					'main',
+					'[role="main"]',
+					'.conversation-container',
+					'.chat-container'
+				]
+			});
 		}
 
 
@@ -1189,14 +1144,8 @@
 		 * @returns {Element|null}
 		 */
 		findElementBySelectors(selectors) {
-			// 1. 尝试全局直接查找
-			for (const selector of selectors) {
-				const el = document.querySelector(selector);
-				if (el) return el;
-			}
-
-			// 2. 深度 Shadow DOM 查找
-			return this.findInShadowRecursive(document, selectors);
+			// 使用 DOMToolkit 进行 Shadow DOM 穿透查找
+			return DOMToolkit.query(selectors, { shadow: true });
 		}
 
 		/**
@@ -1205,65 +1154,8 @@
 		 * @returns {Element[]}
 		 */
 		findAllElementsBySelector(selector) {
-			const items = [];
-
-			// 1. 尝试全局直接查找
-			const globalItems = document.querySelectorAll(selector);
-			if (globalItems.length > 0) {
-				return Array.from(globalItems);
-			}
-
-			// 2. 深度 Shadow DOM 查找
-			this.collectElementsInShadow(document, selector, items);
-			return items;
-		}
-
-		/**
-		 * 在 Shadow DOM 中递归查找元素（返回第一个匹配）
-		 */
-		findInShadowRecursive(root, selectors, depth = 0) {
-			if (depth > 15) return null;
-
-			if (root !== document) {
-				for (const selector of selectors) {
-					try {
-						const el = root.querySelector(selector);
-						if (el) return el;
-					} catch (e) { }
-				}
-			}
-
-			const allElements = root.querySelectorAll('*');
-			for (const el of allElements) {
-				if (el.shadowRoot) {
-					const found = this.findInShadowRecursive(el.shadowRoot, selectors, depth + 1);
-					if (found) return found;
-				}
-			}
-			return null;
-		}
-
-		/**
-		 * 在 Shadow DOM 中递归收集所有匹配元素
-		 */
-		collectElementsInShadow(root, selector, results, depth = 0) {
-			if (depth > 15) return;
-
-			if (root !== document) {
-				try {
-					const els = root.querySelectorAll(selector);
-					for (const el of els) {
-						results.push(el);
-					}
-				} catch (e) { }
-			}
-
-			const allElements = root.querySelectorAll('*');
-			for (const el of allElements) {
-				if (el.shadowRoot) {
-					this.collectElementsInShadow(el.shadowRoot, selector, results, depth + 1);
-				}
-			}
+			// 使用 DOMToolkit 进行 Shadow DOM 穿透查找（返回所有匹配）
+			return DOMToolkit.query(selector, { all: true, shadow: true });
 		}
 	}
 
@@ -1606,43 +1498,18 @@
 		}
 
 		findTextarea() {
-			// 优先在 Shadow DOM 中查找
-			const element = this.findInShadowDOM(document);
+			// 使用 DOMToolkit.query + filter 在 Shadow DOM 中查找
+			// filter 参数实现了 isValidTextarea 的验证逻辑
+			const element = DOMToolkit.query(this.getTextareaSelectors(), {
+				shadow: true,
+				filter: (el) => this.isValidTextarea(el)
+			});
+
 			if (element) {
 				this.textarea = element;
 				return element;
 			}
 			return super.findTextarea();
-		}
-
-		findInShadowDOM(root, depth = 0) {
-			if (depth > 15) return null;
-
-			// 只在 Shadow Root 中搜索选择器（跳过主文档以避免匹配脚本 UI）
-			if (root !== document) {
-				for (const selector of this.getTextareaSelectors()) {
-					try {
-						const elements = root.querySelectorAll(selector);
-						for (const element of elements) {
-							if (this.isValidTextarea(element)) {
-								return element;
-							}
-						}
-					} catch (e) {
-						// 某些选择器可能在 Shadow DOM 中不支持
-					}
-				}
-			}
-
-			// 在所有 Shadow Root 中递归搜索
-			const allElements = root.querySelectorAll('*');
-			for (const el of allElements) {
-				if (el.shadowRoot) {
-					const found = this.findInShadowDOM(el.shadowRoot, depth + 1);
-					if (found) return found;
-				}
-			}
-			return null;
 		}
 
 		insertPrompt(content) {
@@ -2298,27 +2165,14 @@
 
 	// ==================== 核心逻辑 ====================
 
-	// HTML 创建函数
+	// HTML 创建函数 (使用 DOMToolkit)
 	function createElement(tag, properties = {}, textContent = '') {
-		const element = document.createElement(tag);
-		Object.keys(properties).forEach(key => {
-			if (key === 'className') {
-				element.className = properties[key];
-			} else if (key === 'style') {
-				element.setAttribute('style', properties[key]);
-			} else {
-				element.setAttribute(key, properties[key]);
-			}
-		});
-		if (textContent) element.textContent = textContent;
-		return element;
+		return DOMToolkit.create(tag, properties, textContent);
 	}
 
-	// 清空元素内容
+	// 清空元素内容 (使用 DOMToolkit)
 	function clearElement(element) {
-		while (element.firstChild) {
-			element.removeChild(element.firstChild);
-		}
+		DOMToolkit.clear(element);
 	}
 
 	/**
@@ -2424,65 +2278,33 @@
 		injectToAllShadows(css) {
 			if (!document.body) return;
 
-			const walk = (root) => {
-				// 如果是 Element 且有 shadowRoot，注入样式
-				if (root.shadowRoot) {
-					this.injectToShadowRoot(root.shadowRoot, css);
-					walk(root.shadowRoot); // 递归遍历 Shadow DOM 内部
+			const siteAdapter = this.siteAdapter;
+			const processedShadowRoots = this.processedShadowRoots;
+
+			// 使用 DOMToolkit.walkShadowRoots 遍历所有 Shadow Root
+			DOMToolkit.walkShadowRoots((shadowRoot, host) => {
+				// 检查是否应该注入到该 Shadow DOM（通过 Adapter 过滤，例如排除侧边栏）
+				if (host && !siteAdapter.shouldInjectIntoShadow(host)) {
+					return;
 				}
 
-				// 遍历子节点
-				const children = root.children || root.childNodes; // 兼容 ShadowRoot 和 Element
-				for (let i = 0; i < children.length; i++) {
-					walk(children[i]);
-				}
-			};
-
-			walk(document.body);
-		}
-
-		injectToShadowRoot(shadowRoot, css) {
-			// 检查是否应该注入到该 Shadow DOM（通过 Adapter 过滤，例如排除侧边栏）
-			if (shadowRoot.host && !this.siteAdapter.shouldInjectIntoShadow(shadowRoot.host)) {
-				return;
-			}
-
-			if (this.processedShadowRoots.has(shadowRoot)) {
-				// 即使已处理过，也要检查样式内容是否需要更新（如果是配置变更）
-				const existingStyle = shadowRoot.getElementById('gemini-helper-width-shadow-style');
-				if (existingStyle && existingStyle.textContent !== css) {
-					existingStyle.textContent = css;
-				}
-				return;
-			}
-
-			try {
-				const style = document.createElement('style');
-				style.id = 'gemini-helper-width-shadow-style';
-				style.textContent = css;
-				shadowRoot.appendChild(style);
-				this.processedShadowRoots.add(shadowRoot);
-			} catch (e) {
-				// 忽略 closed shadow root 错误（虽然我们通常拿不到 closed 的引用）
-			}
+				// 使用 DOMToolkit.cssToShadow 注入样式
+				DOMToolkit.cssToShadow(shadowRoot, css, 'gemini-helper-width-shadow-style');
+				processedShadowRoots.add(shadowRoot);
+			});
 		}
 
 		clearShadowStyles() {
 			if (!document.body) return;
 
-			const walk = (root) => {
-				if (root.shadowRoot) {
-					const style = root.shadowRoot.getElementById('gemini-helper-width-shadow-style');
-					if (style) style.remove();
-					this.processedShadowRoots.delete(root.shadowRoot);
-					walk(root.shadowRoot);
-				}
-				const children = root.children || root.childNodes;
-				for (let i = 0; i < children.length; i++) {
-					walk(children[i]);
-				}
-			};
-			walk(document.body);
+			const processedShadowRoots = this.processedShadowRoots;
+
+			// 使用 DOMToolkit.walkShadowRoots 遍历所有 Shadow Root
+			DOMToolkit.walkShadowRoots((shadowRoot) => {
+				const style = shadowRoot.getElementById('gemini-helper-width-shadow-style');
+				if (style) style.remove();
+				processedShadowRoots.delete(shadowRoot);
+			});
 		}
 	}
 
@@ -3648,7 +3470,7 @@
 						const regex = new RegExp(`(${escapedQuery})`, 'gi');
 						const parts = item.text.split(regex);
 
-						textEl.innerHTML = '';
+						clearElement(textEl);
 						parts.forEach(part => {
 							if (part.toLowerCase() === query.toLowerCase()) {
 								const mark = document.createElement('mark');
@@ -3888,6 +3710,92 @@
 
 
 	/**
+	 * 设置管理器
+	 * 负责所有设置的加载、保存和默认值合并
+	 */
+	class SettingsManager {
+		/**
+		 * 加载设置
+		 * @param {SiteRegistry} registry 站点注册表
+		 * @param {SiteAdapter} currentAdapter 当前适配器
+		 * @returns {Object} 完整的设置对象
+		 */
+		load(registry, currentAdapter) {
+			const widthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
+			const outlineSettings = GM_getValue(SETTING_KEYS.OUTLINE, DEFAULT_OUTLINE_SETTINGS);
+			const promptsSettings = GM_getValue(SETTING_KEYS.PROMPTS_SETTINGS, DEFAULT_PROMPTS_SETTINGS);
+			const tabOrder = GM_getValue(SETTING_KEYS.TAB_ORDER, DEFAULT_TAB_ORDER);
+
+			// 加载模型锁定设置（按站点隔离，但一次性加载所有站点的配置）
+			const savedModelLockSettings = GM_getValue(SETTING_KEYS.MODEL_LOCK, {});
+			const mergedModelLockConfig = {};
+
+			// 兼容旧的单一适配器模式（防御性代码）
+			const currentSiteId = currentAdapter ? currentAdapter.getSiteId() : 'unknown';
+
+			// 遍历所有注册的适配器，合并默认配置和保存的配置
+			if (registry && registry.adapters) {
+				registry.adapters.forEach(adapter => {
+					const siteId = adapter.getSiteId();
+					const defaults = adapter.getDefaultLockSettings();
+					mergedModelLockConfig[siteId] = { ...defaults, ...(savedModelLockSettings[siteId] || {}) };
+				});
+			} else if (currentAdapter) {
+				const defaults = currentAdapter.getDefaultLockSettings();
+				mergedModelLockConfig[currentSiteId] = { ...defaults, ...(savedModelLockSettings[currentSiteId] || {}) };
+			}
+
+			// 确保大纲设置有默认值 (合并默认配置与保存的配置)
+			const mergedOutlineSettings = { ...DEFAULT_OUTLINE_SETTINGS, ...outlineSettings };
+
+			return {
+				clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false), // 默认关闭
+				modelLockConfig: mergedModelLockConfig,
+				pageWidth: widthSettings[currentSiteId] || DEFAULT_WIDTH_SETTINGS[currentSiteId],
+				outline: mergedOutlineSettings,
+				prompts: promptsSettings,
+				tabOrder: tabOrder,
+				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
+				showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
+				tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
+				readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) }
+			};
+		}
+
+		/**
+		 * 保存设置
+		 * @param {Object} settings 当前设置对象
+		 * @param {SiteAdapter} currentAdapter 当前适配器
+		 */
+		save(settings, currentAdapter) {
+			GM_setValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, settings.clearTextareaOnSend);
+
+			// 保存模型锁定设置（保存整个字典）
+			GM_setValue(SETTING_KEYS.MODEL_LOCK, settings.modelLockConfig);
+
+			// 保存标签页设置
+			GM_setValue(SETTING_KEYS.TAB_SETTINGS, settings.tabSettings);
+
+			// 保存页面宽度设置
+			const allWidthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
+			if (currentAdapter) {
+				allWidthSettings[currentAdapter.getSiteId()] = settings.pageWidth;
+			}
+			GM_setValue(SETTING_KEYS.PAGE_WIDTH, allWidthSettings);
+			// 保存大纲设置
+			GM_setValue(SETTING_KEYS.OUTLINE, settings.outline);
+			// 保存提示词设置
+			GM_setValue(SETTING_KEYS.PROMPTS_SETTINGS, settings.prompts);
+			// 保存 Tab 顺序
+			GM_setValue(SETTING_KEYS.TAB_ORDER, settings.tabOrder);
+			// 保存防滚动设置
+			GM_setValue('gemini_prevent_auto_scroll', settings.preventAutoScroll);
+			// 保存阅读历史设置
+			GM_setValue(SETTING_KEYS.READING_HISTORY, settings.readingHistory);
+		}
+	}
+
+	/**
 	 * Gemini 助手核心类
 	 * 管理提示词、设置和 UI 界面
 	 */
@@ -3903,6 +3811,7 @@
 			this.anchorScrollTop = null; // 阅读锚点位置
 			this.lang = detectLanguage(); // 当前语言
 			this.i18n = I18N[this.lang]; // 当前语言文本
+			this.settingsManager = new SettingsManager();
 			this.settings = this.loadSettings(); // 加载设置
 
 			// 初始化当前 Tab：优先使用设置的第一个 Tab
@@ -3963,72 +3872,12 @@
 
 		// 加载设置
 		loadSettings() {
-			const widthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
-			const outlineSettings = GM_getValue(SETTING_KEYS.OUTLINE, DEFAULT_OUTLINE_SETTINGS);
-			const promptsSettings = GM_getValue(SETTING_KEYS.PROMPTS_SETTINGS, DEFAULT_PROMPTS_SETTINGS);
-			const tabOrder = GM_getValue(SETTING_KEYS.TAB_ORDER, DEFAULT_TAB_ORDER);
-
-			// 加载模型锁定设置（按站点隔离，但一次性加载所有站点的配置）
-			const savedModelLockSettings = GM_getValue(SETTING_KEYS.MODEL_LOCK, {});
-			const mergedModelLockConfig = {};
-
-			// 兼容旧的单一适配器模式（防御性代码）
-			const currentAdapter = this.siteAdapter || (this.registry ? this.registry.getCurrent() : null);
-			const currentSiteId = currentAdapter ? currentAdapter.getSiteId() : 'unknown';
-
-			// 遍历所有注册的适配器，合并默认配置和保存的配置
-			if (this.registry && this.registry.adapters) {
-				this.registry.adapters.forEach(adapter => {
-					const siteId = adapter.getSiteId();
-					const defaults = adapter.getDefaultLockSettings();
-					mergedModelLockConfig[siteId] = { ...defaults, ...(savedModelLockSettings[siteId] || {}) };
-				});
-			} else if (currentAdapter) {
-				const defaults = currentAdapter.getDefaultLockSettings();
-				mergedModelLockConfig[currentSiteId] = { ...defaults, ...(savedModelLockSettings[currentSiteId] || {}) };
-			}
-
-			// 确保大纲设置有默认值 (合并默认配置与保存的配置)
-			const mergedOutlineSettings = { ...DEFAULT_OUTLINE_SETTINGS, ...outlineSettings };
-
-			return {
-				clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false), // 默认关闭
-				modelLockConfig: mergedModelLockConfig,
-				pageWidth: widthSettings[currentSiteId] || DEFAULT_WIDTH_SETTINGS[currentSiteId],
-				outline: mergedOutlineSettings,
-				prompts: promptsSettings,
-				tabOrder: tabOrder,
-				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
-				showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
-				tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
-				readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) }
-			};
+			return this.settingsManager.load(this.registry, this.siteAdapter);
 		}
 
 		// 保存设置
 		saveSettings() {
-			GM_setValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, this.settings.clearTextareaOnSend);
-
-			// 保存模型锁定设置（保存整个字典）
-			GM_setValue(SETTING_KEYS.MODEL_LOCK, this.settings.modelLockConfig);
-
-			// 保存标签页设置
-			GM_setValue(SETTING_KEYS.TAB_SETTINGS, this.settings.tabSettings);
-
-			// 保存页面宽度设置
-			const allWidthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
-			allWidthSettings[this.siteAdapter.getSiteId()] = this.settings.pageWidth;
-			GM_setValue(SETTING_KEYS.PAGE_WIDTH, allWidthSettings);
-			// 保存大纲设置
-			GM_setValue(SETTING_KEYS.OUTLINE, this.settings.outline);
-			// 保存提示词设置
-			GM_setValue(SETTING_KEYS.PROMPTS_SETTINGS, this.settings.prompts);
-			// 保存 Tab 顺序
-			GM_setValue(SETTING_KEYS.TAB_ORDER, this.settings.tabOrder);
-			// 保存防滚动设置
-			GM_setValue('gemini_prevent_auto_scroll', this.settings.preventAutoScroll);
-			// 保存阅读历史设置
-			GM_setValue(SETTING_KEYS.READING_HISTORY, this.settings.readingHistory);
+			this.settingsManager.save(this.settings, this.siteAdapter);
 		}
 
 		addPrompt(prompt) {
