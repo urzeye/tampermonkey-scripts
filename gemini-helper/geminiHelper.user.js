@@ -3470,7 +3470,7 @@
 						const regex = new RegExp(`(${escapedQuery})`, 'gi');
 						const parts = item.text.split(regex);
 
-						textEl.innerHTML = '';
+						clearElement(textEl);
 						parts.forEach(part => {
 							if (part.toLowerCase() === query.toLowerCase()) {
 								const mark = document.createElement('mark');
@@ -3710,6 +3710,92 @@
 
 
 	/**
+	 * 设置管理器
+	 * 负责所有设置的加载、保存和默认值合并
+	 */
+	class SettingsManager {
+		/**
+		 * 加载设置
+		 * @param {SiteRegistry} registry 站点注册表
+		 * @param {SiteAdapter} currentAdapter 当前适配器
+		 * @returns {Object} 完整的设置对象
+		 */
+		load(registry, currentAdapter) {
+			const widthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
+			const outlineSettings = GM_getValue(SETTING_KEYS.OUTLINE, DEFAULT_OUTLINE_SETTINGS);
+			const promptsSettings = GM_getValue(SETTING_KEYS.PROMPTS_SETTINGS, DEFAULT_PROMPTS_SETTINGS);
+			const tabOrder = GM_getValue(SETTING_KEYS.TAB_ORDER, DEFAULT_TAB_ORDER);
+
+			// 加载模型锁定设置（按站点隔离，但一次性加载所有站点的配置）
+			const savedModelLockSettings = GM_getValue(SETTING_KEYS.MODEL_LOCK, {});
+			const mergedModelLockConfig = {};
+
+			// 兼容旧的单一适配器模式（防御性代码）
+			const currentSiteId = currentAdapter ? currentAdapter.getSiteId() : 'unknown';
+
+			// 遍历所有注册的适配器，合并默认配置和保存的配置
+			if (registry && registry.adapters) {
+				registry.adapters.forEach(adapter => {
+					const siteId = adapter.getSiteId();
+					const defaults = adapter.getDefaultLockSettings();
+					mergedModelLockConfig[siteId] = { ...defaults, ...(savedModelLockSettings[siteId] || {}) };
+				});
+			} else if (currentAdapter) {
+				const defaults = currentAdapter.getDefaultLockSettings();
+				mergedModelLockConfig[currentSiteId] = { ...defaults, ...(savedModelLockSettings[currentSiteId] || {}) };
+			}
+
+			// 确保大纲设置有默认值 (合并默认配置与保存的配置)
+			const mergedOutlineSettings = { ...DEFAULT_OUTLINE_SETTINGS, ...outlineSettings };
+
+			return {
+				clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false), // 默认关闭
+				modelLockConfig: mergedModelLockConfig,
+				pageWidth: widthSettings[currentSiteId] || DEFAULT_WIDTH_SETTINGS[currentSiteId],
+				outline: mergedOutlineSettings,
+				prompts: promptsSettings,
+				tabOrder: tabOrder,
+				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
+				showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
+				tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
+				readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) }
+			};
+		}
+
+		/**
+		 * 保存设置
+		 * @param {Object} settings 当前设置对象
+		 * @param {SiteAdapter} currentAdapter 当前适配器
+		 */
+		save(settings, currentAdapter) {
+			GM_setValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, settings.clearTextareaOnSend);
+
+			// 保存模型锁定设置（保存整个字典）
+			GM_setValue(SETTING_KEYS.MODEL_LOCK, settings.modelLockConfig);
+
+			// 保存标签页设置
+			GM_setValue(SETTING_KEYS.TAB_SETTINGS, settings.tabSettings);
+
+			// 保存页面宽度设置
+			const allWidthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
+			if (currentAdapter) {
+				allWidthSettings[currentAdapter.getSiteId()] = settings.pageWidth;
+			}
+			GM_setValue(SETTING_KEYS.PAGE_WIDTH, allWidthSettings);
+			// 保存大纲设置
+			GM_setValue(SETTING_KEYS.OUTLINE, settings.outline);
+			// 保存提示词设置
+			GM_setValue(SETTING_KEYS.PROMPTS_SETTINGS, settings.prompts);
+			// 保存 Tab 顺序
+			GM_setValue(SETTING_KEYS.TAB_ORDER, settings.tabOrder);
+			// 保存防滚动设置
+			GM_setValue('gemini_prevent_auto_scroll', settings.preventAutoScroll);
+			// 保存阅读历史设置
+			GM_setValue(SETTING_KEYS.READING_HISTORY, settings.readingHistory);
+		}
+	}
+
+	/**
 	 * Gemini 助手核心类
 	 * 管理提示词、设置和 UI 界面
 	 */
@@ -3725,6 +3811,7 @@
 			this.anchorScrollTop = null; // 阅读锚点位置
 			this.lang = detectLanguage(); // 当前语言
 			this.i18n = I18N[this.lang]; // 当前语言文本
+			this.settingsManager = new SettingsManager();
 			this.settings = this.loadSettings(); // 加载设置
 
 			// 初始化当前 Tab：优先使用设置的第一个 Tab
@@ -3785,72 +3872,12 @@
 
 		// 加载设置
 		loadSettings() {
-			const widthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
-			const outlineSettings = GM_getValue(SETTING_KEYS.OUTLINE, DEFAULT_OUTLINE_SETTINGS);
-			const promptsSettings = GM_getValue(SETTING_KEYS.PROMPTS_SETTINGS, DEFAULT_PROMPTS_SETTINGS);
-			const tabOrder = GM_getValue(SETTING_KEYS.TAB_ORDER, DEFAULT_TAB_ORDER);
-
-			// 加载模型锁定设置（按站点隔离，但一次性加载所有站点的配置）
-			const savedModelLockSettings = GM_getValue(SETTING_KEYS.MODEL_LOCK, {});
-			const mergedModelLockConfig = {};
-
-			// 兼容旧的单一适配器模式（防御性代码）
-			const currentAdapter = this.siteAdapter || (this.registry ? this.registry.getCurrent() : null);
-			const currentSiteId = currentAdapter ? currentAdapter.getSiteId() : 'unknown';
-
-			// 遍历所有注册的适配器，合并默认配置和保存的配置
-			if (this.registry && this.registry.adapters) {
-				this.registry.adapters.forEach(adapter => {
-					const siteId = adapter.getSiteId();
-					const defaults = adapter.getDefaultLockSettings();
-					mergedModelLockConfig[siteId] = { ...defaults, ...(savedModelLockSettings[siteId] || {}) };
-				});
-			} else if (currentAdapter) {
-				const defaults = currentAdapter.getDefaultLockSettings();
-				mergedModelLockConfig[currentSiteId] = { ...defaults, ...(savedModelLockSettings[currentSiteId] || {}) };
-			}
-
-			// 确保大纲设置有默认值 (合并默认配置与保存的配置)
-			const mergedOutlineSettings = { ...DEFAULT_OUTLINE_SETTINGS, ...outlineSettings };
-
-			return {
-				clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false), // 默认关闭
-				modelLockConfig: mergedModelLockConfig,
-				pageWidth: widthSettings[currentSiteId] || DEFAULT_WIDTH_SETTINGS[currentSiteId],
-				outline: mergedOutlineSettings,
-				prompts: promptsSettings,
-				tabOrder: tabOrder,
-				preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
-				showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
-				tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
-				readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) }
-			};
+			return this.settingsManager.load(this.registry, this.siteAdapter);
 		}
 
 		// 保存设置
 		saveSettings() {
-			GM_setValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, this.settings.clearTextareaOnSend);
-
-			// 保存模型锁定设置（保存整个字典）
-			GM_setValue(SETTING_KEYS.MODEL_LOCK, this.settings.modelLockConfig);
-
-			// 保存标签页设置
-			GM_setValue(SETTING_KEYS.TAB_SETTINGS, this.settings.tabSettings);
-
-			// 保存页面宽度设置
-			const allWidthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
-			allWidthSettings[this.siteAdapter.getSiteId()] = this.settings.pageWidth;
-			GM_setValue(SETTING_KEYS.PAGE_WIDTH, allWidthSettings);
-			// 保存大纲设置
-			GM_setValue(SETTING_KEYS.OUTLINE, this.settings.outline);
-			// 保存提示词设置
-			GM_setValue(SETTING_KEYS.PROMPTS_SETTINGS, this.settings.prompts);
-			// 保存 Tab 顺序
-			GM_setValue(SETTING_KEYS.TAB_ORDER, this.settings.tabOrder);
-			// 保存防滚动设置
-			GM_setValue('gemini_prevent_auto_scroll', this.settings.preventAutoScroll);
-			// 保存阅读历史设置
-			GM_setValue(SETTING_KEYS.READING_HISTORY, this.settings.readingHistory);
+			this.settingsManager.save(this.settings, this.siteAdapter);
 		}
 
 		addPrompt(prompt) {
