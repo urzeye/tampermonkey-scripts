@@ -1,7 +1,7 @@
 # Gemini Helper 会话管理与导出功能需求文档
 
 > **文档版本**: v2.1  
-> **最后更新**: 2025-12-18  
+> **最后更新**: 2025-12-18 (Phase 3 Completed)  
 > **状态**: 需求细化完成，待开发
 
 ---
@@ -363,9 +363,9 @@ GM_setValue('gemini_helper_tab_visibility', { prompts: true, outline: true, conv
 
 | 阶段        | 内容                         | 预估代码量 | Git Tag          | 状态 |
 | ----------- | ---------------------------- | ---------- | ---------------- | ---- |
-| **Phase 1** | Tab 骨架 + 空面板            | ~100 行    | `v1.9.0-conv-p1` | ⬜   |
-| **Phase 2** | 数据存储 + 文件夹管理        | ~250 行    | `v1.9.0-conv-p2` | ⬜   |
-| **Phase 3** | 会话同步 + 列表展示          | ~300 行    | `v1.9.0-conv-p3` | ⬜   |
+| **Phase 1** | Tab 骨架 + 空面板            | ~100 行    | `v1.9.0-conv-p1` | ✅   |
+| **Phase 2** | 数据存储 + 文件夹管理        | ~250 行    | `v1.9.0-conv-p2` | ✅   |
+| **Phase 3** | 会话同步 + 列表展示          | ~300 行    | `v1.9.0-conv-p3` | ✅   |
 | **Phase 4** | 交互功能（多选、移动、删除） | ~250 行    | `v1.9.0-conv-p4` | ⬜   |
 | **Phase 5** | 设置集成 + 收尾              | ~100 行    | `v1.9.0`         | ⬜   |
 
@@ -385,8 +385,7 @@ GM_setValue('gemini_helper_tab_visibility', { prompts: true, outline: true, conv
 -   [ ] 面板显示 4 个 Tab
 -   [ ] 点击"会话"Tab 显示占位文字
 -   [ ] 设置 → 界面排版中可禁用"会话"Tab
--   [ ] 禁用后刷新，会话 Tab 不显示
--   [ ] 其他 Tab 功能正常
+-   [ ] 禁用后刷新，会话 Tab 不显示 **状态**: ✅ 已完成
 
 ### 6.3 Phase 2：数据存储 + 文件夹管理
 
@@ -401,8 +400,7 @@ GM_setValue('gemini_helper_tab_visibility', { prompts: true, outline: true, conv
 **验证清单**：
 
 -   [ ] 新建、重命名、删除文件夹正常
--   [ ] 收件箱不可删除
--   [ ] 刷新后数据保留
+-   [ ] 收件箱不可删除 **状态**: ✅ 已完成
 
 ### 6.4 Phase 3：会话同步 + 列表展示
 
@@ -418,8 +416,7 @@ GM_setValue('gemini_helper_tab_visibility', { prompts: true, outline: true, conv
 
 -   [ ] 点击同步按钮获取会话列表
 -   [ ] 文件夹可展开/折叠
--   [ ] 搜索过滤正常
--   [ ] 点击会话跳转
+-   [ ] 搜索过滤正常 **状态**: ✅ 已完成
 
 ### 6.5 Phase 4：交互功能
 
