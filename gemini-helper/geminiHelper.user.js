@@ -989,7 +989,14 @@
         getScrollContainer() {
             // 使用 DOMToolkit 查找滚动容器，传入站点特定选择器
             return DOMToolkit.findScrollContainer({
-                selectors: ['.chat-mode-scroller', 'main', '[role="main"]', '.conversation-container', '.chat-container'],
+                selectors: [
+                    'infinite-scroller.chat-history', // Gemini 主对话滚动容器（精确匹配，避免与侧边栏混淆）
+                    '.chat-mode-scroller',
+                    'main',
+                    '[role="main"]',
+                    '.conversation-container',
+                    '.chat-container',
+                ],
             });
         }
 
