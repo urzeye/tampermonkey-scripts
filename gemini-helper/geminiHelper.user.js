@@ -294,6 +294,7 @@
             batchMove: '移动',
             batchDelete: '删除',
             batchExit: '退出',
+            conversationsRefresh: '刷新会话列表',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -493,6 +494,7 @@
             batchMove: '移動',
             batchDelete: '刪除',
             batchExit: '退出',
+            conversationsRefresh: '刷新會話列表',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -691,6 +693,7 @@
             batchMove: 'Move',
             batchDelete: 'Delete',
             batchExit: 'Exit',
+            conversationsRefresh: 'Refresh List',
         },
     };
 
@@ -6708,7 +6711,7 @@
                 const titleMap = {
                     prompts: this.t('refreshPrompts'),
                     outline: this.t('refreshOutline'),
-                    conversations: this.t('conversationsSync'),
+                    conversations: this.t('conversationsRefresh'),
                     settings: this.t('refreshSettings'),
                 };
                 refreshBtn.title = titleMap[tabName] || this.t('refresh');
