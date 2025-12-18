@@ -5597,7 +5597,7 @@
                     id: 'settings-btn',
                     title: this.t('tabSettings'),
                 },
-                '⚙️',
+                '⚙',
             );
             settingsBtn.addEventListener('click', () => {
                 if (this.currentTab === 'settings') {
