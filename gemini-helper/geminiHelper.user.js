@@ -3818,6 +3818,15 @@
 
             const menu = createElement('div', { className: 'conversations-item-menu' });
 
+            // 重命名
+            const renameBtn = createElement('button', {}, this.t('conversationsRename') || '重命名');
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.showRenameConversationDialog(conv);
+            });
+            menu.appendChild(renameBtn);
+
             // 移动到...
             const moveBtn = createElement('button', {}, this.t('conversationsMoveTo') || '移动到...');
             moveBtn.addEventListener('click', (e) => {
@@ -3826,6 +3835,15 @@
                 this.showMoveToFolderDialog(conv);
             });
             menu.appendChild(moveBtn);
+
+            // 删除
+            const deleteBtn = createElement('button', { className: 'danger' }, this.t('conversationsDelete') || '删除');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.confirmDeleteConversation(conv);
+            });
+            menu.appendChild(deleteBtn);
 
             // 定位菜单
             const rect = anchorEl.getBoundingClientRect();
@@ -3843,6 +3861,131 @@
                 }
             };
             setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+
+        /**
+         * 显示重命名会话对话框
+         */
+        showRenameConversationDialog(conv) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+
+            // 标题
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, this.t('conversationsRename') || '重命名'));
+
+            // 输入框区域
+            const inputSection = createElement('div', { className: 'conversations-dialog-section' });
+            inputSection.appendChild(createElement('label', {}, this.t('conversationsFolderName') || '名称'));
+            const nameInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                value: conv.title || '',
+                placeholder: this.t('conversationsFolderNamePlaceholder') || '输入会话标题',
+            });
+            inputSection.appendChild(nameInput);
+            dialog.appendChild(inputSection);
+
+            // 按钮
+            const buttons = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+
+            const confirmBtn = createElement('button', { className: 'conversations-dialog-btn confirm' }, this.t('confirm') || '确定');
+            confirmBtn.addEventListener('click', () => {
+                const newTitle = nameInput.value.trim();
+                if (newTitle && newTitle !== conv.title) {
+                    this.renameConversation(conv.id, newTitle);
+                }
+                overlay.remove();
+            });
+
+            buttons.appendChild(cancelBtn);
+            buttons.appendChild(confirmBtn);
+            dialog.appendChild(buttons);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            // 聚焦并全选
+            nameInput.focus();
+            nameInput.select();
+
+            // ESC 关闭
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') overlay.remove();
+                if (e.key === 'Enter') confirmBtn.click();
+            });
+        }
+
+        /**
+         * 重命名会话
+         */
+        renameConversation(convId, newTitle) {
+            const conv = this.data.conversations[convId];
+            if (!conv) return;
+
+            const oldTitle = conv.title;
+            conv.title = newTitle;
+            conv.updatedAt = Date.now();
+            this.saveData();
+            this.createUI();
+            showToast(this.t('conversationsFolderRenamed') || '已重命名');
+
+            // 根据设置决定是否同步云端
+            if (this.settings?.conversations?.syncRenameToCloud) {
+                this.syncRenameToCloud(convId, newTitle, oldTitle);
+            }
+        }
+
+        /**
+         * 同步重命名到云端（侧边栏）
+         */
+        syncRenameToCloud(convId, newTitle, oldTitle) {
+            // 尝试在侧边栏找到对应会话并触发重命名
+            const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${convId}"]`);
+            if (sidebarItem) {
+                // 尝试模拟右键菜单或编辑操作
+                // 由于侧边栏结构复杂，这里暂时只打印提示
+                console.log(`[ConversationManager] 云端同步重命名：${oldTitle} -> ${newTitle}`);
+                // TODO: 实现实际的侧边栏重命名操作
+            }
+        }
+
+        /**
+         * 确认删除会话
+         */
+        confirmDeleteConversation(conv) {
+            this.showConfirmDialog(this.t('conversationsDelete') || '删除', `确定删除会话 "${conv.title}" 吗？`, () => this.deleteConversation(conv.id));
+        }
+
+        /**
+         * 删除会话
+         */
+        deleteConversation(convId) {
+            const conv = this.data.conversations[convId];
+            if (!conv) return;
+
+            delete this.data.conversations[convId];
+            this.saveData();
+            this.createUI();
+            showToast(this.t('conversationsDeleted') || '已删除');
+
+            // 根据设置决定是否同步云端删除
+            if (this.settings?.conversations?.syncDeleteToCloud) {
+                this.syncDeleteToCloud(convId);
+            }
+        }
+
+        /**
+         * 同步删除到云端（侧边栏）
+         */
+        syncDeleteToCloud(convId) {
+            // 尝试在侧边栏找到对应会话并触发删除
+            const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${convId}"]`);
+            if (sidebarItem) {
+                console.log(`[ConversationManager] 云端同步删除会话：${convId}`);
+                // TODO: 实现实际的侧边栏删除操作
+            }
         }
 
         /**
@@ -3994,12 +4137,12 @@
          * 确认删除文件夹
          */
         confirmDeleteFolder(folder) {
-            if (confirm(this.t('conversationsDeleteConfirm') || `确定删除文件夹 "${folder.name}" 吗？其中的会话将移到收件箱。`)) {
+            this.showConfirmDialog(this.t('conversationsDelete') || '删除', this.t('conversationsDeleteConfirm') || `确定删除文件夹 "${folder.name}" 吗？其中的会话将移到收件箱。`, () => {
                 if (this.deleteFolder(folder.id)) {
                     this.createUI(); // 刷新 UI
                     showToast(this.t('conversationsFolderDeleted') || '文件夹已删除');
                 }
-            }
+            });
         }
 
         /**
@@ -5565,6 +5708,8 @@
                     text-align: left; font-size: 13px; color: #374151; cursor: pointer; border-radius: 4px;
                 }
                 .conversations-item-menu button:hover { background: #f3f4f6; }
+                .conversations-item-menu button.danger { color: #dc2626; }
+                .conversations-item-menu button.danger:hover { background: #fef2f2; }
 
                 /* 会话对话框样式 */
                 .conversations-dialog-overlay {
