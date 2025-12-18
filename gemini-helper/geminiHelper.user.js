@@ -2,8 +2,8 @@
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
 // @version      1.8.2
-// @description  Gemini 助手：支持对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版/Genspark
-// @description:en Gemini Helper: Supports outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart adaptation for Gemini Standard/Enterprise/Genspark
+// @description  Gemini 助手：支持对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版
+// @description:en Gemini Helper: Supports outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
 // @homepage     https://github.com/urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
@@ -3120,6 +3120,8 @@
             this.isActive = false;
             this.data = null; // 会话数据
             this.expandedFolderId = null; // 记忆当前展开的文件夹（手风琴模式，只展开一个）
+            this.selectedIds = new Set(); // 批量选中的会话 ID
+            this.batchMode = false; // 批量模式开关
 
             this.init();
         }
@@ -3570,11 +3572,51 @@
             addFolderBtn.addEventListener('click', () => this.showCreateFolderDialog());
             toolbar.appendChild(addFolderBtn);
 
+            // 4. 批量模式按钮
+            const batchModeBtn = createElement(
+                'button',
+                {
+                    className: 'conversations-toolbar-btn batch-mode' + (this.batchMode ? ' active' : ''),
+                    title: '批量操作',
+                    id: 'conversations-batch-mode-btn',
+                },
+                '☑️',
+            );
+            batchModeBtn.addEventListener('click', () => this.toggleBatchMode());
+            toolbar.appendChild(batchModeBtn);
+
             content.appendChild(toolbar);
 
             // 文件夹列表
             const folderList = this.createFolderListUI();
             content.appendChild(folderList);
+
+            // 底部批量操作栏（仅批量模式下显示）
+            if (this.batchMode) {
+                const batchBar = createElement('div', { className: 'conversations-batch-bar', id: 'conversations-batch-bar' });
+                // 根据选中数量决定是否显示
+                batchBar.style.display = this.selectedIds.size > 0 ? 'flex' : 'none';
+
+                const batchInfo = createElement('span', { className: 'conversations-batch-info', id: 'conversations-batch-info' }, `已选 ${this.selectedIds.size} 个`);
+                batchBar.appendChild(batchInfo);
+
+                const batchBtns = createElement('div', { className: 'conversations-batch-btns' });
+
+                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📁 移动');
+                batchMoveBtn.addEventListener('click', () => this.batchMove());
+                batchBtns.appendChild(batchMoveBtn);
+
+                const batchDeleteBtn = createElement('button', { className: 'conversations-batch-btn danger' }, '🗑️ 删除');
+                batchDeleteBtn.addEventListener('click', () => this.batchDelete());
+                batchBtns.appendChild(batchDeleteBtn);
+
+                const batchCancelBtn = createElement('button', { className: 'conversations-batch-btn cancel' }, '退出');
+                batchCancelBtn.addEventListener('click', () => this.clearSelection());
+                batchBtns.appendChild(batchCancelBtn);
+
+                batchBar.appendChild(batchBtns);
+                content.appendChild(batchBar);
+            }
 
             container.appendChild(content);
         }
@@ -3769,6 +3811,26 @@
          */
         createConversationItem(conv) {
             const item = createElement('div', { className: 'conversations-item', 'data-id': conv.id });
+
+            // 复选框（仅批量模式下显示）
+            if (this.batchMode) {
+                const checkbox = createElement('input', {
+                    type: 'checkbox',
+                    className: 'conversations-item-checkbox',
+                });
+                // 单独设置 checked 属性（避免 createElement 将 false 转为字符串导致选中）
+                checkbox.checked = this.selectedIds.has(conv.id);
+                checkbox.addEventListener('click', (e) => e.stopPropagation());
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        this.selectedIds.add(conv.id);
+                    } else {
+                        this.selectedIds.delete(conv.id);
+                    }
+                    this.updateBatchActionBar();
+                });
+                item.appendChild(checkbox);
+            }
 
             // 会话标题
             const title = createElement(
@@ -3986,6 +4048,114 @@
                 console.log(`[ConversationManager] 云端同步删除会话：${convId}`);
                 // TODO: 实现实际的侧边栏删除操作
             }
+        }
+
+        /**
+         * 更新底部批量操作栏状态
+         */
+        updateBatchActionBar() {
+            const batchBar = document.getElementById('conversations-batch-bar');
+            const batchInfo = document.getElementById('conversations-batch-info');
+            if (!batchBar || !batchInfo) return;
+
+            const count = this.selectedIds.size;
+            if (count > 0) {
+                batchBar.style.display = 'flex';
+                batchInfo.textContent = `已选 ${count} 个`;
+            } else {
+                batchBar.style.display = 'none';
+            }
+        }
+
+        /**
+         * 切换批量模式
+         */
+        toggleBatchMode() {
+            this.batchMode = !this.batchMode;
+            if (!this.batchMode) {
+                this.selectedIds.clear();
+            }
+            this.createUI();
+            // 恢复之前展开的文件夹
+            if (this.expandedFolderId) {
+                const folderHeader = this.container.querySelector(`.conversations-folder-header[data-folder-id="${this.expandedFolderId}"]`);
+                if (folderHeader) folderHeader.click();
+            }
+        }
+
+        /**
+         * 清除选中状态并退出批量模式
+         */
+        clearSelection() {
+            this.selectedIds.clear();
+            this.batchMode = false;
+            this.createUI();
+            // 恢复之前展开的文件夹
+            if (this.expandedFolderId) {
+                const folderHeader = this.container.querySelector(`.conversations-folder-header[data-folder-id="${this.expandedFolderId}"]`);
+                if (folderHeader) folderHeader.click();
+            }
+        }
+
+        /**
+         * 批量移动会话
+         */
+        batchMove() {
+            if (this.selectedIds.size === 0) return;
+
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, `移动 ${this.selectedIds.size} 个会话到...`));
+
+            // 文件夹列表
+            const list = createElement('div', { className: 'conversations-folder-select-list' });
+            this.data.folders.forEach((folder) => {
+                const item = createElement('div', { className: 'conversations-folder-select-item' }, `${folder.icon} ${folder.name}`);
+                item.addEventListener('click', () => {
+                    // 批量移动
+                    this.selectedIds.forEach((convId) => {
+                        if (this.data.conversations[convId]) {
+                            this.data.conversations[convId].folderId = folder.id;
+                            this.data.conversations[convId].updatedAt = Date.now();
+                        }
+                    });
+                    this.saveData();
+                    overlay.remove();
+                    showToast(`已移动 ${this.selectedIds.size} 个会话到 ${folder.name}`);
+                    this.clearSelection();
+                    this.createUI();
+                });
+                list.appendChild(item);
+            });
+            dialog.appendChild(list);
+
+            // 取消按钮
+            const btns = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            btns.appendChild(cancelBtn);
+            dialog.appendChild(btns);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+        }
+
+        /**
+         * 批量删除会话
+         */
+        batchDelete() {
+            if (this.selectedIds.size === 0) return;
+
+            this.showConfirmDialog('批量删除', `确定删除选中的 ${this.selectedIds.size} 个会话吗？`, () => {
+                const count = this.selectedIds.size;
+                this.selectedIds.forEach((convId) => {
+                    delete this.data.conversations[convId];
+                });
+                this.saveData();
+                showToast(`已删除 ${count} 个会话`);
+                this.clearSelection();
+                this.createUI();
+            });
         }
 
         /**
@@ -5570,6 +5740,7 @@
                 }
                 .conversations-toolbar-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
                 .conversations-toolbar-btn.sync { padding: 6px 10px; }
+                .conversations-toolbar-btn.batch-mode.active { background: #6366f1; color: white; border-color: #6366f1; }
                 .conversations-toolbar-btn:disabled { opacity: 0.6; cursor: wait; }
                 .conversations-folder-select {
                     padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px;
@@ -5710,6 +5881,36 @@
                 .conversations-item-menu button:hover { background: #f3f4f6; }
                 .conversations-item-menu button.danger { color: #dc2626; }
                 .conversations-item-menu button.danger:hover { background: #fef2f2; }
+
+                /* 复选框样式 */
+                .conversations-item-checkbox {
+                    width: 16px; height: 16px; margin-right: 8px; cursor: pointer;
+                    accent-color: #6366f1; flex-shrink: 0;
+                }
+
+                /* 底部批量操作栏 */
+                .conversations-batch-bar {
+                    position: sticky; bottom: 0; left: 0; right: 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;
+                    border-radius: 8px; margin-top: 8px;
+                }
+                .conversations-batch-info {
+                    color: white; font-size: 13px; font-weight: 500;
+                }
+                .conversations-batch-btns {
+                    display: flex; gap: 8px;
+                }
+                .conversations-batch-btn {
+                    padding: 6px 12px; border: none; border-radius: 6px;
+                    font-size: 12px; cursor: pointer; transition: all 0.2s;
+                    background: rgba(255,255,255,0.2); color: white;
+                }
+                .conversations-batch-btn:hover { background: rgba(255,255,255,0.3); }
+                .conversations-batch-btn.danger { background: #dc2626; }
+                .conversations-batch-btn.danger:hover { background: #b91c1c; }
+                .conversations-batch-btn.cancel { background: rgba(0,0,0,0.2); }
+                .conversations-batch-btn.cancel:hover { background: rgba(0,0,0,0.3); }
 
                 /* 会话对话框样式 */
                 .conversations-dialog-overlay {
