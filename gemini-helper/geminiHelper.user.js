@@ -267,6 +267,12 @@
             conversationsFolderNamePlaceholder: '输入文件夹名称',
             cancel: '取消',
             confirm: '确定',
+            conversationsSyncEmpty: '未找到会话',
+            conversationsSyncNoChange: '无新会话',
+            justNow: '刚刚',
+            minutesAgo: '分钟前',
+            hoursAgo: '小时前',
+            daysAgo: '天前',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -444,6 +450,12 @@
             conversationsFolderNamePlaceholder: '輸入資料夾名稱',
             cancel: '取消',
             confirm: '確定',
+            conversationsSyncEmpty: '未找到會話',
+            conversationsSyncNoChange: '無新會話',
+            justNow: '剛剛',
+            minutesAgo: '分鐘前',
+            hoursAgo: '小時前',
+            daysAgo: '天前',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -620,6 +632,12 @@
             conversationsFolderNamePlaceholder: 'Enter folder name',
             cancel: 'Cancel',
             confirm: 'Confirm',
+            conversationsSyncEmpty: 'No conversations found',
+            conversationsSyncNoChange: 'No new conversations',
+            justNow: 'Just now',
+            minutesAgo: 'm ago',
+            hoursAgo: 'h ago',
+            daysAgo: 'd ago',
         },
     };
 
@@ -767,6 +785,15 @@
          */
         isNewConversation() {
             return false;
+        }
+
+        /**
+         * 获取侧边栏会话列表
+         * 子类应覆盖此方法从站点 DOM 提取会话数据
+         * @returns {Array<{id: string, title: string, url: string, isActive: boolean}>}
+         */
+        getConversationList() {
+            return [];
         }
 
         /**
@@ -1260,6 +1287,29 @@
         isNewConversation() {
             const path = window.location.pathname;
             return path === '/app' || path === '/app/';
+        }
+
+        /**
+         * 从侧边栏提取会话列表
+         * @returns {Array<{id: string, title: string, url: string, isActive: boolean}>}
+         */
+        getConversationList() {
+            const items = document.querySelectorAll('.conversation');
+            return Array.from(items)
+                .map((el) => {
+                    // 从 jslog 属性中提取会话 ID
+                    const jslog = el.getAttribute('jslog') || '';
+                    const idMatch = jslog.match(/\["c_([a-z0-9]+)"/);
+                    const id = idMatch ? idMatch[1] : '';
+                    const title = el.textContent?.trim() || '';
+                    return {
+                        id: id,
+                        title: title,
+                        url: id ? `https://gemini.google.com/app/${id}` : '',
+                        isActive: el.classList.contains('selected'),
+                    };
+                })
+                .filter((c) => c.id); // 过滤掉没有 ID 的项
         }
 
         getSessionName() {
@@ -3099,6 +3149,53 @@
         }
 
         /**
+         * 从侧边栏同步会话（增量）
+         */
+        syncConversations() {
+            const sidebarItems = this.siteAdapter.getConversationList();
+            if (!sidebarItems || sidebarItems.length === 0) {
+                showToast(this.t('conversationsSyncEmpty') || '未找到会话');
+                return;
+            }
+
+            let newCount = 0;
+            let updatedCount = 0;
+            const now = Date.now();
+
+            sidebarItems.forEach((item) => {
+                const existing = this.data.conversations[item.id];
+                if (existing) {
+                    // 更新已有会话的标题（可能被用户修改）
+                    if (existing.title !== item.title) {
+                        existing.title = item.title;
+                        existing.updatedAt = now;
+                        updatedCount++;
+                    }
+                } else {
+                    // 新会话：添加到收件箱
+                    this.data.conversations[item.id] = {
+                        id: item.id,
+                        title: item.title,
+                        url: item.url,
+                        folderId: this.data.lastUsedFolderId || 'inbox',
+                        createdAt: now,
+                        updatedAt: now,
+                    };
+                    newCount++;
+                }
+            });
+
+            this.saveData();
+            this.createUI(); // 刷新 UI
+
+            if (newCount > 0 || updatedCount > 0) {
+                showToast(`${this.t('conversationsSynced') || '同步完成'}：+${newCount} ↻${updatedCount}`);
+            } else {
+                showToast(this.t('conversationsSyncNoChange') || '无新会话');
+            }
+        }
+
+        /**
          * 创建会话面板 UI
          */
         createUI() {
@@ -3133,8 +3230,7 @@
                 '🔄 ' + this.t('conversationsSync'),
             );
             syncBtn.addEventListener('click', () => {
-                showToast(this.t('conversationsSyncing'));
-                // Phase 3 实现同步逻辑
+                this.syncConversations();
             });
             toolbar.appendChild(syncBtn);
             content.appendChild(toolbar);
@@ -3251,17 +3347,109 @@
 
             item.appendChild(controls);
 
-            // 点击展开/折叠（Phase 3 实现）
-            item.addEventListener('click', () => {
+            // 会话列表容器（初始隐藏）
+            const conversationList = createElement('div', { className: 'conversations-list', style: 'display: none;' });
+            item.appendChild(conversationList);
+
+            // 点击展开/折叠
+            item.addEventListener('click', (e) => {
+                // 避免点击按钮时触发展开
+                if (e.target.closest('button')) return;
+
                 // 取消其他文件夹的 expanded 状态
                 document.querySelectorAll('.conversations-folder-item.expanded').forEach((el) => {
-                    if (el !== item) el.classList.remove('expanded');
+                    if (el !== item) {
+                        el.classList.remove('expanded');
+                        const list = el.querySelector('.conversations-list');
+                        if (list) list.style.display = 'none';
+                    }
                 });
-                item.classList.toggle('expanded');
-                // Phase 3: 展开时显示会话列表
+
+                const isExpanded = item.classList.toggle('expanded');
+                if (isExpanded) {
+                    // 渲染会话列表
+                    this.renderConversationList(folder.id, conversationList);
+                    conversationList.style.display = 'block';
+                } else {
+                    conversationList.style.display = 'none';
+                }
             });
 
             return item;
+        }
+
+        /**
+         * 渲染文件夹下的会话列表
+         */
+        renderConversationList(folderId, container) {
+            clearElement(container);
+
+            // 获取该文件夹下的会话
+            const conversations = Object.values(this.data.conversations).filter((c) => c.folderId === folderId);
+
+            if (conversations.length === 0) {
+                const empty = createElement('div', { className: 'conversations-list-empty' }, this.t('conversationsEmpty') || '暂无会话');
+                container.appendChild(empty);
+                return;
+            }
+
+            // 按更新时间排序（最新在前）
+            conversations.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+            conversations.forEach((conv) => {
+                const item = this.createConversationItem(conv);
+                container.appendChild(item);
+            });
+        }
+
+        /**
+         * 创建单个会话项
+         */
+        createConversationItem(conv) {
+            const item = createElement('div', { className: 'conversations-item', 'data-id': conv.id });
+
+            // 会话标题
+            const title = createElement(
+                'span',
+                {
+                    className: 'conversations-item-title',
+                    title: conv.title,
+                },
+                conv.title || '无标题',
+            );
+
+            title.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // 跳转到会话
+                if (conv.url) {
+                    window.location.href = conv.url;
+                }
+            });
+
+            item.appendChild(title);
+
+            // 更新时间
+            const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
+            item.appendChild(time);
+
+            return item;
+        }
+
+        /**
+         * 格式化时间显示
+         */
+        formatTime(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            if (diff < 60000) return this.t('justNow') || '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + (this.t('minutesAgo') || '分钟前');
+            if (diff < 86400000) return Math.floor(diff / 3600000) + (this.t('hoursAgo') || '小时前');
+            if (diff < 604800000) return Math.floor(diff / 86400000) + (this.t('daysAgo') || '天前');
+
+            return date.toLocaleDateString();
         }
 
         /**
@@ -4825,6 +5013,31 @@
                 .conversations-folder-menu button:hover { background: #f3f4f6; }
                 .conversations-empty {
                     text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 14px;
+                }
+
+                /* 会话列表样式 */
+                .conversations-list {
+                    padding: 8px 8px 8px 40px; /* 缩进显示层级 */
+                    background: rgba(255, 255, 255, 0.5);
+                }
+                .conversations-list-empty {
+                    padding: 12px; color: #9ca3af; font-size: 13px; text-align: center;
+                }
+                .conversations-item {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 8px 12px; margin-bottom: 4px; border-radius: 6px;
+                    background: white; cursor: pointer; transition: all 0.2s;
+                    border-left: 3px solid transparent;
+                }
+                .conversations-item:hover {
+                    background: #f3f4f6; border-left-color: #4285f4;
+                }
+                .conversations-item-title {
+                    flex: 1; font-size: 13px; color: #374151;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                }
+                .conversations-item-time {
+                    font-size: 11px; color: #9ca3af; flex-shrink: 0; margin-left: 8px;
                 }
 
                 /* 会话对话框样式 */
