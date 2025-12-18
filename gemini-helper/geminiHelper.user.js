@@ -276,6 +276,9 @@
             conversationsSelectFolder: '选择同步目标文件夹',
             conversationsMoveTo: '移动到...',
             conversationsMoved: '已移动到',
+            conversationsSyncDeleteTitle: '同步删除',
+            conversationsSyncDeleteMsg: '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？',
+            conversationsDeleted: '已移除',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -462,6 +465,9 @@
             conversationsSelectFolder: '選擇同步目標資料夾',
             conversationsMoveTo: '移動到...',
             conversationsMoved: '已移動到',
+            conversationsSyncDeleteTitle: '同步刪除',
+            conversationsSyncDeleteMsg: '檢測到 {count} 個會話已在雲端刪除，是否同步刪除本地記錄？',
+            conversationsDeleted: '已移除',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -647,6 +653,9 @@
             conversationsSelectFolder: 'Select sync folder',
             conversationsMoveTo: 'Move to...',
             conversationsMoved: 'Moved to',
+            conversationsSyncDeleteTitle: 'Sync Deletion',
+            conversationsSyncDeleteMsg: '{count} conversation(s) have been deleted from cloud. Remove local records?',
+            conversationsDeleted: 'Removed',
         },
     };
 
@@ -3118,9 +3127,9 @@
                                 updatedAt: Date.now(),
                             };
                             this.saveData();
-                            // 刷新 UI（如果当前 Tab 是会话）
+                            // 轻量级更新计数（避免重建整个 UI 丢失展开状态）
                             if (this.isActive) {
-                                this.createUI();
+                                this.updateFolderCount(this.data.lastUsedFolderId || 'inbox');
                             }
                         }
                     } else if (retries > 0) {
@@ -3139,6 +3148,18 @@
             if (this.sidebarObserverStop) {
                 this.sidebarObserverStop();
                 this.sidebarObserverStop = null;
+            }
+        }
+
+        /**
+         * 轻量级更新文件夹计数（不重建 UI）
+         */
+        updateFolderCount(folderId) {
+            const folderItem = this.container?.querySelector(`.conversations-folder-item[data-folder-id="${folderId}"]`);
+            if (folderItem) {
+                const count = Object.values(this.data.conversations).filter((c) => c.folderId === folderId).length;
+                const countSpan = folderItem.querySelector('.conversations-folder-count');
+                if (countSpan) countSpan.textContent = `(${count})`;
             }
         }
 
@@ -3275,8 +3296,9 @@
          * 从侧边栏同步会话（增量）
          * @param {string} targetFolderId 可选，指定目标文件夹
          * @param {boolean} silent 是否静默同步（不显示 Toast）
+         * @param {boolean} checkForDeletions 是否检查并删除失效会话（仅全量同步时启用）
          */
-        syncConversations(targetFolderId = null, silent = false) {
+        syncConversations(targetFolderId = null, silent = false, checkForDeletions = false) {
             const sidebarItems = this.siteAdapter.getConversationList();
 
             if (!sidebarItems || sidebarItems.length === 0) {
@@ -3338,6 +3360,23 @@
                 this.createUI();
             }
 
+            // 检查已删除的会话
+            if (checkForDeletions) {
+                const remoteIds = new Set(sidebarItems.map((item) => item.id));
+                const localIds = Object.keys(this.data.conversations);
+                const missingIds = localIds.filter((id) => !remoteIds.has(id));
+
+                if (missingIds.length > 0) {
+                    const msg = (this.t('conversationsSyncDeleteMsg') || '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？').replace('{count}', missingIds.length);
+                    this.showConfirmDialog(this.t('conversationsSyncDeleteTitle') || '同步删除', msg, () => {
+                        missingIds.forEach((id) => delete this.data.conversations[id]);
+                        this.saveData();
+                        this.createUI();
+                        showToast(`${this.t('conversationsDeleted') || '已移除'} ${missingIds.length}`);
+                    });
+                }
+            }
+
             if (!silent) {
                 if (newCount > 0 || updatedCount > 0) {
                     showToast(`${this.t('conversationsSynced') || '同步完成'}：+${newCount} ↻${updatedCount}`);
@@ -3390,6 +3429,37 @@
         }
 
         /**
+         * 显示确认对话框
+         */
+        showConfirmDialog(title, message, onConfirm) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, title));
+
+            const msgDiv = createElement('div', { className: 'conversations-dialog-message' }, message);
+            dialog.appendChild(msgDiv);
+
+            // 按钮
+            const btns = createElement('div', { className: 'conversations-dialog-buttons' });
+
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            btns.appendChild(cancelBtn);
+
+            const confirmBtn = createElement('button', { className: 'conversations-dialog-btn confirm' }, this.t('confirm') || '确定');
+            confirmBtn.addEventListener('click', () => {
+                overlay.remove();
+                onConfirm();
+            });
+            btns.appendChild(confirmBtn);
+
+            dialog.appendChild(btns);
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+        }
+
+        /**
          * 创建会话面板 UI
          */
         createUI() {
@@ -3435,7 +3505,7 @@
                 syncBtn.disabled = true;
                 syncBtn.textContent = '⏳';
                 await this.siteAdapter.loadAllConversations();
-                this.syncConversations(folderSelect.value);
+                this.syncConversations(folderSelect.value, false, true);
                 syncBtn.disabled = false;
                 syncBtn.textContent = '🔄';
             });
@@ -3502,6 +3572,11 @@
 
                     const isExpanded = folderItem.classList.toggle('expanded');
                     if (isExpanded) {
+                        // 刷新计数（确保与实际会话数一致）
+                        const count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id).length;
+                        const countSpan = folderItem.querySelector('.conversations-folder-count');
+                        if (countSpan) countSpan.textContent = `(${count})`;
+
                         this.renderConversationList(folder.id, conversationList);
                         conversationList.style.display = 'block';
                     } else {
@@ -5427,6 +5502,10 @@
                 }
                 .conversations-dialog-title {
                     font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 16px;
+                }
+                .conversations-dialog-message {
+                    font-size: 14px; color: #4b5563; margin-bottom: 20px; line-height: 1.5;
+                    white-space: pre-line;
                 }
                 .conversations-dialog-section {
                     margin-bottom: 16px;
