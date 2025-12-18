@@ -3015,6 +3015,33 @@
         }
 
         /**
+         * 上移文件夹
+         * @param {string} folderId 文件夹 ID
+         */
+        moveFolderUp(folderId) {
+            const index = this.data.folders.findIndex((f) => f.id === folderId);
+            // index 0 是收件箱（固定），index 1 是第一个可移动的
+            if (index <= 1) return;
+            // 与上一个交换位置
+            [this.data.folders[index - 1], this.data.folders[index]] = [this.data.folders[index], this.data.folders[index - 1]];
+            this.saveData();
+            this.createUI();
+        }
+
+        /**
+         * 下移文件夹
+         * @param {string} folderId 文件夹 ID
+         */
+        moveFolderDown(folderId) {
+            const index = this.data.folders.findIndex((f) => f.id === folderId);
+            if (index <= 0 || index >= this.data.folders.length - 1) return;
+            // 与下一个交换位置
+            [this.data.folders[index], this.data.folders[index + 1]] = [this.data.folders[index + 1], this.data.folders[index]];
+            this.saveData();
+            this.createUI();
+        }
+
+        /**
          * 创建文件夹
          * @param {string} name 文件夹名称
          * @param {string} icon 图标 emoji
@@ -3131,8 +3158,8 @@
                 return container;
             }
 
-            this.data.folders.forEach((folder) => {
-                const folderItem = this.createFolderItem(folder);
+            this.data.folders.forEach((folder, index) => {
+                const folderItem = this.createFolderItem(folder, index);
                 container.appendChild(folderItem);
             });
 
@@ -3141,17 +3168,33 @@
 
         /**
          * 创建单个文件夹项
+         * @param {number} index 文件夹在数组中的索引
          */
-        createFolderItem(folder) {
+        createFolderItem(folder, index) {
+            // 为非默认文件夹生成柔和的背景色（较淡）
+            const bgColors = ['#fef9e7', '#fdf2f8', '#eff6ff', '#ecfdf5', '#faf5ff', '#fefce8', '#ecfeff', '#fdf4ff'];
+            const bgColor = folder.isDefault ? '#f0f9ff' : bgColors[index % bgColors.length];
+
             const item = createElement('div', {
                 className: 'conversations-folder-item' + (folder.isDefault ? ' default' : ''),
                 'data-folder-id': folder.id,
+                style: `background: ${bgColor};`,
             });
 
             // 文件夹信息
+            const folderName = folder.name.replace(folder.icon, '').trim();
             const info = createElement('div', { className: 'conversations-folder-info' });
             info.appendChild(createElement('span', { className: 'conversations-folder-icon' }, folder.icon));
-            info.appendChild(createElement('span', { className: 'conversations-folder-name' }, folder.name.replace(folder.icon, '').trim()));
+            info.appendChild(
+                createElement(
+                    'span',
+                    {
+                        className: 'conversations-folder-name',
+                        title: folderName, // 鼠标悬停显示全名
+                    },
+                    folderName,
+                ),
+            );
 
             // 会话计数
             const count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id).length;
@@ -3159,18 +3202,61 @@
 
             item.appendChild(info);
 
-            // 操作菜单（非默认文件夹才显示）
+            // 控制按钮区域
+            const controls = createElement('div', { className: 'conversations-folder-controls' });
+
+            // 上下排序按钮（非默认文件夹才显示）
             if (!folder.isDefault) {
+                // 上移按钮
+                const upBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-folder-order-btn',
+                        title: this.t('moveUp') || '上移',
+                    },
+                    '↑',
+                );
+                if (index <= 1) upBtn.disabled = true; // index 0 是收件箱，1 是第一个非默认
+                upBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!upBtn.disabled) this.moveFolderUp(folder.id);
+                });
+
+                // 下移按钮
+                const downBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-folder-order-btn',
+                        title: this.t('moveDown') || '下移',
+                    },
+                    '↓',
+                );
+                if (index >= this.data.folders.length - 1) downBtn.disabled = true;
+                downBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!downBtn.disabled) this.moveFolderDown(folder.id);
+                });
+
+                controls.appendChild(upBtn);
+                controls.appendChild(downBtn);
+
+                // 操作菜单按钮
                 const menuBtn = createElement('button', { className: 'conversations-folder-menu-btn' }, '⋯');
                 menuBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.showFolderMenu(folder, menuBtn);
                 });
-                item.appendChild(menuBtn);
+                controls.appendChild(menuBtn);
             }
+
+            item.appendChild(controls);
 
             // 点击展开/折叠（Phase 3 实现）
             item.addEventListener('click', () => {
+                // 取消其他文件夹的 expanded 状态
+                document.querySelectorAll('.conversations-folder-item.expanded').forEach((el) => {
+                    if (el !== item) el.classList.remove('expanded');
+                });
                 item.classList.toggle('expanded');
                 // Phase 3: 展开时显示会话列表
             });
@@ -4686,18 +4772,47 @@
                 }
                 .conversations-folder-item:hover { background: #f3f4f6; }
                 .conversations-folder-item.default { background: #e0f2fe; }
-                .conversations-folder-item.expanded { background: #e0e7ff; }
-                .conversations-folder-info {
-                    display: flex; align-items: center; gap: 8px; flex: 1;
+                .conversations-folder-item.expanded {
+                    background: #c7d2fe !important; /* 更深的紫蓝色 */
+                    border: 2px solid #6366f1; /* 明显的边框 */
+                    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
                 }
-                .conversations-folder-icon { font-size: 18px; }
-                .conversations-folder-name { font-size: 14px; font-weight: 500; color: #1f2937; }
-                .conversations-folder-count { font-size: 12px; color: #6b7280; }
+                .conversations-folder-info {
+                    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; /* 关键：允许 flex 子元素收缩 */
+                }
+                .conversations-folder-icon {
+                    font-size: 18px; width: 24px; height: 24px;
+                    display: flex; align-items: center; justify-content: center;
+                    line-height: 1; flex-shrink: 0;
+                }
+                .conversations-folder-name {
+                    font-size: 14px; font-weight: 500; color: #1f2937;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; /* 占据剩余空间并截断 */
+                }
+                .conversations-folder-count { font-size: 12px; color: #6b7280; flex-shrink: 0; }
                 .conversations-folder-menu-btn {
                     width: 24px; height: 24px; border: none; background: transparent;
                     color: #6b7280; cursor: pointer; border-radius: 4px; font-size: 14px;
                 }
                 .conversations-folder-menu-btn:hover { background: #e5e7eb; }
+                .conversations-folder-controls {
+                    display: flex; align-items: center; gap: 4px;
+                }
+                .conversations-folder-order-btn {
+                    width: 22px; height: 22px; border: 1px solid #d1d5db; border-radius: 4px;
+                    background: white; color: #6b7280; cursor: pointer; font-size: 12px;
+                    display: flex; align-items: center; justify-content: center;
+                    transition: all 0.2s; opacity: 0; /* 默认隐藏 */
+                }
+                .conversations-folder-item:hover .conversations-folder-order-btn {
+                    opacity: 1; /* 悬停显示 */
+                }
+                .conversations-folder-order-btn:hover:not(:disabled) {
+                    background: #f3f4f6; border-color: #9ca3af; color: #374151;
+                }
+                .conversations-folder-order-btn:disabled {
+                    opacity: 0; cursor: default; /* 禁用的按钮保持隐藏 */
+                }
                 .conversations-folder-menu {
                     background: white; border: 1px solid #e5e7eb; border-radius: 8px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000002; padding: 4px;
