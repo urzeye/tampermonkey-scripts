@@ -3706,6 +3706,34 @@
             // 文件夹信息（图标 + 名称）
             const folderName = folder.name.replace(folder.icon, '').trim();
             const info = createElement('div', { className: 'conversations-folder-info' });
+
+            // 全选复选框（仅批量模式下显示）
+            if (this.batchMode) {
+                const conversationsInFolder = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id);
+                const allSelected = conversationsInFolder.length > 0 && conversationsInFolder.every((c) => this.selectedIds.has(c.id));
+                const someSelected = !allSelected && conversationsInFolder.some((c) => this.selectedIds.has(c.id));
+
+                const checkbox = createElement('input', {
+                    type: 'checkbox',
+                    className: 'conversations-folder-checkbox',
+                });
+                checkbox.checked = allSelected;
+                if (someSelected) checkbox.indeterminate = true;
+
+                checkbox.addEventListener('click', (e) => e.stopPropagation());
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        // 全选
+                        conversationsInFolder.forEach((c) => this.selectedIds.add(c.id));
+                    } else {
+                        // 全不选
+                        conversationsInFolder.forEach((c) => this.selectedIds.delete(c.id));
+                    }
+                    this.createUI(); // 使用 createUI 重绘以更新状态
+                });
+                info.appendChild(checkbox);
+            }
+
             info.appendChild(createElement('span', { className: 'conversations-folder-icon' }, folder.icon));
             info.appendChild(
                 createElement(
@@ -3844,6 +3872,23 @@
 
             title.addEventListener('click', (e) => {
                 e.stopPropagation();
+
+                // 批量模式下点击标题触发行选中
+                if (this.batchMode) {
+                    const checkbox = item.querySelector('.conversations-item-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        // 手动触发 change 事件处理逻辑
+                        if (checkbox.checked) {
+                            this.selectedIds.add(conv.id);
+                        } else {
+                            this.selectedIds.delete(conv.id);
+                        }
+                        this.updateBatchActionBar();
+                    }
+                    return;
+                }
+
                 // 尝试模拟点击侧边栏中对应的会话项（无刷新切换）
                 const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${conv.id}"]`);
                 if (sidebarItem) {
@@ -5934,6 +5979,10 @@
                 .conversations-item-menu button.danger:hover { background: #fef2f2; }
 
                 /* 复选框样式 */
+                .conversations-folder-checkbox {
+                    margin-right: 8px; width: 16px; height: 16px; cursor: pointer;
+                    accent-color: #4b5563; flex-shrink: 0;
+                }
                 .conversations-item-checkbox {
                     width: 16px; height: 16px; margin-right: 8px; cursor: pointer;
                     accent-color: #4b5563; flex-shrink: 0;
