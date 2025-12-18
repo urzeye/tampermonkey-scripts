@@ -806,6 +806,42 @@
         }
 
         /**
+         * 获取侧边栏可滚动容器
+         * 子类应覆盖此方法返回侧边栏的可滚动容器元素
+         * @returns {Element|null}
+         */
+        getSidebarScrollContainer() {
+            return null;
+        }
+
+        /**
+         * 滚动加载全部会话
+         * 模拟滚动侧边栏到底部，直到所有会话都加载完成
+         * @returns {Promise<void>}
+         */
+        async loadAllConversations() {
+            const container = this.getSidebarScrollContainer();
+            if (!container) return;
+
+            let lastCount = 0;
+            let stableRounds = 0;
+            const maxStableRounds = 3; // 连续3次无新增则停止
+
+            while (stableRounds < maxStableRounds) {
+                container.scrollTop = container.scrollHeight;
+                await new Promise((r) => setTimeout(r, 500));
+
+                const currentCount = document.querySelectorAll('.conversation').length;
+                if (currentCount === lastCount) {
+                    stableRounds++;
+                } else {
+                    lastCount = currentCount;
+                    stableRounds = 0;
+                }
+            }
+        }
+
+        /**
          * 检测 AI 是否正在生成响应
          * @returns {boolean}
          */
@@ -1319,6 +1355,14 @@
                     };
                 })
                 .filter((c) => c.id); // 过滤掉没有 ID 的项
+        }
+
+        /**
+         * 获取侧边栏可滚动容器
+         * @returns {Element|null}
+         */
+        getSidebarScrollContainer() {
+            return DOMToolkit.query('infinite-scroller[scrollable="true"]') || DOMToolkit.query('infinite-scroller');
         }
 
         getSessionName() {
@@ -3042,6 +3086,65 @@
         init() {
             this.loadData();
             this.createUI();
+            this.startSidebarObserver();
+        }
+
+        /**
+         * 启动侧边栏实时监听
+         * 使用 DOMToolkit.each 监听新会话添加
+         */
+        startSidebarObserver() {
+            if (this.sidebarObserverStop) return; // 已经在监听
+
+            this.sidebarObserverStop = DOMToolkit.each('.conversation', (el, isNew) => {
+                if (!isNew) return; // 只处理新增的会话
+
+                // 从 jslog 提取 ID
+                const jslog = el.getAttribute('jslog') || '';
+                const idMatch = jslog.match(/\["c_([a-z0-9]+)"/);
+                const id = idMatch ? idMatch[1] : '';
+                if (!id || this.data.conversations[id]) return; // 无ID或已存在
+
+                // 自动添加新会话到当前选中文件夹
+                this.data.conversations[id] = {
+                    id,
+                    title: el.textContent?.trim() || '',
+                    url: `https://gemini.google.com/app/${id}`,
+                    folderId: this.data.lastUsedFolderId || 'inbox',
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                };
+                this.saveData();
+                // 刷新 UI（如果当前 Tab 是会话）
+                if (this.isActive) {
+                    this.createUI();
+                }
+            });
+        }
+
+        /**
+         * 停止侧边栏监听
+         */
+        stopSidebarObserver() {
+            if (this.sidebarObserverStop) {
+                this.sidebarObserverStop();
+                this.sidebarObserverStop = null;
+            }
+        }
+
+        /**
+         * 激活会话 Tab 时调用
+         */
+        activate() {
+            this.isActive = true;
+            this.createUI();
+        }
+
+        /**
+         * 停用会话 Tab 时调用
+         */
+        deactivate() {
+            this.isActive = false;
         }
 
         /**
@@ -3274,32 +3377,58 @@
             // 工具栏
             const toolbar = createElement('div', { className: 'conversations-toolbar' });
 
-            // 新建文件夹按钮
+            // 1. 同步目标选择 (左侧)
+            const folderSelect = createElement('select', {
+                className: 'conversations-folder-select',
+                id: 'conversations-folder-select',
+                title: this.t('conversationsSelectFolder') || 'Select folder',
+            });
+            this.data.folders.forEach((folder) => {
+                // 仅显示名称，避免图标重复或杂乱
+                const option = createElement('option', { value: folder.id }, folder.name);
+                if (folder.id === (this.data.lastUsedFolderId || 'inbox')) {
+                    option.selected = true;
+                }
+                folderSelect.appendChild(option);
+            });
+            folderSelect.addEventListener('change', () => {
+                this.data.lastUsedFolderId = folderSelect.value;
+                this.saveData();
+            });
+            toolbar.appendChild(folderSelect);
+
+            // 2. 同步按钮 (紧跟下拉框)
+            const syncBtn = createElement(
+                'button',
+                {
+                    className: 'conversations-toolbar-btn sync',
+                    id: 'conversations-sync-btn',
+                    title: this.t('conversationsSync'),
+                },
+                '🔄',
+            );
+            syncBtn.addEventListener('click', async () => {
+                syncBtn.disabled = true;
+                syncBtn.textContent = '⏳';
+                await this.siteAdapter.loadAllConversations();
+                this.syncConversations(folderSelect.value);
+                syncBtn.disabled = false;
+                syncBtn.textContent = '🔄';
+            });
+            toolbar.appendChild(syncBtn);
+
+            // 3. 新建文件夹按钮 (右侧，仅图标)
             const addFolderBtn = createElement(
                 'button',
                 {
-                    className: 'conversations-toolbar-btn',
-                    title: this.t('conversationsAddFolder') || '新建文件夹',
+                    className: 'conversations-toolbar-btn add-folder',
+                    title: this.t('conversationsAddFolder') || 'New Folder',
                 },
-                '➕ ' + (this.t('conversationsAddFolder') || '新建文件夹'),
+                '➕',
             );
             addFolderBtn.addEventListener('click', () => this.showCreateFolderDialog());
             toolbar.appendChild(addFolderBtn);
 
-            // 同步按钮
-            const syncBtn = createElement(
-                'button',
-                {
-                    className: 'conversations-toolbar-btn',
-                    id: 'conversations-sync-btn',
-                    title: this.t('conversationsSync'),
-                },
-                '🔄 ' + this.t('conversationsSync'),
-            );
-            syncBtn.addEventListener('click', () => {
-                this.syncConversations();
-            });
-            toolbar.appendChild(syncBtn);
             content.appendChild(toolbar);
 
             // 文件夹列表
@@ -3436,15 +3565,18 @@
             const count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id).length;
             controls.appendChild(createElement('span', { className: 'conversations-folder-count' }, `(${count})`));
 
-            // 操作菜单按钮（非默认文件夹）
-            if (!folder.isDefault) {
-                const menuBtn = createElement('button', { className: 'conversations-folder-menu-btn' }, '⋯');
+            // 操作菜单按钮（始终渲染以保持对齐，默认文件夹隐藏）
+            const menuBtn = createElement('button', { className: 'conversations-folder-menu-btn' }, '⋯');
+            if (folder.isDefault) {
+                menuBtn.style.visibility = 'hidden';
+                menuBtn.style.pointerEvents = 'none'; // 避免阻挡点击
+            } else {
                 menuBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.showFolderMenu(folder, menuBtn);
                 });
-                controls.appendChild(menuBtn);
             }
+            controls.appendChild(menuBtn);
 
             item.appendChild(controls);
 
@@ -5119,6 +5251,14 @@
                     display: flex; align-items: center; gap: 4px;
                 }
                 .conversations-toolbar-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+                .conversations-toolbar-btn.sync { padding: 6px 10px; }
+                .conversations-toolbar-btn:disabled { opacity: 0.6; cursor: wait; }
+                .conversations-folder-select {
+                    padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px;
+                    background: #f9fafb; font-size: 13px; color: #374151; cursor: pointer;
+                    flex: 1; min-width: 0; max-width: 150px;
+                }
+                .conversations-folder-select:focus { outline: none; border-color: #6366f1; }
                 .conversations-folder-list {
                     flex: 1; overflow-y: auto; padding: 8px;
                     scrollbar-width: none; /* Firefox */
