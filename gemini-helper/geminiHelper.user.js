@@ -2161,6 +2161,22 @@
     }
 
     /**
+     * 全局 Toast 提示函数
+     * @param {string} message 提示信息
+     * @param {number} duration 显示时长 (ms)
+     */
+    function showToast(message, duration = 2000) {
+        const existing = document.querySelector('.gemini-toast');
+        if (existing) existing.remove();
+        const toast = createElement('div', { className: 'gemini-toast' }, message);
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.animation = 'toastSlideIn 0.3s reverse';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    /**
      * 页面宽度样式管理器
      * 负责动态注入和移除页面宽度样式
      */
@@ -2940,7 +2956,7 @@
                 '🔄 ' + this.t('conversationsSync'),
             );
             syncBtn.addEventListener('click', () => {
-                this.showToast(this.t('conversationsSyncing'));
+                showToast(this.t('conversationsSyncing'));
                 // Phase 3 实现同步逻辑
             });
             toolbar.appendChild(syncBtn);
@@ -2961,18 +2977,6 @@
             content.appendChild(placeholder);
 
             container.appendChild(content);
-        }
-
-        /**
-         * 显示提示消息
-         */
-        showToast(message) {
-            const existing = document.querySelector('.gemini-helper-toast');
-            if (existing) existing.remove();
-
-            const toast = createElement('div', { className: 'gemini-helper-toast' }, message);
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2000);
         }
 
         /**
@@ -4243,7 +4247,7 @@
                 .quick-btn-group.hidden { display: none; }
                 .hidden { display: none !important; }
                 .outline-hidden { display: none !important; }
-                .prompt-toast {
+                .gemini-toast {
                     position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981;
                     color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000001; animation: toastSlideIn 0.3s;
@@ -4502,12 +4506,12 @@
                 // 根据当前 Tab 智能刷新
                 if (this.currentTab === 'outline') {
                     this.refreshOutline();
-                    this.showToast(this.t('refreshed'));
+                    showToast(this.t('refreshed'));
                 } else if (this.currentTab === 'prompts') {
                     this.refreshPromptList();
-                    this.showToast(this.t('refreshed'));
+                    showToast(this.t('refreshed'));
                 } else {
-                    this.showToast(this.t('refreshed'));
+                    showToast(this.t('refreshed'));
                 }
                 setTimeout(() => refreshBtn.classList.remove('loading'), 500);
             });
@@ -4592,7 +4596,7 @@
                             privacyTitleItem.style.pointerEvents = isPrivate ? 'auto' : 'none';
                         }
                     }
-                    this.showToast(isPrivate ? '🔒 隐私模式已开启' : '🔓 隐私模式已关闭');
+                    showToast(isPrivate ? '🔒 隐私模式已开启' : '🔓 隐私模式已关闭');
                 }
             });
 
@@ -4966,7 +4970,7 @@
                 this.createUI();
                 this.bindEvents();
                 this.switchTab('settings');
-                this.showToast(langSelect.value === 'auto' ? this.t('languageAuto') : langSelect.options[langSelect.selectedIndex].text);
+                showToast(langSelect.value === 'auto' ? this.t('languageAuto') : langSelect.options[langSelect.selectedIndex].text);
             });
 
             langItem.appendChild(langInfo);
@@ -5064,7 +5068,7 @@
                 if (this.widthStyleManager) {
                     this.widthStyleManager.updateConfig(this.settings.pageWidth);
                 }
-                this.showToast(this.settings.pageWidth.enabled ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.pageWidth.enabled ? this.t('settingOn') : this.t('settingOff'));
             });
             enableWidthItem.appendChild(enableWidthInfo);
             enableWidthItem.appendChild(enableToggle);
@@ -5123,7 +5127,7 @@
                 if (unitSelect.value === '%' && parseFloat(widthInput.value) > 100) widthInput.value = '70';
                 else if (unitSelect.value === 'px' && parseFloat(widthInput.value) <= 100) widthInput.value = '1200';
                 validateAndSave();
-                this.showToast(`${this.t('widthValue')}: ${widthInput.value}${unitSelect.value}`);
+                showToast(`${this.t('widthValue')}: ${widthInput.value}${unitSelect.value}`);
             });
 
             widthControls.appendChild(widthInput);
@@ -5149,7 +5153,7 @@
                 if (this.scrollLockManager) {
                     this.scrollLockManager.setEnabled(this.settings.preventAutoScroll);
                 }
-                this.showToast(this.settings.preventAutoScroll ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.preventAutoScroll ? this.t('settingOn') : this.t('settingOff'));
             });
             scrollLockItem.appendChild(scrollLockInfo);
             scrollLockItem.appendChild(scrollLockToggle);
@@ -5206,7 +5210,7 @@
                             this.outlineManager.updateAutoUpdateState();
                         }
 
-                        this.showToast(this.settings.outline.enabled ? this.t('settingOn') : this.t('settingOff'));
+                        showToast(this.settings.outline.enabled ? this.t('settingOn') : this.t('settingOff'));
                     });
                     controls.appendChild(outlineToggle);
                 }
@@ -5230,7 +5234,7 @@
 
                         if (!this.settings.prompts.enabled && this.currentTab === 'prompts') this.switchTab('settings');
 
-                        this.showToast(this.settings.prompts.enabled ? this.t('settingOn') : this.t('settingOff'));
+                        showToast(this.settings.prompts.enabled ? this.t('settingOn') : this.t('settingOff'));
                     });
                     controls.appendChild(promptsToggle);
                 }
@@ -5258,7 +5262,7 @@
 
                         if (!this.settings.conversations.enabled && this.currentTab === 'conversations') this.switchTab('settings');
 
-                        this.showToast(this.settings.conversations.enabled ? this.t('settingOn') : this.t('settingOff'));
+                        showToast(this.settings.conversations.enabled ? this.t('settingOn') : this.t('settingOff'));
                     });
                     controls.appendChild(conversationsToggle);
                 }
@@ -5403,20 +5407,20 @@
                 anchorPersistenceToggle.classList.toggle('active', this.settings.readingHistory.persistence);
                 this.saveSettings();
                 updateDependency(this.settings.readingHistory.persistence);
-                this.showToast(this.settings.readingHistory.persistence ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.readingHistory.persistence ? this.t('settingOn') : this.t('settingOff'));
             });
 
             anchorAutoRestoreToggle.addEventListener('click', () => {
                 this.settings.readingHistory.autoRestore = !this.settings.readingHistory.autoRestore;
                 anchorAutoRestoreToggle.classList.toggle('active', this.settings.readingHistory.autoRestore);
                 this.saveSettings();
-                this.showToast(this.settings.readingHistory.autoRestore ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.readingHistory.autoRestore ? this.t('settingOn') : this.t('settingOff'));
             });
 
             anchorCleanupInput.addEventListener('change', () => {
                 this.settings.readingHistory.cleanupDays = parseInt(anchorCleanupInput.value);
                 this.saveSettings();
-                this.showToast(`${this.t('readingHistoryCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
+                showToast(`${this.t('readingHistoryCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
             });
 
             anchorPersistenceItem.appendChild(anchorPersistenceInfo);
@@ -5455,7 +5459,7 @@
                     quickAnchor.style.display = this.settings.showCollapsedAnchor ? 'flex' : 'none';
                 }
 
-                this.showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
             });
             showAnchorItem.appendChild(showAnchorInfo);
             showAnchorItem.appendChild(showAnchorToggle);
@@ -5481,7 +5485,7 @@
                 autoUpdateToggle.classList.toggle('active', this.settings.outline.autoUpdate);
                 this.saveSettings();
                 if (this.outlineManager) this.outlineManager.updateAutoUpdateState();
-                this.showToast(this.settings.outline.autoUpdate ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.outline.autoUpdate ? this.t('settingOn') : this.t('settingOff'));
             });
             autoUpdateItem.appendChild(autoUpdateInfo);
             autoUpdateItem.appendChild(autoUpdateToggle);
@@ -5506,7 +5510,7 @@
                 this.settings.outline.updateInterval = val;
                 this.saveSettings();
                 // OutlineManager 在触发下一次更新时会自动使用新间隔
-                this.showToast(this.t('outlineIntervalUpdated').replace('{val}', val));
+                showToast(this.t('outlineIntervalUpdated').replace('{val}', val));
             });
             updateIntervalControls.appendChild(updateIntervalInput);
             updateIntervalItem.appendChild(updateIntervalInfo);
@@ -5538,7 +5542,7 @@
                     if (this.currentTab === 'settings') {
                         this.switchTab('settings');
                     }
-                    this.showToast(this.settings.tabSettings.openInNewTab ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.openInNewTab ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 newTabItem.appendChild(newTabInfo);
@@ -5584,7 +5588,7 @@
                     if (this.tabRenameManager && this.tabRenameManager.isActive()) {
                         this.tabRenameManager.setInterval(this.settings.tabSettings.renameInterval);
                     }
-                    this.showToast(`${this.t('renameIntervalLabel')}: ${intervalSelect.value}${this.t('secondsSuffix')}`);
+                    showToast(`${this.t('renameIntervalLabel')}: ${intervalSelect.value}${this.t('secondsSuffix')}`);
                 });
 
                 intervalControls.appendChild(intervalSelect);
@@ -5621,7 +5625,7 @@
                         }
                     }
 
-                    this.showToast(this.settings.tabSettings.autoRenameTab ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.autoRenameTab ? this.t('settingOn') : this.t('settingOff'));
                 });
             }
 
@@ -5641,7 +5645,7 @@
                     showStatusToggle.classList.toggle('active', this.settings.tabSettings.showStatus);
                     this.saveSettings();
                     if (this.tabRenameManager) this.tabRenameManager.updateTabName(true);
-                    this.showToast(this.settings.tabSettings.showStatus ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.showStatus ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 showStatusItem.appendChild(showStatusInfo);
@@ -5688,7 +5692,7 @@
                     this.settings.tabSettings.showNotification = !this.settings.tabSettings.showNotification;
                     notificationToggle.classList.toggle('active', this.settings.tabSettings.showNotification);
                     this.saveSettings();
-                    this.showToast(this.settings.tabSettings.showNotification ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.showNotification ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 notificationItem.appendChild(notificationInfo);
@@ -5711,7 +5715,7 @@
                     this.settings.tabSettings.autoFocus = !this.settings.tabSettings.autoFocus;
                     autoFocusToggle.classList.toggle('active', this.settings.tabSettings.autoFocus);
                     this.saveSettings();
-                    this.showToast(this.settings.tabSettings.autoFocus ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.autoFocus ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 autoFocusItem.appendChild(autoFocusInfo);
@@ -5778,7 +5782,7 @@
                     if (this.tabRenameManager) this.tabRenameManager.updateTabName(true);
                     // 更新伪装标题项状态
                     updatePrivacyTitleState();
-                    this.showToast(this.settings.tabSettings.privacyMode ? '🔒 ' + this.t('settingOn') : '🔓 ' + this.t('settingOff'));
+                    showToast(this.settings.tabSettings.privacyMode ? '🔒 ' + this.t('settingOn') : '🔓 ' + this.t('settingOff'));
                 });
             }
 
@@ -5801,7 +5805,7 @@
                     this.settings.clearTextareaOnSend = !this.settings.clearTextareaOnSend;
                     toggle.classList.toggle('active', this.settings.clearTextareaOnSend);
                     this.saveSettings();
-                    this.showToast(this.settings.clearTextareaOnSend ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.clearTextareaOnSend ? this.t('settingOn') : this.t('settingOff'));
                 });
                 clearItem.appendChild(clearInfo);
                 clearItem.appendChild(toggle);
@@ -5852,7 +5856,7 @@
         // 恢复阅读历史 (Auto-Resume)
         async restoreReadingProgress() {
             // 将 showToast 传给 manager 以显示加载进度
-            const success = await this.readingProgressManager.restoreProgress((msg) => this.showToast(msg));
+            const success = await this.readingProgressManager.restoreProgress((msg) => showToast(msg));
 
             const onRestorationComplete = () => {
                 // 延迟一点开启记录，避开惯性滚动等干扰，确保后续的用户滚动能被正确记录
@@ -5867,7 +5871,7 @@
                 if (restoredTop !== undefined) {
                     this.anchorManager.setAnchor(restoredTop);
                 }
-                this.showToast(this.t('restoredPosition'));
+                showToast(this.t('restoredPosition'));
             }
 
             // 无论成功失败，最后都开启记录
@@ -5883,9 +5887,9 @@
         handleAnchorClick() {
             if (this.anchorManager.hasAnchor()) {
                 this.anchorManager.backToAnchor();
-                this.showToast(this.t('jumpToAnchor'));
+                showToast(this.t('jumpToAnchor'));
             } else {
-                this.showToast('暂无阅读锚点 (点击顶部/底部按钮可自动生成)');
+                showToast('暂无阅读锚点 (点击顶部/底部按钮可自动生成)');
             }
         }
 
@@ -6030,7 +6034,7 @@
             this.savePrompts();
             this.refreshCategories();
             this.refreshPromptList();
-            this.showToast(`分类已重命名为"${newName}"`);
+            showToast(`分类已重命名为"${newName}"`);
         }
 
         // 删除分类（将关联提示词移至"未分类"）
@@ -6043,7 +6047,7 @@
             this.savePrompts();
             this.refreshCategories();
             this.refreshPromptList();
-            this.showToast(`分类"${name}"已删除`);
+            showToast(`分类"${name}"已删除`);
         }
 
         refreshPromptList(filter = '') {
@@ -6190,12 +6194,12 @@
 
             this.prompts = orderedPrompts;
             this.savePrompts();
-            this.showToast(this.t('orderUpdated'));
+            showToast(this.t('orderUpdated'));
         }
 
         selectPrompt(prompt, itemElement) {
             if (this.isScrolling) {
-                this.showToast(this.t('scrolling'));
+                showToast(this.t('scrolling'));
                 return;
             }
             this.selectedPrompt = prompt;
@@ -6211,12 +6215,12 @@
             }
 
             this.insertPromptToTextarea(prompt.content);
-            this.showToast(`${this.t('inserted')}: ${prompt.title}`);
+            showToast(`${this.t('inserted')}: ${prompt.title}`);
         }
 
         insertPromptToTextarea(promptContent) {
             if (this.isScrolling) {
-                this.showToast('页面正在滚动，请稍后再选择提示词');
+                showToast('页面正在滚动，请稍后再选择提示词');
                 return;
             }
             const promiseOrResult = this.siteAdapter.insertPrompt(promptContent);
@@ -6225,13 +6229,13 @@
             if (promiseOrResult instanceof Promise) {
                 promiseOrResult.then((success) => {
                     if (!success) {
-                        this.showToast('未找到输入框，请点击输入框后重试');
+                        showToast('未找到输入框，请点击输入框后重试');
                         // 再次尝试查找
                         this.siteAdapter.findTextarea();
                     }
                 });
             } else if (!promiseOrResult) {
-                this.showToast('未找到输入框，请点击输入框后重试');
+                showToast('未找到输入框，请点击输入框后重试');
                 this.siteAdapter.findTextarea();
             }
         }
@@ -6300,10 +6304,10 @@
 
                 if (isEdit) {
                     this.updatePrompt(prompt.id, { title, category: categoryInput.value.trim(), content });
-                    this.showToast(this.t('promptUpdated'));
+                    showToast(this.t('promptUpdated'));
                 } else {
                     this.addPrompt({ title, category: categoryInput.value.trim(), content });
-                    this.showToast(this.t('promptAdded'));
+                    showToast(this.t('promptAdded'));
                 }
                 modal.remove();
             });
@@ -6311,15 +6315,6 @@
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) modal.remove();
             });
-        }
-
-        showToast(message) {
-            const toast = createElement('div', { className: 'prompt-toast' }, message);
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.animation = 'toastSlideIn 0.3s reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 2000);
         }
 
         findElementByComposedPath(e) {
@@ -6362,7 +6357,7 @@
                 } else if (e.target.classList.contains('delete-prompt')) {
                     if (confirm(this.t('confirmDelete'))) {
                         this.deletePrompt(e.target.dataset.id);
-                        this.showToast(this.t('deleted'));
+                        showToast(this.t('deleted'));
                     }
                 } else if (e.target.classList.contains('copy-prompt')) {
                     const prompt = this.prompts.find((p) => p.id === e.target.dataset.id);
@@ -6370,7 +6365,7 @@
                         navigator.clipboard
                             .writeText(prompt.content)
                             .then(() => {
-                                this.showToast(this.t('copied'));
+                                showToast(this.t('copied'));
                             })
                             .catch(() => {
                                 // 降级方案
@@ -6380,7 +6375,7 @@
                                 textarea.select();
                                 document.execCommand('copy');
                                 document.body.removeChild(textarea);
-                                this.showToast(this.t('copied'));
+                                showToast(this.t('copied'));
                             });
                     }
                 }
@@ -6399,7 +6394,7 @@
                     // 其他适配器调用各自的 clearTextarea 方法
                     this.siteAdapter.clearTextarea();
                 }
-                this.showToast(this.t('cleared'));
+                showToast(this.t('cleared'));
             });
 
             this.makeDraggable();
