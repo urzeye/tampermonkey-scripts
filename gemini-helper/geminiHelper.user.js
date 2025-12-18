@@ -3552,48 +3552,64 @@
             });
             toolbar.appendChild(folderSelect);
 
+            // 定义局部 helper 创建 SVG
+            const createSVG = (pathData) => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('fill', 'currentColor');
+                svg.setAttribute('width', '18');
+                svg.setAttribute('height', '18');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', pathData);
+                svg.appendChild(path);
+                return svg;
+            };
+
+            const SYNC_PATH =
+                'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+            const HOURGLASS_PATH = 'M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z';
+            const CHECK_BOX_PATH = 'M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
+
             // 2. 同步按钮 (紧跟下拉框)
-            const syncBtn = createElement(
-                'button',
-                {
-                    className: 'conversations-toolbar-btn sync',
-                    id: 'conversations-sync-btn',
-                    title: this.t('conversationsSync'),
-                },
-                '🔄',
-            );
+            const syncBtn = createElement('button', {
+                className: 'conversations-toolbar-btn sync',
+                id: 'conversations-sync-btn',
+                title: this.t('conversationsSync'),
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            syncBtn.appendChild(createSVG(SYNC_PATH));
             syncBtn.addEventListener('click', async () => {
                 syncBtn.disabled = true;
-                syncBtn.textContent = '⏳';
+                clearElement(syncBtn);
+                syncBtn.appendChild(createSVG(HOURGLASS_PATH));
+
                 await this.siteAdapter.loadAllConversations();
                 this.syncConversations(folderSelect.value, false, true);
+
                 syncBtn.disabled = false;
-                syncBtn.textContent = '🔄';
+                clearElement(syncBtn);
+                syncBtn.appendChild(createSVG(SYNC_PATH));
             });
             toolbar.appendChild(syncBtn);
 
             // 3. 新建文件夹按钮 (右侧，仅图标)
-            const addFolderBtn = createElement(
-                'button',
-                {
-                    className: 'conversations-toolbar-btn add-folder',
-                    title: this.t('conversationsAddFolder') || 'New Folder',
-                },
-                '➕',
-            );
+            const addFolderBtn = createElement('button', {
+                className: 'conversations-toolbar-btn add-folder',
+                title: this.t('conversationsAddFolder') || 'New Folder',
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            addFolderBtn.appendChild(createSVG('M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z'));
             addFolderBtn.addEventListener('click', () => this.showCreateFolderDialog());
             toolbar.appendChild(addFolderBtn);
 
             // 4. 批量模式按钮
-            const batchModeBtn = createElement(
-                'button',
-                {
-                    className: 'conversations-toolbar-btn batch-mode' + (this.batchMode ? ' active' : ''),
-                    title: '批量操作',
-                    id: 'conversations-batch-mode-btn',
-                },
-                '☑️',
-            );
+            const batchModeBtn = createElement('button', {
+                className: 'conversations-toolbar-btn batch-mode' + (this.batchMode ? ' active' : ''),
+                title: '批量操作',
+                id: 'conversations-batch-mode-btn',
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            batchModeBtn.appendChild(createSVG(CHECK_BOX_PATH));
             batchModeBtn.addEventListener('click', () => this.toggleBatchMode());
             toolbar.appendChild(batchModeBtn);
 
@@ -3618,7 +3634,7 @@
 
                 const batchBtns = createElement('div', { className: 'conversations-batch-btns' });
 
-                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📁 ' + (this.t('batchMove') || '移动'));
+                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📂 ' + (this.t('batchMove') || '移动'));
                 batchMoveBtn.addEventListener('click', () => this.batchMove());
                 batchBtns.appendChild(batchMoveBtn);
 
