@@ -290,6 +290,10 @@
             conversationsSyncDeleteDesc: '删除本地会话记录时，同时从 {site} 云端删除',
             conversationsSyncRenameLabel: '重命名时同步云端',
             conversationsSyncRenameDesc: '修改会话标题时，同时在 {site} 侧边栏更新标题',
+            batchSelected: '已选 {n} 个',
+            batchMove: '移动',
+            batchDelete: '删除',
+            batchExit: '退出',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -485,6 +489,10 @@
             conversationsSyncDeleteDesc: '刪除本地會話記錄時，同時從 {site} 雲端刪除',
             conversationsSyncRenameLabel: '重命名時同步雲端',
             conversationsSyncRenameDesc: '修改會話標題時，同時在 {site} 側邊欄更新標題',
+            batchSelected: '已選 {n} 個',
+            batchMove: '移動',
+            batchDelete: '刪除',
+            batchExit: '退出',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -679,6 +687,10 @@
             conversationsSyncDeleteDesc: 'When deleting local record, also delete from {site} cloud',
             conversationsSyncRenameLabel: 'Sync rename to cloud',
             conversationsSyncRenameDesc: 'When renaming conversation, also update title in {site} sidebar',
+            batchSelected: 'Selected {n}',
+            batchMove: 'Move',
+            batchDelete: 'Delete',
+            batchExit: 'Exit',
         },
     };
 
@@ -3597,20 +3609,24 @@
                 // 根据选中数量决定是否显示
                 batchBar.style.display = this.selectedIds.size > 0 ? 'flex' : 'none';
 
-                const batchInfo = createElement('span', { className: 'conversations-batch-info', id: 'conversations-batch-info' }, `已选 ${this.selectedIds.size} 个`);
+                const batchInfo = createElement(
+                    'span',
+                    { className: 'conversations-batch-info', id: 'conversations-batch-info' },
+                    (this.t('batchSelected') || '已选 {n} 个').replace('{n}', this.selectedIds.size),
+                );
                 batchBar.appendChild(batchInfo);
 
                 const batchBtns = createElement('div', { className: 'conversations-batch-btns' });
 
-                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📁 移动');
+                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📁 ' + (this.t('batchMove') || '移动'));
                 batchMoveBtn.addEventListener('click', () => this.batchMove());
                 batchBtns.appendChild(batchMoveBtn);
 
-                const batchDeleteBtn = createElement('button', { className: 'conversations-batch-btn danger' }, '🗑️ 删除');
+                const batchDeleteBtn = createElement('button', { className: 'conversations-batch-btn danger' }, '🗑️ ' + (this.t('batchDelete') || '删除'));
                 batchDeleteBtn.addEventListener('click', () => this.batchDelete());
                 batchBtns.appendChild(batchDeleteBtn);
 
-                const batchCancelBtn = createElement('button', { className: 'conversations-batch-btn cancel' }, '退出');
+                const batchCancelBtn = createElement('button', { className: 'conversations-batch-btn cancel' }, this.t('batchExit') || '退出');
                 batchCancelBtn.addEventListener('click', () => this.clearSelection());
                 batchBtns.appendChild(batchCancelBtn);
 
@@ -4106,7 +4122,7 @@
             const count = this.selectedIds.size;
             if (count > 0) {
                 batchBar.style.display = 'flex';
-                batchInfo.textContent = `已选 ${count} 个`;
+                batchInfo.textContent = (this.t('batchSelected') || '已选 {n} 个').replace('{n}', count);
             } else {
                 batchBar.style.display = 'none';
             }
@@ -4168,9 +4184,10 @@
             const renderList = (filter = '') => {
                 clearElement(list);
                 this.data.folders.forEach((folder) => {
-                    if (filter && !folder.name.toLowerCase().includes(filter.toLowerCase())) return;
+                    const folderName = folder.name.replace(folder.icon, '').trim();
+                    if (filter && !folderName.toLowerCase().includes(filter.toLowerCase())) return;
 
-                    const item = createElement('div', { className: 'conversations-folder-select-item' }, `${folder.icon} ${folder.name}`);
+                    const item = createElement('div', { className: 'conversations-folder-select-item' }, `${folder.icon} ${folderName}`);
                     item.addEventListener('click', () => {
                         // 批量移动
                         this.selectedIds.forEach((convId) => {
@@ -4256,7 +4273,9 @@
                 this.data.folders.forEach((folder) => {
                     // 排除当前所在文件夹
                     if (folder.id === conv.folderId) return;
-                    if (filter && !folder.name.toLowerCase().includes(filter.toLowerCase())) return;
+
+                    const folderName = folder.name.replace(folder.icon, '').trim();
+                    if (filter && !folderName.toLowerCase().includes(filter.toLowerCase())) return;
 
                     const item = createElement(
                         'div',
@@ -4264,7 +4283,7 @@
                             className: 'conversations-folder-select-item',
                             'data-folder-id': folder.id,
                         },
-                        `${folder.icon} ${folder.name}`,
+                        `${folder.icon} ${folderName}`,
                     );
                     item.addEventListener('click', () => {
                         // 移动会话
