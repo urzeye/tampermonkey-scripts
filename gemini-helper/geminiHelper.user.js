@@ -4189,7 +4189,6 @@
             // Row 2: Tags
 
             // Container for Row 1
-            const topRow = createElement('div', { className: 'conversations-item-top' });
 
             // Checkbox
             if (this.batchMode) {
@@ -4204,7 +4203,7 @@
                     else this.selectedIds.delete(conv.id);
                     this.updateBatchActionBar();
                 });
-                topRow.appendChild(checkbox);
+                item.appendChild(checkbox);
             }
 
             // Title
@@ -4220,7 +4219,7 @@
             title.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (this.batchMode) {
-                    const checkbox = topRow.querySelector('.conversations-item-checkbox');
+                    const checkbox = item.querySelector('.conversations-item-checkbox');
                     if (checkbox) {
                         checkbox.click();
                     }
@@ -4230,28 +4229,11 @@
                 if (sidebarItem) sidebarItem.click();
                 else if (conv.url) window.location.href = conv.url;
             });
-            topRow.appendChild(title);
+            item.appendChild(title);
 
-            // Right side of Top Row: Time + Menu
-            const metaContainer = createElement('div', { className: 'conversations-item-meta' });
-
-            const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
-            metaContainer.appendChild(time);
-
-            const menuBtn = createElement('button', { className: 'conversations-item-menu-btn' }, '⋯');
-            menuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showConversationMenu(conv, menuBtn);
-            });
-            metaContainer.appendChild(menuBtn);
-
-            topRow.appendChild(metaContainer);
-            item.appendChild(topRow);
-
-            // Row 2: Tags (if any)
+            // Tags (Insert after title)
             if (conv.tagIds && conv.tagIds.length > 0 && this.data.tags) {
                 const tagList = createElement('div', { className: 'conversations-tag-list' });
-                // Limit to first 5 tags to prevent bloating, maybe? Or just auto-wrap.
                 conv.tagIds.forEach((tagId) => {
                     const tagDef = this.data.tags.find((t) => t.id === tagId);
                     if (tagDef) {
@@ -4270,6 +4252,20 @@
                     item.appendChild(tagList);
                 }
             }
+
+            // Right side of Top Row: Time + Menu
+            const metaContainer = createElement('div', { className: 'conversations-item-meta' });
+
+            const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
+            metaContainer.appendChild(time);
+
+            const menuBtn = createElement('button', { className: 'conversations-item-menu-btn' }, '⋯');
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showConversationMenu(conv, menuBtn);
+            });
+            metaContainer.appendChild(menuBtn);
+            item.appendChild(metaContainer);
 
             return item;
         }
@@ -5194,7 +5190,7 @@
                             }
                             this.setConversationTags(conv.id, newTags);
                             this.saveData();
-                            const list = document.querySelector('.conversations-list');
+                            const list = this.container.querySelector(`.conversations-list[data-folder-id="${conv.folderId}"]`);
                             if (list) this.renderConversationList(conv.folderId, list);
                         });
                         left.appendChild(checkbox);
@@ -6914,18 +6910,34 @@
                     padding: 12px; color: #9ca3af; font-size: 13px; text-align: center;
                 }
                 .conversations-item {
-                    display: flex; flex-direction: column; align-items: stretch;
+                    display: flex; align-items: center; 
                     padding: 8px 12px;
                     border-bottom: 1px solid #e5e7eb;
                     cursor: pointer;
                     transition: all 0.2s;
-                    gap: 4px;
+                    gap: 8px; /* Gap between elements */
+                    border-left: 3px solid transparent; /* Prepare for hover */
                 }
-                .conversations-item-top {
-                    display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;
+                .conversations-item:hover {
+                    background: #f8fafc;
+                    border-left-color: #6366f1; /* Hover Effect Restored */
+                }
+                .conversations-item-title {
+                    flex: 1; /* Take remaining space */
+                    min-width: 0; /* Critical for text-overflow to work in flex child */
+                    font-size: 14px; color: #374151;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                }
+                /* Tags Container in Row Layout */
+                .conversations-tag-list {
+                    display: flex; gap: 4px; border: none; padding: 0; margin: 0;
+                    flex-shrink: 0; /* Don't shrink tags too much */
+                    max-width: 35%; /* Limit tags width so title works */
+                    overflow: hidden; /* Hide excess tags */
                 }
                 .conversations-item-meta {
                     display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+                    margin-left: auto; /* Push to right if needed, but flex gap handles it */
                 }
                     padding: 8px 12px; margin-bottom: 4px; border-radius: 6px;
                     background: white; cursor: pointer; transition: all 0.2s;
