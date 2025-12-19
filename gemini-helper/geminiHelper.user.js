@@ -6940,53 +6940,61 @@
                     padding: 12px; color: #9ca3af; font-size: 13px; text-align: center;
                 }
                 .conversations-item {
-                    display: flex; align-items: center; 
+                    display: flex; align-items: center;
                     padding: 8px 12px;
-                    border-bottom: 1px solid #e5e7eb;
+                    margin-bottom: 4px; /* Card Layout: Spacing */
+                    border-radius: 6px; /* Card Layout: Radius */
+                    background: white;  /* Card Layout: White Background */
                     cursor: pointer;
                     transition: all 0.2s;
-                    gap: 8px; /* Gap between elements */
-                    border-left: 3px solid transparent; /* Prepare for hover */
+                    gap: 8px;
+                    position: relative;
+                    /* border-bottom removed for card style */
                 }
                 .conversations-item:hover {
-                    background: #f8fafc;
-                    border-left-color: #6366f1; /* Hover Effect Restored */
+                    background: #f3f4f6; /* Slightly darker on hover */
                 }
+                /* Rounded Blue Bar on Hover */
+                .conversations-item::before {
+                    content: '';
+                    position: absolute;
+                    left: 2px; /* Slightly offset from edge for card feel */
+                    top: 50%;
+                    transform: translateY(-50%) scaleY(0);
+                    width: 4px;
+                    height: 20px;
+                    background-color: #6366f1;
+                    border-radius: 4px; /* Fully rounded pill */
+                    transition: transform 0.2s;
+                }
+                .conversations-item:hover::before {
+                    transform: translateY(-50%) scaleY(1);
+                }
+
                 .conversations-item-title {
-                    flex: 1; /* Take remaining space */
-                    min-width: 0; /* Critical for text-overflow to work in flex child */
+                    flex: 1;
+                    min-width: 0;
                     font-size: 14px; color: #374151;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
-                /* Tags Container in Row Layout */
+                /* Tags Container */
                 .conversations-tag-list {
                     display: flex; gap: 4px; border: none; padding: 0; margin: 0;
-                    flex-shrink: 0; /* Don't shrink tags too much */
-                    max-width: 35%; /* Limit tags width so title works */
-                    overflow: hidden; /* Hide excess tags */
+                    flex-shrink: 0;
+                    max-width: 35%;
+                    overflow: hidden;
                 }
                 .conversations-item-meta {
                     display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-                    margin-left: auto; /* Push to right if needed, but flex gap handles it */
-                }
-                    padding: 8px 12px; margin-bottom: 4px; border-radius: 6px;
-                    background: white; cursor: pointer; transition: all 0.2s;
-                    border-left: 3px solid transparent;
-                }
-                .conversations-item:hover {
-                    background: #f3f4f6; border-left-color: #4285f4;
-                }
-                .conversations-item-title {
-                    flex: 1; font-size: 13px; color: #374151;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                    margin-left: auto;
                 }
                 .conversations-item-time {
-                    font-size: 11px; color: #9ca3af; flex-shrink: 0; margin-left: 8px;
+                    font-size: 11px; color: #9ca3af; flex-shrink: 0;
                 }
                 .conversations-item-menu-btn {
                     width: 20px; height: 20px; border: none; background: transparent;
                     color: #9ca3af; cursor: pointer; border-radius: 4px; font-size: 12px;
-                    opacity: 0; transition: opacity 0.2s; flex-shrink: 0;
+                    opacity: 0; transition: opacity 0.2s; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
                 }
                 .conversations-item:hover .conversations-item-menu-btn { opacity: 1; }
                 .conversations-item-menu-btn:hover { background: #e5e7eb; color: #374151; }
