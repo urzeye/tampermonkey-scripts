@@ -8693,48 +8693,6 @@
 
             const otherSettingsSection = this.createCollapsibleSection(this.t('otherSettingsTitle'), otherSettingsContainer, { defaultExpanded: false });
 
-            // 8. 会话设置
-            const conversationsSettingsContainer = createElement('div', {});
-            const siteName = this.siteAdapter.getName();
-
-            // 8.1 重命名时同步云端
-            const syncRenameItem = createElement('div', { className: 'setting-item' });
-            const syncRenameInfo = createElement('div', { className: 'setting-item-info' });
-            syncRenameInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('conversationsSyncRenameLabel')));
-            syncRenameInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('conversationsSyncRenameDesc').replace('{site}', siteName)));
-            const syncRenameToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.conversations?.syncRenameToCloud ? ' active' : ''),
-            });
-            syncRenameToggle.addEventListener('click', () => {
-                this.settings.conversations.syncRenameToCloud = !this.settings.conversations.syncRenameToCloud;
-                syncRenameToggle.classList.toggle('active', this.settings.conversations.syncRenameToCloud);
-                this.saveSettings();
-                showToast(this.settings.conversations.syncRenameToCloud ? this.t('settingOn') : this.t('settingOff'));
-            });
-            syncRenameItem.appendChild(syncRenameInfo);
-            syncRenameItem.appendChild(syncRenameToggle);
-            conversationsSettingsContainer.appendChild(syncRenameItem);
-
-            // 8.2 删除时同步删除云端
-            const syncDeleteItem = createElement('div', { className: 'setting-item' });
-            const syncDeleteInfo = createElement('div', { className: 'setting-item-info' });
-            syncDeleteInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('conversationsSyncDeleteLabel')));
-            syncDeleteInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('conversationsSyncDeleteDesc').replace('{site}', siteName)));
-            const syncDeleteToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.conversations?.syncDeleteToCloud ? ' active' : ''),
-            });
-            syncDeleteToggle.addEventListener('click', () => {
-                this.settings.conversations.syncDeleteToCloud = !this.settings.conversations.syncDeleteToCloud;
-                syncDeleteToggle.classList.toggle('active', this.settings.conversations.syncDeleteToCloud);
-                this.saveSettings();
-                showToast(this.settings.conversations.syncDeleteToCloud ? this.t('settingOn') : this.t('settingOff'));
-            });
-            syncDeleteItem.appendChild(syncDeleteInfo);
-            syncDeleteItem.appendChild(syncDeleteToggle);
-            conversationsSettingsContainer.appendChild(syncDeleteItem);
-
-            const conversationsSettingsSection = this.createCollapsibleSection(this.t('conversationsSettingsTitle'), conversationsSettingsContainer, { defaultExpanded: false });
-
             // ========== 统一管理分类顺序 ==========
             // 1. 通用设置（语言）- 已在上方添加
             // 2. 标签页设置
@@ -8751,8 +8709,6 @@
             content.appendChild(layoutSection);
             // 8. 其他设置
             content.appendChild(otherSettingsSection);
-            // 9. 会话设置
-            content.appendChild(conversationsSettingsSection);
 
             container.appendChild(content);
         }
