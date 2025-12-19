@@ -78,10 +78,44 @@
     // 默认会话数据结构
     const DEFAULT_CONVERSATION_DATA = {
         folders: [{ id: 'inbox', name: '📥 收件箱', icon: '📥', isDefault: true }],
-        tags: [], // 预留标签系统
+        tags: [], // 标签定义数组 { id, name, color }
         conversations: {}, // 会话数据，key 为 conversationId
         lastUsedFolderId: 'inbox',
     };
+
+    // 预设标签颜色 (30色)
+    const TAG_COLORS = [
+        '#ef4444',
+        '#f97316',
+        '#f59e0b',
+        '#eab308',
+        '#84cc16',
+        '#22c55e',
+        '#10b981',
+        '#14b8a6',
+        '#06b6d4',
+        '#0ea5e9',
+        '#3b82f6',
+        '#6366f1',
+        '#8b5cf6',
+        '#a855f7',
+        '#d946ef',
+        '#ec4899',
+        '#f43f5e',
+        '#be185d',
+        '#78350f',
+        '#92400e',
+        '#365314',
+        '#064e3b',
+        '#0c4a6e',
+        '#312e81',
+        '#581c87',
+        '#701a75',
+        '#831843',
+        '#7c2d12',
+        '#1e3a5f',
+        '#1e1e1e',
+    ];
 
     // Tab 定义（用于渲染和显示）
     const TAB_DEFINITIONS = {
@@ -298,6 +332,16 @@
             conversationsSearchPlaceholder: '搜索会话...',
             conversationsSearchResult: '个结果',
             conversationsNoSearchResult: '未找到匹配结果',
+            conversationsSetTags: '设置标签',
+            conversationsNewTag: '新建标签',
+            conversationsTagName: '标签名称',
+            conversationsTagColor: '标签颜色',
+            conversationsFilterByTags: '按标签筛选',
+            conversationsTagCreated: '标签已创建',
+            conversationsTagUpdated: '标签已更新',
+            conversationsTagDeleted: '标签已删除',
+            conversationsNoTags: '暂无标签',
+            conversationsManageTags: '管理标签',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -501,6 +545,17 @@
             conversationsSearchPlaceholder: '搜尋會話...',
             conversationsSearchResult: '個結果',
             conversationsNoSearchResult: '未找到匹配結果',
+            conversationsSetTags: '設定標籤',
+            conversationsNewTag: '新建標籤',
+            conversationsTagName: '標籤名稱',
+            conversationsTagColor: '標籤顏色',
+            conversationsFilterByTags: '按標籤篩選',
+            conversationsClearTags: '清除篩選',
+            conversationsTagCreated: '標籤已建立',
+            conversationsTagUpdated: '標籤已更新',
+            conversationsTagDeleted: '標籤已刪除',
+            conversationsNoTags: '暫無標籤',
+            conversationsManageTags: '管理標籤',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -703,6 +758,28 @@
             conversationsSearchPlaceholder: 'Search conversations...',
             conversationsSearchResult: 'result(s)',
             conversationsNoSearchResult: 'No matching results',
+            conversationsSetTags: 'Set Tags',
+            conversationsNewTag: 'New Tag',
+            conversationsTagName: 'Tag Name',
+            conversationsTagColor: 'Tag Color',
+            conversationsFilterByTags: 'Filter by Tags',
+            conversationsClearTags: 'Clear Filter',
+            conversationsTagCreated: 'Tag Created',
+            conversationsTagUpdated: 'Tag Updated',
+            conversationsTagDeleted: 'Tag Deleted',
+            conversationsNoTags: 'No Tags',
+            conversationsManageTags: 'Manage Tags',
+            conversationsSetTags: 'Set Tags',
+            conversationsNewTag: 'New Tag',
+            conversationsTagName: 'Tag Name',
+            conversationsTagColor: 'Tag Color',
+            conversationsFilterByTags: 'Filter by Tags',
+            conversationsClearTags: 'Clear Filter',
+            conversationsTagCreated: 'Tag Created',
+            conversationsTagUpdated: 'Tag Updated',
+            conversationsTagDeleted: 'Tag Deleted',
+            conversationsNoTags: 'No Tags',
+            conversationsManageTags: 'Manage Tags',
         },
     };
 
@@ -3667,6 +3744,90 @@
 
             searchWrapper.appendChild(searchInput);
             searchWrapper.appendChild(clearBtn);
+
+            // 标签筛选按钮
+            const tagFilterBtn = createElement(
+                'div',
+                {
+                    className: 'conversations-tag-search-btn',
+                    title: this.t('conversationsFilterByTags') || '按标签筛选',
+                },
+                '🏷️',
+            );
+
+            tagFilterBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                const existingMenu = document.querySelector('.conversations-tag-filter-menu');
+                if (existingMenu) {
+                    existingMenu.remove();
+                    if (existingMenu.dataset.trigger === 'search-filter') return;
+                }
+
+                const menu = createElement('div', { className: 'conversations-tag-filter-menu', 'data-trigger': 'search-filter' });
+
+                // 清除选项
+                if (this.filterTagIds && this.filterTagIds.size > 0) {
+                    const clearItem = createElement('div', { className: 'conversations-tag-filter-item' });
+                    clearItem.textContent = this.t('conversationsClearTags') || '清除筛选';
+                    clearItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.filterTagIds.clear();
+                        tagFilterBtn.classList.remove('active');
+                        menu.remove();
+                        this.handleSearch(this.searchQuery);
+                    });
+                    menu.appendChild(clearItem);
+                }
+
+                if (this.data.tags) {
+                    this.data.tags.forEach((tag) => {
+                        const item = createElement('div', { className: 'conversations-tag-filter-item' });
+                        if (this.filterTagIds && this.filterTagIds.has(tag.id)) {
+                            item.classList.add('selected');
+                        }
+
+                        const dot = createElement('span', { className: 'conversations-tag-dot', style: `background-color: ${tag.color}` });
+                        item.appendChild(dot);
+                        item.appendChild(document.createTextNode(tag.name));
+
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (!this.filterTagIds) this.filterTagIds = new Set();
+
+                            if (this.filterTagIds.has(tag.id)) {
+                                this.filterTagIds.delete(tag.id);
+                                item.classList.remove('selected');
+                            } else {
+                                this.filterTagIds.add(tag.id);
+                                item.classList.add('selected');
+                            }
+
+                            if (this.filterTagIds.size > 0) tagFilterBtn.classList.add('active');
+                            else tagFilterBtn.classList.remove('active');
+
+                            this.handleSearch(this.searchQuery);
+                        });
+                        menu.appendChild(item);
+                    });
+                }
+
+                // Position relative to button? No, absolute in wrapper or document body?
+                // CSS: .conversations-tag-filter-menu { position: absolute; top: 100%; right: 0; ... }
+                // So append to searchWrapper to respect relative positioning.
+                searchWrapper.appendChild(menu);
+
+                // Click outside to close
+                const closeMenu = (e) => {
+                    if (!menu.contains(e.target) && e.target !== tagFilterBtn) {
+                        menu.remove();
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
+            });
+
+            searchWrapper.appendChild(tagFilterBtn);
             searchBar.appendChild(searchWrapper);
 
             // 搜索结果计数条
@@ -4053,6 +4214,28 @@
 
             item.appendChild(title);
 
+            // 标签展示
+            if (conv.tagIds && conv.tagIds.length > 0 && this.data.tags) {
+                const tagList = createElement('div', { className: 'conversations-tag-list' });
+                conv.tagIds.forEach((tagId) => {
+                    const tagDef = this.data.tags.find((t) => t.id === tagId);
+                    if (tagDef) {
+                        const tagEl = createElement(
+                            'span',
+                            {
+                                className: 'conversations-tag',
+                                style: `background-color: ${tagDef.color || '#9ca3af'}`,
+                            },
+                            tagDef.name,
+                        );
+                        tagList.appendChild(tagEl);
+                    }
+                });
+                if (tagList.children.length > 0) {
+                    item.appendChild(tagList);
+                }
+            }
+
             // 更新时间
             const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
             item.appendChild(time);
@@ -4085,6 +4268,15 @@
                 this.showRenameConversationDialog(conv);
             });
             menu.appendChild(renameBtn);
+
+            // 设置标签
+            const tagBtn = createElement('button', {}, this.t('conversationsSetTags') || '设置标签');
+            tagBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.showTagManagerDialog(conv);
+            });
+            menu.appendChild(tagBtn);
 
             // 移动到...
             const moveBtn = createElement('button', {}, this.t('conversationsMoveTo') || '移动到...');
@@ -4403,6 +4595,76 @@
                 this.clearSelection();
                 this.createUI();
             });
+        }
+
+        /**
+         * 创建标签
+         * @param {string} name 标签名称
+         * @param {string} color 标签颜色
+         */
+        createTag(name, color) {
+            if (!this.data.tags) this.data.tags = [];
+            const tag = {
+                id: 'tag_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                name,
+                color,
+            };
+            this.data.tags.push(tag);
+            this.saveData();
+            return tag;
+        }
+
+        /**
+         * 更新标签
+         * @param {string} tagId 标签ID
+         * @param {string} name 标签名称
+         * @param {string} color 标签颜色
+         */
+        updateTag(tagId, name, color) {
+            if (!this.data.tags) return null;
+            const tag = this.data.tags.find((t) => t.id === tagId);
+            if (tag) {
+                tag.name = name;
+                tag.color = color;
+                this.saveData();
+            }
+            return tag;
+        }
+
+        /**
+         * 删除标签
+         * @param {string} tagId 标签ID
+         */
+        deleteTag(tagId) {
+            if (!this.data.tags) return;
+            // 1. 删除标签定义
+            this.data.tags = this.data.tags.filter((t) => t.id !== tagId);
+
+            // 2. 从所有会话中移除该标签引用
+            Object.values(this.data.conversations).forEach((conv) => {
+                if (conv.tagIds) {
+                    conv.tagIds = conv.tagIds.filter((id) => id !== tagId);
+                    if (conv.tagIds.length === 0) delete conv.tagIds;
+                }
+            });
+
+            this.saveData();
+        }
+
+        /**
+         * 设置会话标签
+         * @param {string} convId 会话ID
+         * @param {Array<string>} tagIds 标签ID数组
+         */
+        setConversationTags(convId, tagIds) {
+            if (this.data.conversations[convId]) {
+                if (tagIds && tagIds.length > 0) {
+                    this.data.conversations[convId].tagIds = tagIds;
+                } else {
+                    delete this.data.conversations[convId].tagIds;
+                }
+                this.saveData();
+            }
         }
 
         /**
@@ -4771,7 +5033,11 @@
             // 2. 遍历会话，匹配标题
             if (this.data && this.data.conversations) {
                 Object.values(this.data.conversations).forEach((conv) => {
-                    if (conv.title && conv.title.toLowerCase().includes(lowerQuery)) {
+                    // 逻辑整合：关键词 AND 标签
+                    const matchQuery = !lowerQuery || (conv.title && conv.title.toLowerCase().includes(lowerQuery));
+                    const matchTags = !this.filterTagIds || this.filterTagIds.size === 0 || (conv.tagIds && conv.tagIds.some((id) => this.filterTagIds.has(id)));
+
+                    if (matchQuery && matchTags) {
                         conversationMatches.add(conv.id);
                         conversationFolderMap.set(conv.id, conv.folderId);
                     }
@@ -4846,6 +5112,193 @@
                 fragment.appendChild(document.createTextNode(text));
             }
             return fragment;
+        }
+        /**
+         * 显示标签管理对话框
+         */
+        showTagManagerDialog(conv = null) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog conversations-dialog-tag-manager' });
+
+            // 标题
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, this.t('conversationsManageTags') || '管理标签'));
+
+            const content = createElement('div', { className: 'conversations-dialog-content' });
+
+            // 标签列表容器
+            const listContainer = createElement('div', { className: 'conversations-tag-manager-list' });
+
+            const renderList = () => {
+                clearElement(listContainer);
+                if (!this.data.tags || this.data.tags.length === 0) {
+                    listContainer.appendChild(createElement('div', { className: 'conversations-empty' }, this.t('conversationsNoTags') || '暂无标签'));
+                    return;
+                }
+
+                this.data.tags.forEach((tag) => {
+                    const item = createElement('div', { className: 'conversations-tag-manager-item' });
+
+                    // 左侧：勾选框（如果有会话上下文）+ 预览
+                    const left = createElement('div', { style: 'display:flex; align-items:center; gap:8px;' });
+
+                    if (conv) {
+                        const checkbox = createElement('input', { type: 'checkbox' });
+                        checkbox.checked = conv.tagIds && conv.tagIds.includes(tag.id);
+                        checkbox.addEventListener('change', () => {
+                            let newTags = conv.tagIds || [];
+                            if (checkbox.checked) {
+                                if (!newTags.includes(tag.id)) newTags.push(tag.id);
+                            } else {
+                                newTags = newTags.filter((id) => id !== tag.id);
+                            }
+                            this.setConversationTags(conv.id, newTags);
+                            this.renderConversationList(conv.folderId, this.container.querySelector('.conversations-list'));
+                        });
+                        left.appendChild(checkbox);
+                    }
+
+                    const preview = createElement(
+                        'span',
+                        {
+                            className: 'conversations-tag-preview',
+                            style: `background-color: ${tag.color}`,
+                        },
+                        tag.name,
+                    );
+                    left.appendChild(preview);
+                    item.appendChild(left);
+
+                    // 右侧：编辑/删除按钮
+                    const actions = createElement('div', { className: 'conversations-tag-actions' });
+
+                    // 编辑逻辑简化：点击填充到底部输入框，暂不实现行内编辑
+                    const editBtn = createElement(
+                        'button',
+                        {
+                            className: 'conversations-tag-btn edit',
+                            title: this.t('edit'),
+                        },
+                        '✎',
+                    );
+                    editBtn.addEventListener('click', () => {
+                        nameInput.value = tag.name;
+                        updateColorSelection(tag.color);
+                        editingId = tag.id;
+                        addBtn.textContent = this.t('conversationsTagUpdated') || '更新';
+                    });
+                    actions.appendChild(editBtn);
+
+                    const delBtn = createElement(
+                        'button',
+                        {
+                            className: 'conversations-tag-btn delete',
+                            title: this.t('delete'),
+                        },
+                        '×',
+                    );
+                    delBtn.addEventListener('click', () => {
+                        if (confirm(this.t('confirmDelete') || '确定删除?')) {
+                            this.deleteTag(tag.id);
+                            renderList();
+                            if (conv) this.renderConversationList(conv.folderId, this.container.querySelector('.conversations-list'));
+                        }
+                    });
+                    actions.appendChild(delBtn);
+
+                    item.appendChild(actions);
+                    listContainer.appendChild(item);
+                });
+            };
+
+            content.appendChild(listContainer);
+
+            // 新建/编辑区域
+            const formSection = createElement('div', { className: 'conversations-dialog-section', style: 'border-top:1px solid #eee; padding-top:10px;' });
+
+            let editingId = null;
+
+            const nameInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                placeholder: this.t('conversationsTagName') || '标签名称',
+                style: 'flex:1; margin-bottom: 8px;',
+            });
+            formSection.appendChild(nameInput);
+
+            const colorPicker = createElement('div', { className: 'conversations-color-picker' });
+            let selectedColor = TAG_COLORS[0];
+
+            const updateColorSelection = (color) => {
+                selectedColor = color;
+                Array.from(colorPicker.children).forEach((child) => {
+                    if (child.dataset.color === color) child.classList.add('selected');
+                    else child.classList.remove('selected');
+                });
+            };
+
+            TAG_COLORS.forEach((color) => {
+                const colorItem = createElement('div', {
+                    className: 'conversations-color-item',
+                    style: `background-color: ${color}`,
+                    'data-color': color,
+                });
+                if (color === selectedColor) colorItem.classList.add('selected');
+                colorItem.addEventListener('click', () => updateColorSelection(color));
+                colorPicker.appendChild(colorItem);
+            });
+            formSection.appendChild(colorPicker);
+
+            const addBtn = createElement(
+                'button',
+                {
+                    className: 'conversations-dialog-btn confirm',
+                    style: 'width:100%; margin-top:8px;',
+                },
+                this.t('conversationsNewTag') || '新建标签',
+            );
+
+            addBtn.addEventListener('click', () => {
+                const name = nameInput.value.trim();
+                if (!name) return;
+
+                if (editingId) {
+                    this.updateTag(editingId, name, selectedColor);
+                    editingId = null;
+                    addBtn.textContent = this.t('conversationsNewTag') || '新建标签';
+                } else {
+                    this.createTag(name, selectedColor);
+                }
+
+                nameInput.value = '';
+                renderList();
+                if (conv) this.renderConversationList(conv.folderId, this.container.querySelector('.conversations-list'));
+            });
+
+            formSection.appendChild(addBtn);
+            content.appendChild(formSection);
+            dialog.appendChild(content);
+
+            // 关闭按钮
+            const closeBtn = createElement(
+                'button',
+                {
+                    className: 'conversations-dialog-close',
+                    style: 'position:absolute; top:12px; right:12px; border:none; background:none; cursor:pointer; font-size:18px; color:#999;',
+                },
+                '×',
+            );
+            closeBtn.addEventListener('click', () => overlay.remove());
+            dialog.appendChild(closeBtn);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            renderList();
+
+            // ESC key & click outside
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
         }
     }
 
@@ -6278,6 +6731,86 @@
                 }
                 .conversations-search-clear.visible { display: block; }
                 .conversations-search-clear:hover { color: #6b7280; }
+
+                .conversations-result-bar {
+                    text-align: center;
+                    padding: 6px;
+                    color: #3b82f6;
+                    font-size: 13px;
+                    background: #eff6ff;
+                    display: none;
+                }
+                .conversations-result-bar.visible { display: block; }
+
+                /* 标签样式 */
+                .conversations-tag {
+                    display: inline-block; padding: 2px 6px; border-radius: 4px;
+                    font-size: 11px; margin-right: 4px; margin-top: 4px;
+                    color: white; background-color: #9ca3af; line-height: 1.2;
+                }
+                .conversations-tag-list {
+                    margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px; border-top: 1px dashed #eee; padding-top: 2px;
+                }
+                .conversations-tag-list:empty { display: none; }
+
+                /* 标签筛选按钮 */
+                .conversations-tag-search-btn {
+                    cursor: pointer; padding: 0 8px; color: #6b7280; font-size: 14px;
+                    display: flex; align-items: center; justify-content: center;
+                    border-left: 1px solid #e5e7eb; transition: all 0.2s;
+                    position: absolute; right: 30px; top: 0; bottom: 0;
+                }
+                .conversations-tag-search-btn:hover { background: #f3f4f6; color: #374151; }
+                .conversations-tag-search-btn.active { color: #6366f1; background: #eef2ff; }
+
+                /* 标签筛选菜单 */
+                .conversations-tag-filter-menu {
+                    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000003; padding: 8px;
+                    width: 200px; max-height: 300px; overflow-y: auto;
+                    position: absolute; top: 100%; right: 0; margin-top: 4px;
+                }
+                .conversations-tag-filter-item {
+                    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+                    cursor: pointer; border-radius: 4px; font-size: 13px; color: #374151;
+                }
+                .conversations-tag-filter-item:hover { background: #f3f4f6; }
+                .conversations-tag-filter-item.selected { background: #eff6ff; color: #2563eb; }
+                .conversations-tag-dot {
+                    width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+                }
+
+                /* 标签管理弹窗 */
+                .conversations-tag-manager-list {
+                    max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 12px; padding: 4px;
+                }
+                .conversations-tag-manager-item {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 6px 8px; border-bottom: 1px solid #f3f4f6;
+                }
+                .conversations-tag-manager-item:last-child { border-bottom: none; }
+                .conversations-tag-manager-item:hover { background: #f9fafb; }
+                .conversations-tag-preview {
+                    padding: 2px 8px; border-radius: 4px; font-size: 12px; color: white;
+                }
+                .conversations-tag-actions { display: flex; gap: 4px; }
+                .conversations-tag-btn {
+                    width: 20px; height: 20px; border: none; background: transparent; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center; color: #9ca3af; border-radius: 4px;
+                }
+                .conversations-tag-btn:hover { background: #fee2e2; color: #ef4444; }
+                .conversations-tag-btn.edit:hover { background: #e0f2fe; color: #3b82f6; }
+
+                /* 颜色选择器 */
+                .conversations-color-picker {
+                    display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin: 12px 0;
+                }
+                .conversations-color-item {
+                    width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+                    border: 2px solid transparent; transition: transform 0.1s;
+                }
+                .conversations-color-item:hover { transform: scale(1.1); }
+                .conversations-color-item.selected { border-color: #374151; transform: scale(1.1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
                 .conversations-result-bar {
                     text-align: center;
                     padding: 6px;
