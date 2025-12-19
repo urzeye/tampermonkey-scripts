@@ -3725,11 +3725,12 @@
                 value: this.searchQuery || '',
             });
 
-            // 清空按钮
+            // 清空按钮 (Global Clear for both text and tags)
+            const hasInitialTags = this.filterTagIds && this.filterTagIds.size > 0;
             const clearBtn = createElement(
                 'span',
                 {
-                    className: 'conversations-search-clear' + (this.searchQuery ? ' visible' : ''),
+                    className: 'conversations-search-clear' + (this.searchQuery || hasInitialTags ? ' visible' : ''),
                     id: 'conversations-search-clear',
                 },
                 '×',
@@ -3738,14 +3739,17 @@
             const updateClearBtn = () => {
                 const hasText = searchInput.value.length > 0;
                 const hasTags = this.filterTagIds && this.filterTagIds.size > 0;
+                // Show global clear if there is ANY filter (text or tags)
                 clearBtn.classList.toggle('visible', hasText || hasTags);
             };
 
             clearBtn.addEventListener('click', () => {
                 searchInput.value = '';
+                // Clear both text and tags (Reset All)
                 if (this.filterTagIds) this.filterTagIds.clear();
                 const tagBtn = searchWrapper.querySelector('.conversations-tag-search-btn');
                 if (tagBtn) tagBtn.classList.remove('active');
+
                 this.handleSearch('');
                 updateClearBtn();
             });
@@ -3764,14 +3768,17 @@
             searchWrapper.appendChild(clearBtn);
 
             // 标签筛选按钮
+            const isTagFiltering = this.filterTagIds && this.filterTagIds.size > 0;
             const tagFilterBtn = createElement(
                 'div',
                 {
-                    className: 'conversations-tag-search-btn' + (this.data.tags && this.data.tags.length > 0 ? '' : ' empty'),
+                    className: 'conversations-tag-search-btn' + (this.data.tags && this.data.tags.length > 0 ? '' : ' empty') + (isTagFiltering ? ' active' : ''),
                     title: this.t('conversationsFilterByTags') || '按标签筛选',
                 },
                 '🏷️',
             );
+
+            // Removed inner clear icon to avoid confusion. Global clear button handles reset.
 
             tagFilterBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -3779,7 +3786,7 @@
                 const existingMenu = document.querySelector('.conversations-tag-filter-menu');
                 if (existingMenu) {
                     existingMenu.remove();
-                    if (existingMenu.dataset.trigger === 'search-filter') return;
+                    return;
                 }
 
                 const menu = createElement('div', { className: 'conversations-tag-filter-menu', 'data-trigger': 'search-filter' });
@@ -6832,6 +6839,24 @@
                     box-shadow: inset 0 0 0 1px #818cf8; /* Fix 7: Distinct active border/shadow */
                 }
                 .conversations-tag-search-btn.empty { opacity: 0.5; }
+                
+                .conversations-tag-clear-btn {
+                    display: none;
+                    margin-left: 4px;
+                    font-size: 16px;
+                    line-height: 1;
+                    color: #6366f1;
+                    cursor: pointer;
+                    opacity: 0.7;
+                    transition: opacity 0.2s;
+                }
+                .conversations-tag-search-btn.active .conversations-tag-clear-btn {
+                    display: block;
+                }
+                .conversations-tag-clear-btn:hover {
+                    opacity: 1;
+                    font-weight: bold;
+                }
 
                 /* 标签筛选菜单 - Refined */
                 .conversations-tag-filter-menu {
