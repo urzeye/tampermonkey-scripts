@@ -20,7 +20,8 @@
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
-// @require      https://update.greasyfork.org/scripts/559176/1715343/domToolkit.js
+// @note         https://update.greasyfork.org/scripts/559176/1715343/domToolkit.js
+// @require      https://update.greasyfork.org/scripts/559176/1717005/domToolkit.js
 // @license      MIT
 // @downloadURL https://update.greasyfork.org/scripts/558318/gemini-helper.user.js
 // @updateURL https://update.greasyfork.org/scripts/558318/gemini-helper.meta.js
@@ -3255,7 +3256,8 @@
             this.sidebarObserverStop = DOMToolkit.each(
                 '.conversation',
                 (el, isNew) => {
-                    if (!isNew) return; // 只处理新增的会话
+                    // 移除 isNew 检查，以便对现有会话也能附加标题监听
+                    // if (!isNew) return;
 
                     // 尝试提取 ID，如果失败则重试（因为新会话可能属性延迟生成）
                     const tryAdd = (retries = 5) => {
@@ -3264,7 +3266,8 @@
                         const id = idMatch ? idMatch[1] : '';
 
                         if (id) {
-                            if (!this.data.conversations[id]) {
+                            // 仅对新发现的元素尝试添加到数据（如果是全新的会话）
+                            if (isNew && !this.data.conversations[id]) {
                                 // 自动添加新会话到当前选中文件夹
                                 const folderId = this.data.lastUsedFolderId || 'inbox';
                                 this.data.conversations[id] = {
@@ -3279,6 +3282,9 @@
                                 // 轻量级更新计数（避免重建整个 UI 丢失展开状态）
                                 this.updateFolderCount(folderId);
                             }
+
+                            // 对所有会话（无论新旧）启动标题变更监听
+                            this.monitorConversationTitle(el, id);
                         } else if (retries > 0) {
                             setTimeout(() => tryAdd(retries - 1), 500);
                         }
@@ -3287,6 +3293,45 @@
                     tryAdd();
                 },
                 { parent: sidebarContainer },
+            );
+        }
+
+        /**
+         * 监听会话标题变化
+         * 当侧边栏标题改变时，删除本地存储的旧数据
+         * @param {HTMLElement} el 会话元素
+         * @param {string} id 会话ID
+         */
+        monitorConversationTitle(el, id) {
+            // 防止重复监听
+            if (el.dataset.ghTitleObserver) return;
+            el.dataset.ghTitleObserver = 'true';
+
+            // 使用 DOMToolkit.watch 监听文本变化，防抖 500ms
+            DOMToolkit.watch(
+                el,
+                () => {
+                    const currentTitle = el.textContent?.trim();
+                    const stored = this.data.conversations[id];
+
+                    if (currentTitle && stored && stored.title !== currentTitle) {
+                        console.log(`[Gemini Helper] Title changed for ${id}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
+
+                        // 更新本地数据的标题
+                        stored.title = currentTitle;
+                        stored.updatedAt = Date.now();
+                        this.saveData();
+
+                        // 刷新 UI (更新显示)
+                        this.createUI();
+                    }
+                },
+                {
+                    characterData: true,
+                    subtree: true,
+                    childList: true,
+                    debounce: 500,
+                },
             );
         }
 
