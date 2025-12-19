@@ -295,6 +295,9 @@
             batchDelete: '删除',
             batchExit: '退出',
             conversationsRefresh: '刷新会话列表',
+            conversationsSearchPlaceholder: '搜索会话...',
+            conversationsSearchResult: '个结果',
+            conversationsNoSearchResult: '未找到匹配结果',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -495,6 +498,9 @@
             batchDelete: '刪除',
             batchExit: '退出',
             conversationsRefresh: '刷新會話列表',
+            conversationsSearchPlaceholder: '搜尋會話...',
+            conversationsSearchResult: '個結果',
+            conversationsNoSearchResult: '未找到匹配結果',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -694,6 +700,9 @@
             batchDelete: 'Delete',
             batchExit: 'Exit',
             conversationsRefresh: 'Refresh List',
+            conversationsSearchPlaceholder: 'Search conversations...',
+            conversationsSearchResult: 'result(s)',
+            conversationsNoSearchResult: 'No matching results',
         },
     };
 
@@ -3137,6 +3146,8 @@
             this.expandedFolderId = null; // 记忆当前展开的文件夹（手风琴模式，只展开一个）
             this.selectedIds = new Set(); // 批量选中的会话 ID
             this.batchMode = false; // 批量模式开关
+            this.searchQuery = ''; // 搜索关键词
+            this.searchResult = null; // 搜索结果 { folderMatches, conversationMatches, totalCount }
 
             this.init();
         }
@@ -3618,6 +3629,59 @@
 
             content.appendChild(toolbar);
 
+            // 搜索栏
+            const searchBar = createElement('div', { className: 'conversations-search-bar' });
+            const searchWrapper = createElement('div', { className: 'conversations-search-wrapper' });
+
+            const searchInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-search-input',
+                id: 'conversations-search-input',
+                placeholder: this.t('conversationsSearchPlaceholder') || '搜索会话...',
+                value: this.searchQuery || '',
+            });
+
+            // 清空按钮
+            const clearBtn = createElement(
+                'span',
+                {
+                    className: 'conversations-search-clear' + (this.searchQuery ? ' visible' : ''),
+                    id: 'conversations-search-clear',
+                },
+                '×',
+            );
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                this.handleSearch('');
+            });
+
+            // 搜索输入防抖处理
+            let searchTimeout = null;
+            searchInput.addEventListener('input', () => {
+                clearBtn.classList.toggle('visible', searchInput.value.length > 0);
+                if (searchTimeout) clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.handleSearch(searchInput.value.trim());
+                }, 150);
+            });
+
+            searchWrapper.appendChild(searchInput);
+            searchWrapper.appendChild(clearBtn);
+            searchBar.appendChild(searchWrapper);
+
+            // 搜索结果计数条
+            const resultBar = createElement('div', {
+                className: 'conversations-result-bar',
+                id: 'conversations-result-bar',
+            });
+            if (this.searchQuery && this.searchResult) {
+                resultBar.textContent = `${this.searchResult.totalCount} ${this.t('conversationsSearchResult') || '个结果'}`;
+                resultBar.classList.add('visible');
+            }
+            searchBar.appendChild(resultBar);
+
+            content.appendChild(searchBar);
+
             // 文件夹列表
             const folderList = this.createFolderListUI();
             content.appendChild(folderList);
@@ -3668,28 +3732,55 @@
                 return container;
             }
 
+            // 搜索模式下的过滤逻辑
+            const isSearching = this.searchQuery && this.searchResult;
+            const { folderMatches, conversationMatches, conversationFolderMap } = this.searchResult || {};
+
+            // 计算搜索时哪些文件夹有匹配的会话（需要展开父级）
+            const foldersWithMatchedConversations = new Set();
+            if (isSearching && conversationFolderMap) {
+                conversationFolderMap.forEach((folderId) => {
+                    foldersWithMatchedConversations.add(folderId);
+                });
+            }
+
+            let hasVisibleItems = false;
+
             this.data.folders.forEach((folder, index) => {
+                // 搜索过滤：判断文件夹是否应该显示
+                if (isSearching) {
+                    const folderDirectMatch = folderMatches?.has(folder.id);
+                    const hasMatchedChildren = foldersWithMatchedConversations.has(folder.id);
+                    if (!folderDirectMatch && !hasMatchedChildren) {
+                        return; // 跳过不匹配的文件夹
+                    }
+                }
+
+                hasVisibleItems = true;
+
                 // 文件夹项
                 const folderItem = this.createFolderItem(folder, index);
                 container.appendChild(folderItem);
 
-                // 会话列表容器（独立于文件夹项，紧随其后）
-                // 根据记忆的展开状态初始化
-                const isInitiallyExpanded = this.expandedFolderId === folder.id;
+                // 搜索时：如果有匹配的会话则自动展开，否则只显示文件夹
+                const hasMatchedConvs = isSearching && foldersWithMatchedConversations.has(folder.id);
+                const shouldExpand = isSearching ? hasMatchedConvs : this.expandedFolderId === folder.id;
+
+                // 会话列表容器
                 const conversationList = createElement('div', {
                     className: 'conversations-list',
                     'data-folder-id': folder.id,
-                    style: isInitiallyExpanded ? 'display: block;' : 'display: none;',
+                    style: shouldExpand ? 'display: block;' : 'display: none;',
                 });
                 container.appendChild(conversationList);
 
-                // 如果文件夹初始展开，立即渲染并添加 expanded class
-                if (isInitiallyExpanded) {
+                // 如果需要展开，渲染会话列表
+                if (shouldExpand) {
                     folderItem.classList.add('expanded');
                     this.renderConversationList(folder.id, conversationList);
                 }
 
-                // 绑定展开逻辑
+                // 绑定展开逻辑（非搜索模式下或搜索结果中点击可切换）
                 folderItem.addEventListener('click', (e) => {
                     if (e.target.closest('button')) return; // 避免点击按钮触发
 
@@ -3719,6 +3810,12 @@
                     }
                 });
             });
+
+            // 搜索无结果显示
+            if (isSearching && !hasVisibleItems) {
+                const noResult = createElement('div', { className: 'conversations-empty' }, this.t('conversationsNoSearchResult') || '未找到匹配结果');
+                container.appendChild(noResult);
+            }
 
             return container;
         }
@@ -3852,7 +3949,14 @@
             clearElement(container);
 
             // 获取该文件夹下的会话
-            const conversations = Object.values(this.data.conversations).filter((c) => c.folderId === folderId);
+            let conversations = Object.values(this.data.conversations).filter((c) => c.folderId === folderId);
+
+            // 搜索模式下过滤不匹配的会话
+            const isSearching = this.searchQuery && this.searchResult;
+            if (isSearching) {
+                const { conversationMatches } = this.searchResult;
+                conversations = conversations.filter((c) => conversationMatches?.has(c.id));
+            }
 
             if (conversations.length === 0) {
                 const empty = createElement('div', { className: 'conversations-list-empty' }, this.t('conversationsEmpty') || '暂无会话');
@@ -3895,15 +3999,18 @@
                 item.appendChild(checkbox);
             }
 
-            // 会话标题
-            const title = createElement(
-                'span',
-                {
-                    className: 'conversations-item-title',
-                    title: conv.title,
-                },
-                conv.title || '无标题',
-            );
+            // 会话标题（支持搜索高亮）
+            const title = createElement('span', {
+                className: 'conversations-item-title',
+                title: conv.title,
+            });
+
+            // 如果在搜索模式，使用高亮渲染
+            if (this.searchQuery && this.searchResult?.conversationMatches?.has(conv.id)) {
+                title.appendChild(this.highlightText(conv.title || '无标题', this.searchQuery));
+            } else {
+                title.textContent = conv.title || '无标题';
+            }
 
             title.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -4565,6 +4672,124 @@
         refresh() {
             this.loadData();
             this.createUI();
+        }
+
+        /**
+         * 处理搜索输入
+         * @param {string} query 搜索关键词
+         */
+        handleSearch(query) {
+            this.searchQuery = query;
+            if (!query) {
+                // 清空搜索时重置
+                this.searchResult = null;
+                this.refreshAfterSearch();
+                return;
+            }
+
+            // 执行搜索
+            this.searchResult = this.performSearch(query);
+            this.refreshAfterSearch();
+        }
+
+        /**
+         * 执行搜索
+         * @param {string} query 搜索关键词
+         * @returns {{ folderMatches: Set, conversationMatches: Set, conversationFolderMap: Map, totalCount: number }}
+         */
+        performSearch(query) {
+            const lowerQuery = query.toLowerCase();
+            const folderMatches = new Set(); // 直接匹配的文件夹 ID
+            const conversationMatches = new Set(); // 匹配的会话 ID
+            const conversationFolderMap = new Map(); // 会话 ID -> 所属文件夹 ID（用于展开父级）
+
+            // 1. 遍历文件夹，匹配名称
+            if (this.data && this.data.folders) {
+                this.data.folders.forEach((folder) => {
+                    if (folder.name.toLowerCase().includes(lowerQuery)) {
+                        folderMatches.add(folder.id);
+                    }
+                });
+            }
+
+            // 2. 遍历会话，匹配标题
+            if (this.data && this.data.conversations) {
+                Object.values(this.data.conversations).forEach((conv) => {
+                    if (conv.title && conv.title.toLowerCase().includes(lowerQuery)) {
+                        conversationMatches.add(conv.id);
+                        conversationFolderMap.set(conv.id, conv.folderId);
+                    }
+                });
+            }
+
+            return {
+                folderMatches,
+                conversationMatches,
+                conversationFolderMap,
+                totalCount: folderMatches.size + conversationMatches.size,
+            };
+        }
+
+        /**
+         * 搜索后刷新 UI（不重建整个面板，只更新列表和结果条）
+         */
+        refreshAfterSearch() {
+            // 更新结果条
+            const resultBar = document.getElementById('conversations-result-bar');
+            if (resultBar) {
+                if (this.searchQuery && this.searchResult) {
+                    resultBar.textContent = `${this.searchResult.totalCount} ${this.t('conversationsSearchResult') || '个结果'}`;
+                    resultBar.classList.add('visible');
+                } else {
+                    resultBar.textContent = '';
+                    resultBar.classList.remove('visible');
+                }
+            }
+
+            // 重建文件夹列表（带搜索过滤）
+            const container = this.container?.querySelector('.conversations-content');
+            const oldFolderList = container?.querySelector('.conversations-folder-list');
+            if (container && oldFolderList) {
+                const newFolderList = this.createFolderListUI();
+                container.replaceChild(newFolderList, oldFolderList);
+            }
+        }
+
+        /**
+         * 高亮文本中的关键词
+         * @param {string} text 原始文本
+         * @param {string} query 搜索关键词
+         * @returns {DocumentFragment} 带高亮的文档片段
+         */
+        highlightText(text, query) {
+            const fragment = document.createDocumentFragment();
+            if (!query) {
+                fragment.appendChild(document.createTextNode(text));
+                return fragment;
+            }
+
+            try {
+                const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`(${escapedQuery})`, 'gi');
+                const parts = text.split(regex);
+
+                parts.forEach((part) => {
+                    if (part.toLowerCase() === query.toLowerCase()) {
+                        const mark = document.createElement('mark');
+                        mark.textContent = part;
+                        mark.style.backgroundColor = 'rgba(255, 235, 59, 0.5)';
+                        mark.style.color = 'inherit';
+                        mark.style.padding = '0 2px';
+                        mark.style.borderRadius = '2px';
+                        fragment.appendChild(mark);
+                    } else {
+                        fragment.appendChild(document.createTextNode(part));
+                    }
+                });
+            } catch (e) {
+                fragment.appendChild(document.createTextNode(text));
+            }
+            return fragment;
         }
     }
 
@@ -5960,6 +6185,54 @@
                 .conversations-empty {
                     text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 14px;
                 }
+
+                /* 搜索栏样式 */
+                .conversations-search-bar {
+                    padding: 8px 12px;
+                    border-bottom: 1px solid #e5e7eb;
+                    background: #f9fafb;
+                }
+                .conversations-search-wrapper {
+                    position: relative;
+                }
+                .conversations-search-input {
+                    width: 100%;
+                    padding: 8px 32px 8px 12px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    box-sizing: border-box;
+                    transition: all 0.2s;
+                }
+                .conversations-search-input:focus {
+                    outline: none;
+                    border-color: #6366f1;
+                }
+                .conversations-search-clear {
+                    position: absolute;
+                    right: 10px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    cursor: pointer;
+                    color: #9ca3af;
+                    font-size: 18px;
+                    line-height: 1;
+                    display: none;
+                    user-select: none;
+                }
+                .conversations-search-clear.visible { display: block; }
+                .conversations-search-clear:hover { color: #6b7280; }
+                .conversations-result-bar {
+                    text-align: center;
+                    padding: 6px;
+                    color: #6366f1;
+                    font-size: 13px;
+                    background: #eef2ff;
+                    border-radius: 4px;
+                    margin-top: 8px;
+                    display: none;
+                }
+                .conversations-result-bar.visible { display: block; }
 
                 /* 会话列表样式 */
                 .conversations-list {
