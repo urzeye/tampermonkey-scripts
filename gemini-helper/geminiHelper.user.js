@@ -3414,7 +3414,9 @@
         updateFolderCount(folderId) {
             const folderItem = this.container?.querySelector(`.conversations-folder-item[data-folder-id="${folderId}"]`);
             if (folderItem) {
-                const count = Object.values(this.data.conversations).filter((c) => c.folderId === folderId).length;
+                // 获取当前 CID（仅 Gemini Business 有效）
+                const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+                const count = Object.values(this.data.conversations).filter((c) => c.folderId === folderId && this.matchesCid(c, currentCid)).length;
                 const countSpan = folderItem.querySelector('.conversations-folder-count');
                 if (countSpan) countSpan.textContent = `(${count})`;
 
@@ -3571,8 +3573,12 @@
                 return;
             }
 
+            // 获取当前 CID（仅 Gemini Business 有效）
+            const currentCid = sidebarItems[0]?.cid || null;
+
             // 检查是否有已保存的会话（初次同步判断）
-            const existingConvCount = Object.keys(this.data.conversations).length;
+            // 注意：需要按当前 CID 过滤，避免其他团队的数据干扰判断
+            const existingConvCount = Object.values(this.data.conversations).filter((c) => this.matchesCid(c, currentCid)).length;
             const isFirstSync = existingConvCount === 0;
 
             // 初次同步且未指定目标文件夹：弹窗让用户选择
@@ -3591,7 +3597,10 @@
             const folderId = targetFolderId || this.data.lastUsedFolderId || 'inbox';
 
             sidebarItems.forEach((item) => {
-                const existing = this.data.conversations[item.id];
+                // 生成存储 Key：有 CID 时用 "cid:id" 格式，否则直接用 id
+                const storageKey = this.getConversationKey(item.id, item.cid);
+
+                const existing = this.data.conversations[storageKey];
                 if (existing) {
                     // 更新已有会话的标题（可能被用户修改）
                     if (existing.title !== item.title) {
@@ -3601,15 +3610,15 @@
                     }
                 } else {
                     // 新会话：添加到指定文件夹
-                    this.data.conversations[item.id] = {
+                    this.data.conversations[storageKey] = {
                         id: item.id,
+                        cid: item.cid || null, // 记录所属团队（Gemini Business）
                         title: item.title,
                         url: item.url,
                         folderId: folderId,
                         createdAt: now,
                         updatedAt: now,
                     };
-                    // 如果在后台自动同步，可能需要通知？暂不需要
                     newCount++;
                 }
             });
@@ -3625,19 +3634,26 @@
                 this.createUI();
             }
 
-            // 检查已删除的会话
+            // 检查已删除的会话（仅检查当前 CID 下的会话）
             if (checkForDeletions) {
-                const remoteIds = new Set(sidebarItems.map((item) => item.id));
-                const localIds = Object.keys(this.data.conversations);
-                const missingIds = localIds.filter((id) => !remoteIds.has(id));
+                // 远程会话的 Key 集合
+                const remoteKeys = new Set(sidebarItems.map((item) => this.getConversationKey(item.id, item.cid)));
 
-                if (missingIds.length > 0) {
-                    const msg = (this.t('conversationsSyncDeleteMsg') || '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？').replace('{count}', missingIds.length);
+                // 本地当前 CID 的会话 Key
+                const localKeysForCurrentCid = Object.entries(this.data.conversations)
+                    .filter(([, conv]) => this.matchesCid(conv, currentCid))
+                    .map(([key]) => key);
+
+                // 找出本地有但远程没有的（当前 CID 范围内）
+                const missingKeys = localKeysForCurrentCid.filter((key) => !remoteKeys.has(key));
+
+                if (missingKeys.length > 0) {
+                    const msg = (this.t('conversationsSyncDeleteMsg') || '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？').replace('{count}', missingKeys.length);
                     this.showConfirmDialog(this.t('conversationsSyncDeleteTitle') || '同步删除', msg, () => {
-                        missingIds.forEach((id) => delete this.data.conversations[id]);
+                        missingKeys.forEach((key) => delete this.data.conversations[key]);
                         this.saveData();
                         this.createUI();
-                        showToast(`${this.t('conversationsDeleted') || '已移除'} ${missingIds.length}`);
+                        showToast(`${this.t('conversationsDeleted') || '已移除'} ${missingKeys.length}`);
                     });
                 }
             }
@@ -3648,10 +3664,30 @@
                 } else {
                     showToast(this.t('conversationsSyncNoChange') || '无新会话');
                 }
-            } else if (newCount > 0) {
-                // 静默模式下，如果有新会话，也轻微提示一下？或者更新 Tab 标题？不用了，只要 UI 刷新就行。
-                // console.log(`[GeminiHelper] Auto-synced ${newCount} new conversations.`);
             }
+        }
+
+        /**
+         * 生成会话存储的 Key
+         * @param {string} id 会话 ID
+         * @param {string|null} cid 团队 ID (Gemini Business)
+         * @returns {string}
+         */
+        getConversationKey(id, cid) {
+            return cid ? `${cid}:${id}` : id;
+        }
+
+        /**
+         * 检查会话是否属于当前 CID
+         * @param {Object} conv 会话对象
+         * @param {string|null} currentCid 当前团队 ID
+         * @returns {boolean}
+         */
+        matchesCid(conv, currentCid) {
+            // 如果当前无 CID（非 Gemini Business 或无团队），显示无 CID 的会话
+            if (!currentCid) return !conv.cid;
+            // 否则显示匹配当前 CID 的会话
+            return conv.cid === currentCid;
         }
 
         /**
@@ -4157,8 +4193,10 @@
 
             // 全选复选框（仅批量模式下显示）
             if (this.batchMode) {
-                // 搜索模式下只处理匹配的会话
-                let conversationsInFolder = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id);
+                // 获取当前 CID（仅 Gemini Business 有效）
+                const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+                // 搜索模式下只处理匹配的会话（同时按 CID 过滤）
+                let conversationsInFolder = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, currentCid));
                 if (this.searchResult) {
                     conversationsInFolder = conversationsInFolder.filter((c) => this.searchResult.conversationMatches?.has(c.id));
                 }
@@ -4243,10 +4281,12 @@
             // 右侧控制区域（计数 + 菜单按钮）
             const controls = createElement('div', { className: 'conversations-folder-controls' });
 
-            // 会话计数（搜索模式下显示匹配数量）
-            let count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id).length;
+            // 获取当前 CID（仅 Gemini Business 有效）- 复用上面的变量或重新获取
+            const cidForCount = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+            // 会话计数（搜索模式下显示匹配数量，同时按 CID 过滤）
+            let count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, cidForCount)).length;
             if (this.searchResult) {
-                count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.searchResult.conversationMatches?.has(c.id)).length;
+                count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, cidForCount) && this.searchResult.conversationMatches?.has(c.id)).length;
             }
             controls.appendChild(createElement('span', { className: 'conversations-folder-count' }, `(${count})`));
 
@@ -4274,8 +4314,11 @@
         renderConversationList(folderId, container) {
             clearElement(container);
 
-            // 获取该文件夹下的会话
-            let conversations = Object.values(this.data.conversations).filter((c) => c.folderId === folderId);
+            // 获取当前 CID（仅 Gemini Business 有效）
+            const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+
+            // 获取该文件夹下的会话（按 CID 过滤）
+            let conversations = Object.values(this.data.conversations).filter((c) => c.folderId === folderId && this.matchesCid(c, currentCid));
 
             // 搜索模式下过滤不匹配的会话
             const isSearching = !!this.searchResult;
@@ -5176,6 +5219,9 @@
             const conversationMatches = new Set(); // 匹配的会话 ID
             const conversationFolderMap = new Map(); // 会话 ID -> 所属文件夹 ID（用于展开父级）
 
+            // 获取当前 CID（仅 Gemini Business 有效）
+            const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+
             // 1. 遍历文件夹，匹配名称
             if (this.data && this.data.folders && lowerQuery) {
                 this.data.folders.forEach((folder) => {
@@ -5185,9 +5231,12 @@
                 });
             }
 
-            // 2. 遍历会话，匹配标题
+            // 2. 遍历会话，匹配标题（按 CID 过滤）
             if (this.data && this.data.conversations) {
                 Object.values(this.data.conversations).forEach((conv) => {
+                    // 先按 CID 过滤
+                    if (!this.matchesCid(conv, currentCid)) return;
+
                     // 逻辑整合：关键词 AND 标签
                     const matchQuery = !lowerQuery || (conv.title && conv.title.toLowerCase().includes(lowerQuery));
                     const matchTags = !this.filterTagIds || this.filterTagIds.size === 0 || (conv.tagIds && conv.tagIds.some((id) => this.filterTagIds.has(id)));
