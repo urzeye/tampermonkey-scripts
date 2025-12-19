@@ -337,6 +337,7 @@
             conversationsTagName: '标签名称',
             conversationsTagColor: '标签颜色',
             conversationsFilterByTags: '按标签筛选',
+            conversationsClearTags: '清除筛选',
             conversationsTagCreated: '标签已创建',
             conversationsTagUpdated: '标签已更新',
             conversationsTagDeleted: '标签已删除',
@@ -3727,15 +3728,26 @@
                 },
                 '×',
             );
+            // Update clear button visibility helper
+            const updateClearBtn = () => {
+                const hasText = searchInput.value.length > 0;
+                const hasTags = this.filterTagIds && this.filterTagIds.size > 0;
+                clearBtn.classList.toggle('visible', hasText || hasTags);
+            };
+
             clearBtn.addEventListener('click', () => {
                 searchInput.value = '';
+                if (this.filterTagIds) this.filterTagIds.clear();
+                const tagBtn = searchWrapper.querySelector('.conversations-tag-search-btn');
+                if (tagBtn) tagBtn.classList.remove('active');
                 this.handleSearch('');
+                updateClearBtn();
             });
 
             // 搜索输入防抖处理
             let searchTimeout = null;
             searchInput.addEventListener('input', () => {
-                clearBtn.classList.toggle('visible', searchInput.value.length > 0);
+                updateClearBtn();
                 if (searchTimeout) clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
                     this.handleSearch(searchInput.value.trim());
@@ -3749,7 +3761,7 @@
             const tagFilterBtn = createElement(
                 'div',
                 {
-                    className: 'conversations-tag-search-btn',
+                    className: 'conversations-tag-search-btn' + (this.data.tags && this.data.tags.length > 0 ? '' : ' empty'),
                     title: this.t('conversationsFilterByTags') || '按标签筛选',
                 },
                 '🏷️',
@@ -3765,6 +3777,7 @@
                 }
 
                 const menu = createElement('div', { className: 'conversations-tag-filter-menu', 'data-trigger': 'search-filter' });
+                const list = createElement('div', { className: 'conversations-tag-filter-list' }); // Scrollable area
 
                 // 清除选项
                 if (this.filterTagIds && this.filterTagIds.size > 0) {
@@ -3776,8 +3789,9 @@
                         tagFilterBtn.classList.remove('active');
                         menu.remove();
                         this.handleSearch(this.searchQuery);
+                        updateClearBtn();
                     });
-                    menu.appendChild(clearItem);
+                    list.appendChild(clearItem);
                 }
 
                 if (this.data.tags) {
@@ -3789,7 +3803,11 @@
 
                         const dot = createElement('span', { className: 'conversations-tag-dot', style: `background-color: ${tag.color}` });
                         item.appendChild(dot);
-                        item.appendChild(document.createTextNode(tag.name));
+
+                        // Tag Name Span
+                        const nameSpan = createElement('span');
+                        nameSpan.textContent = tag.name;
+                        item.appendChild(nameSpan);
 
                         item.addEventListener('click', (e) => {
                             e.stopPropagation();
@@ -3807,14 +3825,31 @@
                             else tagFilterBtn.classList.remove('active');
 
                             this.handleSearch(this.searchQuery);
+                            updateClearBtn();
                         });
-                        menu.appendChild(item);
+                        list.appendChild(item);
                     });
+                } else {
+                    const emptyItem = createElement('div', { className: 'conversations-tag-filter-item', style: 'color:#9ca3af; cursor:default;' });
+                    emptyItem.textContent = this.t('conversationsNoTags') || '暂无标签';
+                    list.appendChild(emptyItem);
                 }
 
+                menu.appendChild(list);
+
+                // Footer Area
+                const footer = createElement('div', { className: 'conversations-tag-filter-footer' });
+
+                const manageItem = createElement('div', { className: 'conversations-tag-filter-item conversations-tag-filter-action' });
+                manageItem.textContent = this.t('conversationsManageTags') || '管理标签';
+                manageItem.addEventListener('click', () => {
+                    menu.remove();
+                    this.showTagManagerDialog();
+                });
+                footer.appendChild(manageItem);
+                menu.appendChild(footer);
+
                 // Position relative to button? No, absolute in wrapper or document body?
-                // CSS: .conversations-tag-filter-menu { position: absolute; top: 100%; right: 0; ... }
-                // So append to searchWrapper to respect relative positioning.
                 searchWrapper.appendChild(menu);
 
                 // Click outside to close
@@ -4149,74 +4184,74 @@
          */
         createConversationItem(conv) {
             const item = createElement('div', { className: 'conversations-item', 'data-id': conv.id });
+            // New Layout: Flex Column
+            // Row 1: Content (Title + Checkbox) ----- Actions (Time + Menu)
+            // Row 2: Tags
 
-            // 复选框（仅批量模式下显示）
+            // Container for Row 1
+            const topRow = createElement('div', { className: 'conversations-item-top' });
+
+            // Checkbox
             if (this.batchMode) {
                 const checkbox = createElement('input', {
                     type: 'checkbox',
                     className: 'conversations-item-checkbox',
                 });
-                // 单独设置 checked 属性（避免 createElement 将 false 转为字符串导致选中）
                 checkbox.checked = this.selectedIds.has(conv.id);
                 checkbox.addEventListener('click', (e) => e.stopPropagation());
                 checkbox.addEventListener('change', () => {
-                    if (checkbox.checked) {
-                        this.selectedIds.add(conv.id);
-                    } else {
-                        this.selectedIds.delete(conv.id);
-                    }
+                    if (checkbox.checked) this.selectedIds.add(conv.id);
+                    else this.selectedIds.delete(conv.id);
                     this.updateBatchActionBar();
                 });
-                item.appendChild(checkbox);
+                topRow.appendChild(checkbox);
             }
 
-            // 会话标题（支持搜索高亮）
+            // Title
             const title = createElement('span', {
                 className: 'conversations-item-title',
                 title: conv.title,
             });
-
-            // 如果在搜索模式，使用高亮渲染
             if (this.searchQuery && this.searchResult?.conversationMatches?.has(conv.id)) {
                 title.appendChild(this.highlightText(conv.title || '无标题', this.searchQuery));
             } else {
                 title.textContent = conv.title || '无标题';
             }
-
             title.addEventListener('click', (e) => {
                 e.stopPropagation();
-
-                // 批量模式下点击标题触发行选中
                 if (this.batchMode) {
-                    const checkbox = item.querySelector('.conversations-item-checkbox');
+                    const checkbox = topRow.querySelector('.conversations-item-checkbox');
                     if (checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        // 手动触发 change 事件处理逻辑
-                        if (checkbox.checked) {
-                            this.selectedIds.add(conv.id);
-                        } else {
-                            this.selectedIds.delete(conv.id);
-                        }
-                        this.updateBatchActionBar();
+                        checkbox.click();
                     }
                     return;
                 }
-
-                // 尝试模拟点击侧边栏中对应的会话项（无刷新切换）
                 const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${conv.id}"]`);
-                if (sidebarItem) {
-                    sidebarItem.click();
-                } else if (conv.url) {
-                    // 回退：侧边栏项不存在时直接跳转
-                    window.location.href = conv.url;
-                }
+                if (sidebarItem) sidebarItem.click();
+                else if (conv.url) window.location.href = conv.url;
             });
+            topRow.appendChild(title);
 
-            item.appendChild(title);
+            // Right side of Top Row: Time + Menu
+            const metaContainer = createElement('div', { className: 'conversations-item-meta' });
 
-            // 标签展示
+            const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
+            metaContainer.appendChild(time);
+
+            const menuBtn = createElement('button', { className: 'conversations-item-menu-btn' }, '⋯');
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showConversationMenu(conv, menuBtn);
+            });
+            metaContainer.appendChild(menuBtn);
+
+            topRow.appendChild(metaContainer);
+            item.appendChild(topRow);
+
+            // Row 2: Tags (if any)
             if (conv.tagIds && conv.tagIds.length > 0 && this.data.tags) {
                 const tagList = createElement('div', { className: 'conversations-tag-list' });
+                // Limit to first 5 tags to prevent bloating, maybe? Or just auto-wrap.
                 conv.tagIds.forEach((tagId) => {
                     const tagDef = this.data.tags.find((t) => t.id === tagId);
                     if (tagDef) {
@@ -4235,18 +4270,6 @@
                     item.appendChild(tagList);
                 }
             }
-
-            // 更新时间
-            const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
-            item.appendChild(time);
-
-            // 操作按钮（移动）
-            const menuBtn = createElement('button', { className: 'conversations-item-menu-btn' }, '⋯');
-            menuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showConversationMenu(conv, menuBtn);
-            });
-            item.appendChild(menuBtn);
 
             return item;
         }
@@ -5121,7 +5144,25 @@
             const dialog = createElement('div', { className: 'conversations-dialog conversations-dialog-tag-manager' });
 
             // 标题
-            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, this.t('conversationsManageTags') || '管理标签'));
+            // 标题栏 (含关闭按钮)
+            const titleRow = createElement('div', { className: 'conversations-dialog-title', style: 'display:flex; justify-content:space-between; align-items:center;' });
+            titleRow.textContent = this.t('conversationsManageTags') || '管理标签';
+
+            const closeIcon = createElement(
+                'span',
+                {
+                    className: 'conversations-close-icon',
+                    style: 'cursor:pointer; padding:4px; font-size:20px; color:#9ca3af; line-height:1; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:4px;',
+                    title: this.t('close') || '关闭',
+                },
+                '×',
+            );
+            closeIcon.addEventListener('click', () => overlay.remove());
+            closeIcon.addEventListener('mouseenter', () => (closeIcon.style.backgroundColor = '#f3f4f6'));
+            closeIcon.addEventListener('mouseleave', () => (closeIcon.style.backgroundColor = 'transparent'));
+
+            titleRow.appendChild(closeIcon);
+            dialog.appendChild(titleRow);
 
             const content = createElement('div', { className: 'conversations-dialog-content' });
 
@@ -5152,7 +5193,9 @@
                                 newTags = newTags.filter((id) => id !== tag.id);
                             }
                             this.setConversationTags(conv.id, newTags);
-                            this.renderConversationList(conv.folderId, this.container.querySelector('.conversations-list'));
+                            this.saveData();
+                            const list = document.querySelector('.conversations-list');
+                            if (list) this.renderConversationList(conv.folderId, list);
                         });
                         left.appendChild(checkbox);
                     }
@@ -5271,34 +5314,29 @@
 
                 nameInput.value = '';
                 renderList();
-                if (conv) this.renderConversationList(conv.folderId, this.container.querySelector('.conversations-list'));
+                if (conv) {
+                    const list = this.container.querySelector(`.conversations-list[data-folder-id="${conv.folderId}"]`);
+                    if (list) this.renderConversationList(conv.folderId, list);
+                }
             });
 
             formSection.appendChild(addBtn);
             content.appendChild(formSection);
             dialog.appendChild(content);
 
-            // 关闭按钮
-            const closeBtn = createElement(
-                'button',
-                {
-                    className: 'conversations-dialog-close',
-                    style: 'position:absolute; top:12px; right:12px; border:none; background:none; cursor:pointer; font-size:18px; color:#999;',
-                },
-                '×',
-            );
-            closeBtn.addEventListener('click', () => overlay.remove());
-            dialog.appendChild(closeBtn);
-
             overlay.appendChild(dialog);
             document.body.appendChild(overlay);
 
+            // 渲染列表
             renderList();
 
-            // ESC key & click outside
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) overlay.remove();
+            // ESC 关闭
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') overlay.remove();
             });
+
+            // Focus input
+            nameInput.focus();
         }
     }
 
@@ -6747,6 +6785,8 @@
                     display: inline-block; padding: 2px 6px; border-radius: 4px;
                     font-size: 11px; margin-right: 4px; margin-top: 4px;
                     color: white; background-color: #9ca3af; line-height: 1.2;
+                    /* Fix 1: Max width and overflow */
+                    max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
                 }
                 .conversations-tag-list {
                     margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px; border-top: 1px dashed #eee; padding-top: 2px;
@@ -6755,49 +6795,80 @@
 
                 /* 标签筛选按钮 */
                 .conversations-tag-search-btn {
-                    cursor: pointer; padding: 0 8px; color: #6b7280; font-size: 14px;
+                    cursor: pointer; padding: 0 8px; color: #9ca3af; font-size: 14px;
                     display: flex; align-items: center; justify-content: center;
                     border-left: 1px solid #e5e7eb; transition: all 0.2s;
                     position: absolute; right: 30px; top: 0; bottom: 0;
                 }
                 .conversations-tag-search-btn:hover { background: #f3f4f6; color: #374151; }
-                .conversations-tag-search-btn.active { color: #6366f1; background: #eef2ff; }
+                .conversations-tag-search-btn.active { 
+                    color: #6366f1; background: #eef2ff; 
+                    box-shadow: inset 0 0 0 1px #818cf8; /* Fix 7: Distinct active border/shadow */
+                }
+                .conversations-tag-search-btn.empty { opacity: 0.5; }
 
-                /* 标签筛选菜单 */
+                /* 标签筛选菜单 - Refined */
                 .conversations-tag-filter-menu {
                     background: white; border: 1px solid #e5e7eb; border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000003; padding: 8px;
-                    width: 200px; max-height: 300px; overflow-y: auto;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000003; 
+                    width: 220px; max-height: 350px;
                     position: absolute; top: 100%; right: 0; margin-top: 4px;
+                    display: flex; flex-direction: column;
+                    overflow: hidden; /* Important for sticky footer effect */
+                }
+                .conversations-tag-filter-list {
+                    overflow-y: auto; flex: 1; padding: 4px; display: flex; flex-direction: column; gap: 2px;
+                }
+                .conversations-tag-filter-footer {
+                    padding: 4px; border-top: 1px solid #eee; background: #f9fafb; flex-shrink: 0;
                 }
                 .conversations-tag-filter-item {
-                    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-                    cursor: pointer; border-radius: 4px; font-size: 13px; color: #374151;
+                    display: flex; align-items: center; gap: 8px; padding: 8px;
+                    cursor: pointer; border-radius: 6px; font-size: 13px; color: #374151;
+                    /* Fix overflow */
+                    width: 100%; box-sizing: border-box; overflow: hidden;
+                }
+                .conversations-tag-filter-item span:not(.conversations-tag-dot) {
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
                 }
                 .conversations-tag-filter-item:hover { background: #f3f4f6; }
-                .conversations-tag-filter-item.selected { background: #eff6ff; color: #2563eb; }
+                .conversations-tag-filter-item.selected { background: #eff6ff; color: #2563eb; font-weight: 500; }
+                
+                /* Checkmark for selected */
+                .conversations-tag-filter-item.selected::after {
+                    content: '✓'; margin-left: auto; font-size: 14px; font-weight: bold;
+                }
+                
+                /* Ensure dot doesn't stretch */
                 .conversations-tag-dot {
                     width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+                    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
                 }
+                
+                .conversations-tag-filter-divider { height: 1px; background: #eee; margin: 4px 0; flex-shrink: 0; }
+                .conversations-tag-filter-action { color: #6366f1; font-weight: 500; justify-content: center; }
 
                 /* 标签管理弹窗 */
                 .conversations-tag-manager-list {
-                    max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 12px; padding: 4px;
+                    max-height: 250px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 12px; padding: 4px;
                 }
                 .conversations-tag-manager-item {
                     display: flex; align-items: center; justify-content: space-between;
-                    padding: 6px 8px; border-bottom: 1px solid #f3f4f6;
+                    padding: 8px; border-bottom: 1px solid #f3f4f6;
                 }
                 .conversations-tag-manager-item:last-child { border-bottom: none; }
                 .conversations-tag-manager-item:hover { background: #f9fafb; }
                 .conversations-tag-preview {
                     padding: 2px 8px; border-radius: 4px; font-size: 12px; color: white;
+                    /* Fix overflow */
+                    max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; display: inline-block;
                 }
-                .conversations-tag-actions { display: flex; gap: 4px; }
+                .conversations-tag-actions { display: flex; gap: 4px; flex-shrink: 0; }
                 .conversations-tag-btn {
-                    width: 20px; height: 20px; border: none; background: transparent; cursor: pointer;
-                    display: flex; align-items: center; justify-content: center; color: #9ca3af; border-radius: 4px;
+                    width: 24px; height: 24px; border: none; background: transparent; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center; color: #9ca3af; border-radius: 4px; transition: all 0.2s;
                 }
+                .conversations-tag-btn:hover { background: #e5e7eb; color: #374151; }
                 .conversations-tag-btn:hover { background: #fee2e2; color: #ef4444; }
                 .conversations-tag-btn.edit:hover { background: #e0f2fe; color: #3b82f6; }
 
@@ -6843,7 +6914,19 @@
                     padding: 12px; color: #9ca3af; font-size: 13px; text-align: center;
                 }
                 .conversations-item {
-                    display: flex; align-items: center; justify-content: space-between;
+                    display: flex; flex-direction: column; align-items: stretch;
+                    padding: 8px 12px;
+                    border-bottom: 1px solid #e5e7eb;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    gap: 4px;
+                }
+                .conversations-item-top {
+                    display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;
+                }
+                .conversations-item-meta {
+                    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+                }
                     padding: 8px 12px; margin-bottom: 4px; border-radius: 6px;
                     background: white; cursor: pointer; transition: all 0.2s;
                     border-left: 3px solid transparent;
