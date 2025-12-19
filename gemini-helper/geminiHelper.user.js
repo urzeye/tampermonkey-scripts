@@ -969,7 +969,9 @@
                 container.scrollTop = container.scrollHeight;
                 await new Promise((r) => setTimeout(r, 500));
 
-                const currentCount = document.querySelectorAll('.conversation').length;
+                // 使用 DOMToolkit 穿透 Shadow DOM 查询会话数量
+                const conversations = DOMToolkit.query('.conversation', { all: true, shadow: true }) || [];
+                const currentCount = conversations.length;
                 if (currentCount === lastCount) {
                     stableRounds++;
                 } else {
@@ -1804,6 +1806,17 @@
                     };
                 })
                 .filter((c) => c); // 过滤掉 null
+        }
+
+        /**
+         * 获取侧边栏可滚动容器（用于滚动加载全部会话）
+         * Gemini Business 在 Shadow DOM 中，需要穿透查找
+         * @returns {Element|null}
+         */
+        getSidebarScrollContainer() {
+            // 尝试查找会话列表的可滚动容器
+            // 可能的选择器: .conversation-list, mat-sidenav, [class*="sidebar"]
+            return DOMToolkit.query('.conversation-list', { shadow: true }) || DOMToolkit.query('mat-sidenav', { shadow: true }) || DOMToolkit.query('[class*="sidebar-content"]', { shadow: true });
         }
 
         // 排除侧边栏 (mat-sidenav, mat-drawer) 中的 Shadow DOM
@@ -3597,8 +3610,8 @@
             const folderId = targetFolderId || this.data.lastUsedFolderId || 'inbox';
 
             sidebarItems.forEach((item) => {
-                // 生成存储 Key：有 CID 时用 "cid:id" 格式，否则直接用 id
-                const storageKey = this.getConversationKey(item.id, item.cid);
+                // Key 始终用 sessionId（cid 和 siteId 存储在对象属性中）
+                const storageKey = item.id;
 
                 const existing = this.data.conversations[storageKey];
                 if (existing) {
@@ -3608,6 +3621,9 @@
                         existing.updatedAt = now;
                         updatedCount++;
                     }
+                    // 确保 siteId 和 cid 是最新的
+                    if (!existing.siteId) existing.siteId = this.siteAdapter.getSiteId();
+                    if (item.cid && !existing.cid) existing.cid = item.cid;
                 } else {
                     // 新会话：添加到指定文件夹
                     this.data.conversations[storageKey] = {
@@ -3635,26 +3651,26 @@
                 this.createUI();
             }
 
-            // 检查已删除的会话（仅检查当前 CID 下的会话）
+            // 检查已删除的会话（仅检查当前站点+CID 下的会话）
             if (checkForDeletions) {
-                // 远程会话的 Key 集合
-                const remoteKeys = new Set(sidebarItems.map((item) => this.getConversationKey(item.id, item.cid)));
+                // 远程会话的 ID 集合
+                const remoteIds = new Set(sidebarItems.map((item) => item.id));
 
-                // 本地当前 CID 的会话 Key
-                const localKeysForCurrentCid = Object.entries(this.data.conversations)
+                // 本地当前站点+CID 的会话 ID（通过对象属性过滤）
+                const localIdsForCurrentContext = Object.entries(this.data.conversations)
                     .filter(([, conv]) => this.matchesCid(conv, currentCid))
                     .map(([key]) => key);
 
-                // 找出本地有但远程没有的（当前 CID 范围内）
-                const missingKeys = localKeysForCurrentCid.filter((key) => !remoteKeys.has(key));
+                // 找出本地有但远程没有的（当前站点+CID 范围内）
+                const missingIds = localIdsForCurrentContext.filter((id) => !remoteIds.has(id));
 
-                if (missingKeys.length > 0) {
-                    const msg = (this.t('conversationsSyncDeleteMsg') || '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？').replace('{count}', missingKeys.length);
+                if (missingIds.length > 0) {
+                    const msg = (this.t('conversationsSyncDeleteMsg') || '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？').replace('{count}', missingIds.length);
                     this.showConfirmDialog(this.t('conversationsSyncDeleteTitle') || '同步删除', msg, () => {
-                        missingKeys.forEach((key) => delete this.data.conversations[key]);
+                        missingIds.forEach((id) => delete this.data.conversations[id]);
                         this.saveData();
                         this.createUI();
-                        showToast(`${this.t('conversationsDeleted') || '已移除'} ${missingKeys.length}`);
+                        showToast(`${this.t('conversationsDeleted') || '已移除'} ${missingIds.length}`);
                     });
                 }
             }
@@ -3669,32 +3685,25 @@
         }
 
         /**
-         * 生成会话存储的 Key
-         * @param {string} id 会话 ID
-         * @param {string|null} cid 团队 ID (Gemini Business)
-         * @returns {string}
-         */
-        getConversationKey(id, cid) {
-            return cid ? `${cid}:${id}` : id;
-        }
-
-        /**
          * 检查会话是否属于当前站点和团队
          * @param {Object} conv 会话对象
          * @param {string|null} currentCid 当前团队 ID (Gemini Business)
          * @returns {boolean}
          */
         matchesCid(conv, currentCid) {
-            // 1. 首先检查站点匹配（如果会话有 siteId）
+            // 1. 首先检查站点匹配
             const currentSiteId = this.siteAdapter.getSiteId();
+            // 如果会话有 siteId 且不匹配当前站点，排除
             if (conv.siteId && conv.siteId !== currentSiteId) {
                 return false;
             }
 
-            // 2. 然后检查 CID 匹配
-            // 如果当前无 CID（非 Gemini Business 或无团队），显示无 CID 的会话
+            // 2. 检查 CID 匹配
+            // 如果当前无 CID（非 Gemini Business 或无团队），显示无 CID 的会话和旧数据
             if (!currentCid) return !conv.cid;
-            // 否则显示匹配当前 CID 的会话
+            // 如果会话没有 cid（旧数据），显示它
+            if (!conv.cid) return true;
+            // 否则严格匹配 CID
             return conv.cid === currentCid;
         }
 
@@ -4158,8 +4167,9 @@
                     this.expandedFolderId = isExpanded ? folder.id : null;
 
                     if (isExpanded) {
-                        // 刷新计数（确保与实际会话数一致）
-                        const count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id).length;
+                        // 刷新计数（确保与实际会话数一致，按站点+CID 过滤）
+                        const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+                        const count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, currentCid)).length;
                         const countSpan = folderItem.querySelector('.conversations-folder-count');
                         if (countSpan) countSpan.textContent = `(${count})`;
 
@@ -4396,9 +4406,23 @@
                     }
                     return;
                 }
-                const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${conv.id}"]`);
-                if (sidebarItem) sidebarItem.click();
-                else if (conv.url) window.location.href = conv.url;
+                // 尝试在侧边栏中查找并点击（支持 Shadow DOM 穿透）
+                // 方法1: 通过 jslog 属性查找（Gemini 标准版）
+                let sidebarItem = DOMToolkit.query(`.conversation[jslog*="${conv.id}"]`, { shadow: true });
+                // 方法2: 通过菜单按钮 ID 查找（Gemini Business）
+                if (!sidebarItem) {
+                    const menuBtn = DOMToolkit.query(`#menu-${conv.id}`, { shadow: true });
+                    if (menuBtn) {
+                        sidebarItem = menuBtn.closest('.conversation');
+                    }
+                }
+                if (sidebarItem) {
+                    const btn = sidebarItem.querySelector('button.list-item') || sidebarItem.querySelector('button');
+                    if (btn) btn.click();
+                    else sidebarItem.click();
+                } else if (conv.url) {
+                    window.location.href = conv.url;
+                }
             });
             item.appendChild(title);
 
