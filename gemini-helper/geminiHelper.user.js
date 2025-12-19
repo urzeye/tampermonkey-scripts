@@ -48,7 +48,7 @@
         PROMPTS_SETTINGS: 'gemini_prompts_settings',
         READING_HISTORY: 'gemini_reading_history_settings',
         TAB_SETTINGS: 'gemini_tab_settings',
-        CONVERSATIONS: 'gemini_conversations', // 注意：实际存储时加 siteId 后缀
+        CONVERSATIONS: 'gemini_conversations',
     };
 
     // 默认 Tab 顺序（settings 已移到 header 按钮，不参与排序）
@@ -3447,11 +3447,11 @@
         }
 
         /**
-         * 获取站点专属存储键
+         * 获取全局存储键
+         * 注意：文件夹和标签全局共用，会话通过 cid 字段区分不同团队
          */
         getStorageKey() {
-            const siteId = this.siteAdapter.getSiteId();
-            return `${SETTING_KEYS.CONVERSATIONS}_${siteId}`;
+            return SETTING_KEYS.CONVERSATIONS;
         }
 
         /**
@@ -3612,6 +3612,7 @@
                     // 新会话：添加到指定文件夹
                     this.data.conversations[storageKey] = {
                         id: item.id,
+                        siteId: this.siteAdapter.getSiteId(), // 记录所属站点
                         cid: item.cid || null, // 记录所属团队（Gemini Business）
                         title: item.title,
                         url: item.url,
@@ -3678,12 +3679,19 @@
         }
 
         /**
-         * 检查会话是否属于当前 CID
+         * 检查会话是否属于当前站点和团队
          * @param {Object} conv 会话对象
-         * @param {string|null} currentCid 当前团队 ID
+         * @param {string|null} currentCid 当前团队 ID (Gemini Business)
          * @returns {boolean}
          */
         matchesCid(conv, currentCid) {
+            // 1. 首先检查站点匹配（如果会话有 siteId）
+            const currentSiteId = this.siteAdapter.getSiteId();
+            if (conv.siteId && conv.siteId !== currentSiteId) {
+                return false;
+            }
+
+            // 2. 然后检查 CID 匹配
             // 如果当前无 CID（非 Gemini Business 或无团队），显示无 CID 的会话
             if (!currentCid) return !conv.cid;
             // 否则显示匹配当前 CID 的会话
