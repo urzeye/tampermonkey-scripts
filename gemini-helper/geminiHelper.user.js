@@ -1752,33 +1752,31 @@
             const cid = cidMatch ? cidMatch[1] : '';
 
             // 2. 查找会话列表
-            const items = DOMToolkit.query('.conversation', { all: true, shadow: true }) || [];
+            const items = DOMToolkit.query('.conversation', { all: true, shadow: true });
 
             return Array.from(items)
                 .map((el) => {
                     const button = DOMToolkit.query('button.list-item', { root: el }) || el.querySelector('button');
                     if (!button) return null;
 
-                    const titleEl = DOMToolkit.query('.conversation-title', { root: button });
-                    const title = titleEl ? titleEl.textContent.trim() : '';
+                    // Strict Filter: 必须包含操作菜单按钮 (排除 "新对话" 按钮)
+                    // 使用 DOMToolkit 查找，确保能穿透潜在的 shadow dom
+                    const menuBtn = DOMToolkit.query('.conversation-action-menu-button', { root: button });
+                    if (!menuBtn) return null;
 
                     // 3. 从 Menu Button ID 提取 Session ID
                     // ID 格式: menu-8823153884416423953
                     let id = '';
-                    const menuBtn = DOMToolkit.query('.conversation-action-menu-button', { root: button });
-                    if (menuBtn && menuBtn.id && menuBtn.id.startsWith('menu-')) {
+                    if (menuBtn.id && menuBtn.id.startsWith('menu-')) {
                         id = menuBtn.id.replace('menu-', '');
                     }
 
-                    // Fallback: 如果没找到 menu 按钮，尝试从 URL (仅限当前选中项)
-                    const isActive = button.classList.contains('selected') || button.classList.contains('active') || button.getAttribute('aria-selected') === 'true';
-
-                    if (!id && isActive) {
-                        const urlMatch = currentPath.match(/\/session\/(\d+)/);
-                        if (urlMatch) id = urlMatch[1];
-                    }
-
                     if (!id) return null;
+
+                    const titleEl = DOMToolkit.query('.conversation-title', { root: button });
+                    const title = titleEl ? titleEl.textContent.trim() : '';
+
+                    const isActive = button.classList.contains('selected') || button.classList.contains('active') || button.getAttribute('aria-selected') === 'true';
 
                     // 4. 构建完整 URL
                     // 格式: https://business.gemini.google/home/cid/{cid}/r/session/{id}
@@ -1792,7 +1790,7 @@
                         title: title,
                         url: url,
                         isActive: isActive,
-                        cid: cid, // 额外记录 cid，以备后用
+                        cid: cid,
                     };
                 })
                 .filter((c) => c); // 过滤掉 null
