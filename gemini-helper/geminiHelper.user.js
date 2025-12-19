@@ -1489,9 +1489,9 @@
             const items = DOMToolkit.query('.conversation', { all: true }) || [];
             return Array.from(items)
                 .map((el) => {
-                    // 从 jslog 属性中提取会话 ID
+                    // 从 jslog 属性中提取会话 ID (Use safer regex that allows dashes/underscores)
                     const jslog = el.getAttribute('jslog') || '';
-                    const idMatch = jslog.match(/\["c_([a-z0-9]+)"/);
+                    const idMatch = jslog.match(/\["c_([^"]+)"/);
                     const id = idMatch ? idMatch[1] : '';
                     const title = el.textContent?.trim() || '';
 
