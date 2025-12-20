@@ -953,6 +953,20 @@
         }
 
         /**
+         * 获取会话观察器配置（用于侧边栏实时监听）
+         * 子类应覆盖此方法提供站点特定的配置
+         * @returns {{
+         *   selector: string,                    // 会话元素 CSS 选择器
+         *   shadow: boolean,                     // 是否需要 Shadow DOM 穿透
+         *   extractInfo: function(Element): Object|null, // 从元素提取会话信息
+         *   getTitleElement: function(Element): Element  // 获取标题元素（用于监听变化）
+         * }|null} 返回 null 表示不支持
+         */
+        getConversationObserverConfig() {
+            return null;
+        }
+
+        /**
          * 滚动加载全部会话
          * 模拟滚动侧边栏到底部，直到所有会话都加载完成
          * @returns {Promise<void>}
@@ -1513,6 +1527,28 @@
             return DOMToolkit.query('infinite-scroller[scrollable="true"]') || DOMToolkit.query('infinite-scroller');
         }
 
+        /**
+         * 获取会话观察器配置（用于侧边栏实时监听）
+         */
+        getConversationObserverConfig() {
+            return {
+                selector: '.conversation',
+                shadow: false,
+                extractInfo: (el) => {
+                    const jslog = el.getAttribute('jslog') || '';
+                    const idMatch = jslog.match(/\["c_([^"]+)"/);
+                    const id = idMatch ? idMatch[1] : '';
+                    if (!id) return null;
+                    return {
+                        id,
+                        title: el.textContent?.trim() || '',
+                        url: `https://gemini.google.com/app/${id}`,
+                    };
+                },
+                getTitleElement: (el) => el,
+            };
+        }
+
         getSessionName() {
             // 从侧边栏活动对话标题获取
             const titleEl = document.querySelector('.conversation-title');
@@ -1814,6 +1850,39 @@
          */
         getSidebarScrollContainer() {
             return DOMToolkit.query('.conversation-list', { shadow: true }) || DOMToolkit.query('mat-sidenav', { shadow: true });
+        }
+
+        /**
+         * 获取会话观察器配置（用于侧边栏实时监听）
+         */
+        getConversationObserverConfig() {
+            const self = this;
+            return {
+                selector: '.conversation',
+                shadow: true,
+                extractInfo: (el) => {
+                    const button = el.querySelector('button.list-item') || el.querySelector('button');
+                    if (!button) return null;
+
+                    const menuBtn = button.querySelector('.conversation-action-menu-button');
+                    if (!menuBtn || !menuBtn.id?.startsWith('menu-')) return null;
+
+                    const id = menuBtn.id.replace('menu-', '');
+                    if (!/^\d+$/.test(id)) return null; // 排除智能体
+
+                    const titleEl = button.querySelector('.conversation-title');
+                    const title = titleEl?.textContent?.trim() || '';
+
+                    const cid = self.getCurrentCid();
+                    let url = `https://business.gemini.google/home/cid/${cid}/r/session/${id}`;
+
+                    return { id, title, url, cid };
+                },
+                getTitleElement: (el) => {
+                    const button = el.querySelector('button.list-item') || el.querySelector('button');
+                    return button?.querySelector('.conversation-title') || el;
+                },
+            };
         }
 
         /**
@@ -3361,55 +3430,79 @@
         startSidebarObserver() {
             if (this.sidebarObserverStop) return; // 已经在监听
 
-            // 尝试获取侧边栏容器作为更精确的监听范围
-            const sidebarContainer = this.siteAdapter.getSidebarScrollContainer() || document;
+            // 获取适配器提供的配置
+            const config = this.siteAdapter.getConversationObserverConfig();
+            if (!config) return; // 站点不支持侧边栏监听
 
-            this.sidebarObserverStop = DOMToolkit.each(
-                '.conversation',
-                (el, isNew) => {
-                    // 移除 isNew 检查，以便对现有会话也能附加标题监听
-                    // if (!isNew) return;
+            // 保存配置供其他方法使用
+            this.observerConfig = config;
 
-                    // 尝试提取 ID，如果失败则重试（因为新会话可能属性延迟生成）
-                    const tryAdd = (retries = 5) => {
-                        const jslog = el.getAttribute('jslog') || '';
-                        const idMatch = jslog.match(/\["c_([a-z0-9]+)"/);
-                        const id = idMatch ? idMatch[1] : '';
+            // 延迟启动函数（等待侧边栏 DOM 加载完成）
+            const startObserver = (retryCount = 0) => {
+                const maxRetries = 5; // 最多重试5次
+                const retryDelay = 1000; // 每次重试间隔1秒
 
-                        if (id) {
-                            // 仅对新发现的元素尝试添加到数据（如果是全新的会话）
-                            if (isNew && !this.data.conversations[id]) {
-                                // 自动添加新会话到当前选中文件夹
-                                const folderId = this.data.lastUsedFolderId || 'inbox';
-                                this.data.conversations[id] = {
-                                    id,
-                                    title: el.textContent?.trim() || 'New Conversation',
-                                    url: `https://gemini.google.com/app/${id}`,
-                                    folderId: folderId,
-                                    createdAt: Date.now(),
-                                    updatedAt: Date.now(),
-                                };
-                                this.saveData();
-                                // 轻量级更新计数（避免重建整个 UI 丢失展开状态）
-                                this.updateFolderCount(folderId);
+                // 确定监听起点
+                const sidebarContainer = config.shadow ? document : this.siteAdapter.getSidebarScrollContainer() || document;
+
+                // 对于需要 Shadow DOM 穿透的站点，检查侧边栏容器是否已加载
+                if (config.shadow && retryCount < maxRetries) {
+                    const sidebar = this.siteAdapter.getSidebarScrollContainer();
+                    if (!sidebar) {
+                        // 侧边栏还未加载，延迟重试
+                        setTimeout(() => startObserver(retryCount + 1), retryDelay);
+                        return;
+                    }
+                }
+
+                // 侧边栏已加载或达到最大重试次数，开始监听
+                this.sidebarObserverStop = DOMToolkit.each(
+                    config.selector,
+                    (el, isNew) => {
+                        // 尝试提取 ID，如果失败则重试（因为新会话可能属性延迟生成）
+                        const tryAdd = (retries = 5) => {
+                            const info = config.extractInfo(el);
+
+                            if (info?.id) {
+                                // 仅对新发现的元素尝试添加到数据（如果是全新的会话）
+                                if (isNew && !this.data.conversations[info.id]) {
+                                    // 自动添加新会话到当前选中文件夹
+                                    const folderId = this.data.lastUsedFolderId || 'inbox';
+                                    this.data.conversations[info.id] = {
+                                        id: info.id,
+                                        siteId: this.siteAdapter.getSiteId(),
+                                        cid: info.cid || null,
+                                        title: info.title || 'New Conversation',
+                                        url: info.url,
+                                        folderId: folderId,
+                                        createdAt: Date.now(),
+                                        updatedAt: Date.now(),
+                                    };
+                                    this.saveData();
+                                    // 轻量级更新计数（避免重建整个 UI 丢失展开状态）
+                                    this.updateFolderCount(folderId);
+                                }
+
+                                // 对所有会话（无论新旧）启动标题变更监听
+                                this.monitorConversationTitle(el, info.id);
+                            } else if (retries > 0) {
+                                setTimeout(() => tryAdd(retries - 1), 500);
                             }
+                        };
 
-                            // 对所有会话（无论新旧）启动标题变更监听
-                            this.monitorConversationTitle(el, id);
-                        } else if (retries > 0) {
-                            setTimeout(() => tryAdd(retries - 1), 500);
-                        }
-                    };
+                        tryAdd();
+                    },
+                    { parent: sidebarContainer, shadow: config.shadow },
+                );
+            };
 
-                    tryAdd();
-                },
-                { parent: sidebarContainer },
-            );
+            // 启动观察器
+            startObserver();
         }
 
         /**
          * 监听会话标题变化
-         * 当侧边栏标题改变时，删除本地存储的旧数据
+         * 当侧边栏标题改变时，自动更新本地数据
          * @param {HTMLElement} el 会话元素
          * @param {string} id 会话ID
          */
@@ -3418,15 +3511,27 @@
             if (el.dataset.ghTitleObserver) return;
             el.dataset.ghTitleObserver = 'true';
 
+            // 使用配置获取正确的标题元素
+            const titleEl = this.observerConfig?.getTitleElement?.(el) || el;
+
             // 使用 DOMToolkit.watch 监听文本变化，防抖 500ms
             DOMToolkit.watch(
-                el,
+                titleEl,
                 () => {
-                    const currentTitle = el.textContent?.trim();
-                    const stored = this.data.conversations[id];
+                    // 每次回调时重新从元素提取 ID，确保 ID 匹配
+                    const currentInfo = this.observerConfig?.extractInfo?.(el);
+                    const currentId = currentInfo?.id;
+
+                    if (!currentId || currentId !== id) {
+                        // ID 不匹配则跳过（防止元素被复用时错误更新）
+                        return;
+                    }
+
+                    const currentTitle = titleEl.textContent?.trim();
+                    const stored = this.data.conversations[currentId];
 
                     if (currentTitle && stored && stored.title !== currentTitle) {
-                        console.log(`[Gemini Helper] Title changed for ${id}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
+                        console.log(`[Gemini Helper] Title changed for ${currentId}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
 
                         // 更新本地数据的标题
                         stored.title = currentTitle;
