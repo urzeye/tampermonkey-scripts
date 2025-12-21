@@ -5100,16 +5100,16 @@
                 type: 'text',
                 className: 'conversations-dialog-search',
                 placeholder: '搜索文件夹...',
-                style: 'flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; font-size: 13px;',
+                style: 'flex: 1; padding: 8px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; box-sizing: border-box; font-size: 13px;',
             });
             const addFolderBtn = createElement('button', {
                 className: 'conversations-dialog-add-folder-btn',
                 title: this.t('conversationsAddFolder') || '新建文件夹',
-                style: 'width: 36px; height: 36px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;',
+                style: 'width: 36px; height: 36px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; background: var(--gh-bg, white); cursor: pointer; display: flex; align-items: center; justify-content: center;',
             });
             const addSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             addSvg.setAttribute('viewBox', '0 0 24 24');
-            addSvg.setAttribute('fill', '#6b7280');
+            addSvg.setAttribute('fill', 'var(--gh-text-secondary, #6b7280)');
             addSvg.setAttribute('width', '18');
             addSvg.setAttribute('height', '18');
             const addPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -5296,16 +5296,16 @@
                 type: 'text',
                 className: 'conversations-dialog-search',
                 placeholder: '搜索文件夹...',
-                style: 'flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; font-size: 13px;',
+                style: 'flex: 1; padding: 8px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; box-sizing: border-box; font-size: 13px;',
             });
             const addFolderBtn = createElement('button', {
                 className: 'conversations-dialog-add-folder-btn',
                 title: this.t('conversationsAddFolder') || '新建文件夹',
-                style: 'width: 36px; height: 36px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;',
+                style: 'width: 36px; height: 36px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; background: var(--gh-bg, white); cursor: pointer; display: flex; align-items: center; justify-content: center;',
             });
             const addSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             addSvg.setAttribute('viewBox', '0 0 24 24');
-            addSvg.setAttribute('fill', '#6b7280');
+            addSvg.setAttribute('fill', 'var(--gh-text-secondary, #6b7280)');
             addSvg.setAttribute('width', '18');
             addSvg.setAttribute('height', '18');
             const addPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -5572,10 +5572,10 @@
             // 1. 自定义输入区域
             const customRow = createElement('div', {
                 className: 'conversations-emoji-custom-row',
-                style: 'display: flex; align-items: center; gap: 8px; padding: 4px; background: #f9fafb; border-radius: 4px; border: 1px solid #e5e7eb;',
+                style: 'display: flex; align-items: center; gap: 8px; padding: 4px; background: var(--gh-bg-secondary, #f9fafb); border-radius: 4px; border: 1px solid var(--gh-border, #e5e7eb);',
             });
 
-            const customLabel = createElement('span', { style: 'font-size: 12px; color: #6b7280; flex-shrink: 0;' }, this.t('conversationsCustomIcon') || '自定义:');
+            const customLabel = createElement('span', { style: 'font-size: 12px; color: var(--gh-text-secondary, #6b7280); flex-shrink: 0;' }, this.t('conversationsCustomIcon') || '自定义:');
 
             const customInput = createElement('input', {
                 type: 'text',
@@ -5583,7 +5583,7 @@
                 value: selectedEmoji,
                 maxLength: 4, // 稍微放宽长度
                 placeholder: '☺',
-                style: 'width: 60px; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px; font-size: 16px;',
+                style: 'width: 60px; text-align: center; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; padding: 2px; font-size: 16px;',
             });
 
             customRow.appendChild(customLabel);
@@ -5711,7 +5711,7 @@
 
                 // Hover 效果
                 btn.onmouseenter = () => {
-                    if (!btn.classList.contains('selected')) btn.style.backgroundColor = '#f3f4f6';
+                    if (!btn.classList.contains('selected')) btn.style.backgroundColor = 'var(--gh-hover, #f3f4f6)';
                 };
                 btn.onmouseleave = () => {
                     if (!btn.classList.contains('selected')) btn.style.backgroundColor = 'transparent';
@@ -5943,7 +5943,7 @@
                 '×',
             );
             closeIcon.addEventListener('click', () => overlay.remove());
-            closeIcon.addEventListener('mouseenter', () => (closeIcon.style.backgroundColor = '#f3f4f6'));
+            closeIcon.addEventListener('mouseenter', () => (closeIcon.style.backgroundColor = 'var(--gh-hover, #f3f4f6)'));
             closeIcon.addEventListener('mouseleave', () => (closeIcon.style.backgroundColor = 'transparent'));
 
             titleRow.appendChild(closeIcon);
@@ -7303,6 +7303,7 @@
         init() {
             this.createStyles();
             this.createUI();
+            this.monitorTheme();
             this.bindEvents();
             // 初始化锚点按钮状态（初始时没有锚点，应置灰）
             this.updateAnchorButtonState(false);
@@ -7377,6 +7378,34 @@
             const style = document.createElement('style');
             style.id = 'gemini-helper-styles';
             style.textContent = `
+                /* CSS Variables Definition */
+                #gemini-helper-panel {
+                    --gh-bg: #ffffff;
+                    --gh-bg-secondary: var(--gh-bg-secondary, #f9fafb);
+                    --gh-text: var(--gh-text, #1f2937);
+                    --gh-text-secondary: var(--gh-text-secondary, #6b7280);
+                    --gh-border: var(--gh-border, #e5e7eb);
+                    --gh-hover: var(--gh-hover, #f3f4f6);
+                    --gh-shadow: 0 10px 40px rgba(0,0,0,0.15);
+                    --gh-input-bg: #ffffff;
+                    --gh-input-border: var(--gh-input-border, #d1d5db);
+                    --gh-active-bg: var(--gh-border, #e5e7eb);
+                    --gh-danger: #ef4444;
+                    --gh-gradient: ${gradient};
+                }
+                #gemini-helper-panel.gh-dark {
+                    --gh-bg: #1e1e1e;
+                    --gh-bg-secondary: #2d2d2d;
+                    --gh-text: #e3e3e3;
+                    --gh-text-secondary: #a0a0a0;
+                    --gh-border: #444444;
+                    --gh-hover: #333333;
+                    --gh-shadow: 0 10px 40px rgba(0,0,0,0.4);
+                    --gh-input-bg: #2f2f2f;
+                    --gh-input-border: #555555;
+                    --gh-active-bg: #404040;
+                }
+
                 /* 主面板样式 */
                 #gemini-helper-panel {
                     position: fixed;
@@ -7386,7 +7415,7 @@
                     width: 320px;
                     height: 80vh;
                     min-height: 600px;
-                    background: white;
+                    background: var(--gh-bg, white);
                     border-radius: 12px;
                     box-shadow: 0 10px 40px rgba(0,0,0,0.15);
                     z-index: 999999;
@@ -7417,24 +7446,24 @@
                     transition: all 0.2s; font-size: 14px;
                 }
                 .prompt-panel-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.1); }
-                .prompt-search-bar { padding: 12px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+                .prompt-search-bar { padding: 12px; border-bottom: 1px solid var(--gh-border, #e5e7eb); background: var(--gh-bg-secondary, #f9fafb); }
                 .prompt-search-input {
-                    width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;
+                    width: 100%; padding: 8px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px; font-size: 14px;
                     transition: all 0.2s; box-sizing: border-box;
                 }
                 .prompt-search-input:focus { outline: none; border-color: ${colors.primary}; }
-                .prompt-categories { padding: 8px 12px; display: flex; gap: 6px; flex-wrap: wrap; background: white; border-bottom: 1px solid #e5e7eb; }
+                .prompt-categories { padding: 8px 12px; display: flex; gap: 6px; flex-wrap: wrap; background: var(--gh-bg, white); border-bottom: 1px solid var(--gh-border, #e5e7eb); }
                 .category-tag {
-                    padding: 4px 10px; background: #f3f4f6; border-radius: 12px; font-size: 12px; color: #4b5563;
+                    padding: 4px 10px; background: var(--gh-hover, #f3f4f6); border-radius: 12px; font-size: 12px; color: #4b5563;
                     cursor: pointer; transition: all 0.2s; border: 1px solid transparent;
                 }
-                .category-tag:hover { background: #e5e7eb; }
+                .category-tag:hover { background: var(--gh-border, #e5e7eb); }
                 .category-tag.active {
                     background: ${colors.primary}; color: white; border-color: ${colors.primary};
                 }
                 .prompt-list { flex: 1; overflow-y: auto; padding: 8px; }
                 .prompt-item {
-                    background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 8px;
+                    background: var(--gh-bg, white); border: 1px solid var(--gh-border, #e5e7eb); border-radius: 8px; padding: 12px; margin-bottom: 8px;
                     cursor: pointer; transition: all 0.2s; position: relative;
                 }
                 .prompt-item:hover {
@@ -7447,17 +7476,17 @@
                     border-color: ${colors.primary};
                 }
                 .prompt-item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-                .prompt-item-title { font-weight: 600; font-size: 14px; color: #1f2937; flex: 1; }
-                .prompt-item-category { font-size: 11px; padding: 2px 6px; background: #f3f4f6; border-radius: 4px; color: #6b7280; }
-                .prompt-item-content { font-size: 13px; color: #6b7280; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+                .prompt-item-title { font-weight: 600; font-size: 14px; color: var(--gh-text, #1f2937); flex: 1; }
+                .prompt-item-category { font-size: 11px; padding: 2px 6px; background: var(--gh-hover, #f3f4f6); border-radius: 4px; color: var(--gh-text-secondary, #6b7280); }
+                .prompt-item-content { font-size: 13px; color: var(--gh-text-secondary, #6b7280); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
                 .prompt-item-actions { position: absolute; top: 8px; right: 8px; display: none; gap: 4px; }
                 .prompt-item:hover .prompt-item-actions { display: flex; }
                 .prompt-action-btn {
-                    width: 24px; height: 24px; border: none; background: white; border-radius: 4px; cursor: pointer;
+                    width: 24px; height: 24px; border: none; background: var(--gh-bg, white); border-radius: 4px; cursor: pointer;
                     display: flex; align-items: center; justify-content: center; transition: all 0.2s;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 12px;
                 }
-                .prompt-action-btn:hover { background: #f3f4f6; transform: scale(1.1); }
+                .prompt-action-btn:hover { background: var(--gh-hover, #f3f4f6); transform: scale(1.1); }
                 .prompt-item.dragging { opacity: 0.5; }
                 .add-prompt-btn {
                     margin: 12px; padding: 10px; background: ${gradient};
@@ -7473,14 +7502,14 @@
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
                 .prompt-modal-content {
-                    background: white; border-radius: 12px; width: 90%; max-width: 500px; padding: 24px; animation: slideUp 0.3s;
+                    background: var(--gh-bg, white); border-radius: 12px; width: 90%; max-width: 500px; padding: 24px; animation: slideUp 0.3s;
                 }
                 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-                .prompt-modal-header { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1f2937; }
+                .prompt-modal-header { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--gh-text, #1f2937); }
                 .prompt-form-group { margin-bottom: 16px; }
-                .prompt-form-label { display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+                .prompt-form-label { display: block; font-size: 14px; font-weight: 500; color: var(--gh-text, #374151); margin-bottom: 6px; }
                 .prompt-form-input, .prompt-form-textarea {
-                    width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;
+                    width: 100%; padding: 8px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px; font-size: 14px;
                     transition: all 0.2s; box-sizing: border-box;
                 }
                 .prompt-form-textarea { min-height: 100px; resize: vertical; font-family: inherit; }
@@ -7488,7 +7517,7 @@
                 .prompt-modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
                 .prompt-modal-btn { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
                 .prompt-modal-btn.primary { background: ${gradient}; color: white; }
-                .prompt-modal-btn.secondary { background: #f3f4f6; color: #4b5563; }
+                .prompt-modal-btn.secondary { background: var(--gh-hover, #f3f4f6); color: #4b5563; }
                 /* 选中的提示词显示栏 */
                 .selected-prompt-bar {
                     position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
@@ -7538,7 +7567,7 @@
                 }
                 /* 快捷跳转按钮组（面板内） */
                 .scroll-nav-container {
-                    display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid #e5e7eb;
+                    display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--gh-border, #e5e7eb);
                     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
                     border-radius: 0 0 12px 12px; justify-content: center;
                 }
@@ -7565,20 +7594,20 @@
                     overflow-x: hidden; /* 隐藏横向滚动条 */
                 }
                 .conversations-toolbar {
-                    display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0;
+                    display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--gh-border, #e5e7eb); flex-shrink: 0;
                 }
                 .conversations-toolbar-btn {
-                    padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb;
-                    font-size: 13px; color: #374151; cursor: pointer; transition: all 0.2s;
+                    padding: 6px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px; background: var(--gh-bg-secondary, #f9fafb);
+                    font-size: 13px; color: var(--gh-text, #374151); cursor: pointer; transition: all 0.2s;
                     display: flex; align-items: center; gap: 4px;
                 }
-                .conversations-toolbar-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+                .conversations-toolbar-btn:hover { background: var(--gh-hover, #f3f4f6); border-color: #9ca3af; }
                 .conversations-toolbar-btn.sync { padding: 6px 10px; }
                 .conversations-toolbar-btn.batch-mode.active { background: #6366f1; color: white; border-color: #6366f1; }
                 .conversations-toolbar-btn:disabled { opacity: 0.6; cursor: wait; }
                 .conversations-folder-select {
-                    padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px;
-                    background: #f9fafb; font-size: 13px; color: #374151; cursor: pointer;
+                    padding: 6px 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px;
+                    background: var(--gh-bg-secondary, #f9fafb); font-size: 13px; color: var(--gh-text, #374151); cursor: pointer;
                     flex: 1; min-width: 0; max-width: 150px;
                 }
                 .conversations-folder-select:focus { outline: none; border-color: #6366f1; }
@@ -7591,10 +7620,10 @@
                 .conversations-folder-item {
                     display: flex; align-items: center; justify-content: space-between;
                     padding: 10px 12px; margin-bottom: 4px; border-radius: 8px;
-                    background: #f9fafb; cursor: pointer; transition: all 0.2s;
+                    background: var(--gh-bg-secondary, #f9fafb); cursor: pointer; transition: all 0.2s;
                     flex-wrap: wrap; /* 允许换行，会话列表在下方 */
                 }
-                .conversations-folder-item:hover { background: #f3f4f6; }
+                .conversations-folder-item:hover { background: var(--gh-hover, #f3f4f6); }
                 .conversations-folder-item.default { background: #e0f2fe; }
                 .conversations-folder-item.expanded {
                     background: #c7d2fe !important; /* 更深的紫蓝色 */
@@ -7612,16 +7641,16 @@
                     line-height: 1; flex-shrink: 0;
                 }
                 .conversations-folder-name {
-                    font-size: 14px; font-weight: 500; color: #1f2937;
+                    font-size: 14px; font-weight: 500; color: var(--gh-text, #1f2937);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                     user-select: none; /* 禁止选中 */
                 }
-                .conversations-folder-count { font-size: 12px; color: #6b7280; flex-shrink: 0; user-select: none; }
+                .conversations-folder-count { font-size: 12px; color: var(--gh-text-secondary, #6b7280); flex-shrink: 0; user-select: none; }
                 .conversations-folder-menu-btn {
                     width: 24px; height: 24px; border: none; background: transparent;
-                    color: #6b7280; cursor: pointer; border-radius: 4px; font-size: 14px;
+                    color: var(--gh-text-secondary, #6b7280); cursor: pointer; border-radius: 4px; font-size: 14px;
                 }
-                .conversations-folder-menu-btn:hover { background: #e5e7eb; }
+                .conversations-folder-menu-btn:hover { background: var(--gh-border, #e5e7eb); }
                 .conversations-folder-controls {
                     display: flex; align-items: center; gap: 4px; flex-shrink: 0;
                 }
@@ -7636,27 +7665,27 @@
                     opacity: 1;
                 }
                 .conversations-folder-order-btn {
-                    width: 20px; height: 20px; border: 1px solid #d1d5db; border-radius: 4px;
-                    background: white; color: #6b7280; cursor: pointer; font-size: 11px;
+                    width: 20px; height: 20px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px;
+                    background: var(--gh-bg, white); color: var(--gh-text-secondary, #6b7280); cursor: pointer; font-size: 11px;
                     display: flex; align-items: center; justify-content: center;
                     transition: all 0.15s;
                 }
                 .conversations-folder-order-btn:hover:not(:disabled) {
-                    background: #f3f4f6; border-color: #9ca3af; color: #374151;
+                    background: var(--gh-hover, #f3f4f6); border-color: #9ca3af; color: var(--gh-text, #374151);
                 }
                 .conversations-folder-order-btn:disabled {
                     opacity: 0.3; cursor: default;
                 }
                 .conversations-folder-menu {
-                    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+                    background: var(--gh-bg, white); border: 1px solid var(--gh-border, #e5e7eb); border-radius: 8px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000002; padding: 4px;
                     min-width: 100px;
                 }
                 .conversations-folder-menu button {
                     display: block; width: 100%; padding: 8px 12px; border: none; background: none;
-                    text-align: left; font-size: 13px; color: #374151; cursor: pointer; border-radius: 4px;
+                    text-align: left; font-size: 13px; color: var(--gh-text, #374151); cursor: pointer; border-radius: 4px;
                 }
-                .conversations-folder-menu button:hover { background: #f3f4f6; }
+                .conversations-folder-menu button:hover { background: var(--gh-hover, #f3f4f6); }
                 .conversations-empty {
                     text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 14px;
                 }
@@ -7664,8 +7693,8 @@
                 /* 搜索栏样式 */
                 .conversations-search-bar {
                     padding: 8px 12px;
-                    border-bottom: 1px solid #e5e7eb;
-                    background: #f9fafb;
+                    border-bottom: 1px solid var(--gh-border, #e5e7eb);
+                    background: var(--gh-bg-secondary, #f9fafb);
                 }
                 .conversations-search-wrapper {
                     display: flex;
@@ -7689,7 +7718,7 @@
                     width: 100%;
                     height: 100%;
                     padding: 0 12px; /* Symmetric padding */
-                    border: 1px solid #d1d5db;
+                    border: 1px solid var(--gh-input-border, #d1d5db);
                     border-radius: 8px 0 0 8px;
                     font-size: 14px;
                     box-sizing: border-box;
@@ -7706,10 +7735,10 @@
                 .conversations-pin-filter-btn {
                     cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 14px;
                     display: flex; align-items: center; justify-content: center;
-                    border: 1px solid #d1d5db; border-left: none;
-                    background: white; box-sizing: border-box; transition: all 0.2s;
+                    border: 1px solid var(--gh-input-border, #d1d5db); border-left: none;
+                    background: var(--gh-bg, white); box-sizing: border-box; transition: all 0.2s;
                 }
-                .conversations-pin-filter-btn:hover { background: #f3f4f6; color: #374151; }
+                .conversations-pin-filter-btn:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); }
                 .conversations-pin-filter-btn.active { 
                     color: #6366f1; background: #eef2ff; 
                     box-shadow: inset 0 0 0 1px #818cf8;
@@ -7742,10 +7771,10 @@
                 .conversations-tag-search-btn {
                     cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 14px;
                     display: flex; align-items: center; justify-content: center;
-                    border: 1px solid #d1d5db; border-left: none; border-radius: 0; /* Always 0 radius/square */
-                    background: white; box-sizing: border-box; transition: all 0.2s;
+                    border: 1px solid var(--gh-input-border, #d1d5db); border-left: none; border-radius: 0; /* Always 0 radius/square */
+                    background: var(--gh-bg, white); box-sizing: border-box; transition: all 0.2s;
                 }
-                .conversations-tag-search-btn:hover { background: #f3f4f6; color: #374151; }
+                .conversations-tag-search-btn:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); }
                 .conversations-tag-search-btn.active { 
                     color: #6366f1; background: #eef2ff; 
                     box-shadow: inset 0 0 0 1px #818cf8; /* Fix 7: Distinct active border/shadow */
@@ -7756,13 +7785,13 @@
                 .conversations-search-clear {
                     cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 18px;
                     display: flex; align-items: center; justify-content: center;
-                    border: 1px solid #d1d5db; border-left: none; border-radius: 0 8px 8px 0;
-                    background: white; box-sizing: border-box; transition: all 0.2s;
+                    border: 1px solid var(--gh-input-border, #d1d5db); border-left: none; border-radius: 0 8px 8px 0;
+                    background: var(--gh-bg, white); box-sizing: border-box; transition: all 0.2s;
                     user-select: none;
                 }
                 .conversations-search-clear:hover { background: #fef2f2; color: #ef4444; }
                 .conversations-search-clear.disabled { 
-                    opacity: 0.3; cursor: default; background: #f9fafb; pointer-events: none;
+                    opacity: 0.3; cursor: default; background: var(--gh-bg-secondary, #f9fafb); pointer-events: none;
                 }
 
                 /* Removed old inner clear button styles */
@@ -7773,8 +7802,8 @@
                     top: calc(100% + 4px);
                     right: 0;
                     width: 200px;
-                    background: white;
-                    border: 1px solid #e5e7eb;
+                    background: var(--gh-bg, white);
+                    border: 1px solid var(--gh-border, #e5e7eb);
                     border-radius: 8px;
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
                     z-index: 1000;
@@ -7787,18 +7816,18 @@
                     overflow-y: auto; flex: 1; padding: 4px; display: flex; flex-direction: column; gap: 2px;
                 }
                 .conversations-tag-filter-footer {
-                    padding: 4px; border-top: 1px solid #eee; background: #f9fafb; flex-shrink: 0;
+                    padding: 4px; border-top: 1px solid #eee; background: var(--gh-bg-secondary, #f9fafb); flex-shrink: 0;
                 }
                 .conversations-tag-filter-item {
                     display: flex; align-items: center; gap: 8px; padding: 8px;
-                    cursor: pointer; border-radius: 6px; font-size: 13px; color: #374151;
+                    cursor: pointer; border-radius: 6px; font-size: 13px; color: var(--gh-text, #374151);
                     /* Fix overflow */
                     width: 100%; box-sizing: border-box; overflow: hidden;
                 }
                 .conversations-tag-filter-item span:not(.conversations-tag-dot) {
                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
                 }
-                .conversations-tag-filter-item:hover { background: #f3f4f6; }
+                .conversations-tag-filter-item:hover { background: var(--gh-hover, #f3f4f6); }
                 .conversations-tag-filter-item.selected { background: #eff6ff; color: #2563eb; font-weight: 500; }
                 
                 /* Checkmark for selected */
@@ -7817,14 +7846,14 @@
 
                 /* 标签管理弹窗 */
                 .conversations-tag-manager-list {
-                    max-height: 250px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 12px; padding: 4px;
+                    max-height: 250px; overflow-y: auto; border: 1px solid var(--gh-border, #e5e7eb); border-radius: 4px; margin-bottom: 12px; padding: 4px;
                 }
                 .conversations-tag-manager-item {
                     display: flex; align-items: center; justify-content: space-between;
-                    padding: 8px; border-bottom: 1px solid #f3f4f6;
+                    padding: 8px; border-bottom: 1px solid var(--gh-hover, #f3f4f6);
                 }
                 .conversations-tag-manager-item:last-child { border-bottom: none; }
-                .conversations-tag-manager-item:hover { background: #f9fafb; }
+                .conversations-tag-manager-item:hover { background: var(--gh-bg-secondary, #f9fafb); }
                 .conversations-tag-preview {
                     padding: 2px 8px; border-radius: 4px; font-size: 12px; color: white;
                     /* Fix overflow */
@@ -7835,7 +7864,7 @@
                     width: 24px; height: 24px; border: none; background: transparent; cursor: pointer;
                     display: flex; align-items: center; justify-content: center; color: #9ca3af; border-radius: 4px; transition: all 0.2s;
                 }
-                .conversations-tag-btn:hover { background: #e5e7eb; color: #374151; }
+                .conversations-tag-btn:hover { background: var(--gh-border, #e5e7eb); color: var(--gh-text, #374151); }
                 .conversations-tag-btn:hover { background: #fee2e2; color: #ef4444; }
                 .conversations-tag-btn.edit:hover { background: #e0f2fe; color: #3b82f6; }
 
@@ -7848,7 +7877,7 @@
                     border: 2px solid transparent; transition: transform 0.1s;
                 }
                 .conversations-color-item:hover { transform: scale(1.1); }
-                .conversations-color-item.selected { border-color: #374151; transform: scale(1.1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                .conversations-color-item.selected { border-color: var(--gh-text, #374151); transform: scale(1.1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
                 .conversations-result-bar {
                     text-align: center;
                     padding: 6px;
@@ -7885,7 +7914,7 @@
                     padding: 8px 12px;
                     margin-bottom: 4px; /* Card Layout: Spacing */
                     border-radius: 6px; /* Card Layout: Radius */
-                    background: white;  /* Card Layout: White Background */
+                    background: var(--gh-bg, white);  /* Card Layout: White Background */
                     cursor: pointer;
                     transition: all 0.2s;
                     gap: 8px;
@@ -7893,7 +7922,7 @@
                     /* border-bottom removed for card style */
                 }
                 .conversations-item:hover {
-                    background: #f3f4f6; /* Slightly darker on hover */
+                    background: var(--gh-hover, #f3f4f6); /* Slightly darker on hover */
                 }
                 /* Rounded Blue Bar on Hover */
                 .conversations-item::before {
@@ -7915,7 +7944,7 @@
                 .conversations-item-title {
                     flex: 1;
                     min-width: 0;
-                    font-size: 14px; color: #374151;
+                    font-size: 14px; color: var(--gh-text, #374151);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
                 /* Tags Container */
@@ -7938,17 +7967,17 @@
                     opacity: 0; transition: opacity 0.2s; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
                 }
                 .conversations-item:hover .conversations-item-menu-btn { opacity: 1; }
-                .conversations-item-menu-btn:hover { background: #e5e7eb; color: #374151; }
+                .conversations-item-menu-btn:hover { background: var(--gh-border, #e5e7eb); color: var(--gh-text, #374151); }
                 .conversations-item-menu {
-                    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+                    background: var(--gh-bg, white); border: 1px solid var(--gh-border, #e5e7eb); border-radius: 8px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000002; padding: 4px;
                     min-width: 120px;
                 }
                 .conversations-item-menu button {
                     display: block; width: 100%; padding: 8px 12px; border: none; background: none;
-                    text-align: left; font-size: 13px; color: #374151; cursor: pointer; border-radius: 4px;
+                    text-align: left; font-size: 13px; color: var(--gh-text, #374151); cursor: pointer; border-radius: 4px;
                 }
-                .conversations-item-menu button:hover { background: #f3f4f6; }
+                .conversations-item-menu button:hover { background: var(--gh-hover, #f3f4f6); }
                 .conversations-item-menu button.danger { color: #dc2626; }
                 .conversations-item-menu button.danger:hover { background: #fef2f2; }
 
@@ -7965,28 +7994,28 @@
                 /* 底部批量操作栏 */
                 .conversations-batch-bar {
                     position: sticky; bottom: 0; left: 0; right: 0;
-                    background: white;
+                    background: var(--gh-bg, white);
                     padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
                     border-radius: 8px; margin-top: 8px;
-                    border: 1px solid #e5e7eb;
+                    border: 1px solid var(--gh-border, #e5e7eb);
                     box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
                 }
                 .conversations-batch-info {
-                    color: #374151; font-size: 13px; font-weight: 500;
+                    color: var(--gh-text, #374151); font-size: 13px; font-weight: 500;
                 }
                 .conversations-batch-btns {
                     display: flex; gap: 8px;
                 }
                 .conversations-batch-btn {
-                    padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+                    padding: 4px 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     font-size: 12px; cursor: pointer; transition: all 0.2s;
-                    background: #f3f4f6; color: #374151;
+                    background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151);
                 }
-                .conversations-batch-btn:hover { background: #e5e7eb; border-color: #9ca3af; }
+                .conversations-batch-btn:hover { background: var(--gh-border, #e5e7eb); border-color: #9ca3af; }
                 .conversations-batch-btn.danger { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
                 .conversations-batch-btn.danger:hover { background: #fecaca; border-color: #f87171; }
-                .conversations-batch-btn.cancel { background: transparent; border: none; color: #6b7280; }
-                .conversations-batch-btn.cancel:hover { background: #f3f4f6; color: #374151; border: none; }
+                .conversations-batch-btn.cancel { background: transparent; border: none; color: var(--gh-text-secondary, #6b7280); }
+                .conversations-batch-btn.cancel:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); border: none; }
 
                 /* 会话对话框样式 */
                 .conversations-dialog-overlay {
@@ -7995,11 +8024,11 @@
                     display: flex; align-items: center; justify-content: center;
                 }
                 .conversations-dialog {
-                    background: white; border-radius: 12px; padding: 20px; min-width: 320px;
+                    background: var(--gh-bg, white); border-radius: 12px; padding: 20px; min-width: 320px;
                     box-shadow: 0 10px 40px rgba(0,0,0,0.2);
                 }
                 .conversations-dialog-title {
-                    font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 16px;
+                    font-size: 16px; font-weight: 600; color: var(--gh-text, #1f2937); margin-bottom: 16px;
                 }
                 .conversations-dialog-message {
                     font-size: 14px; color: #4b5563; margin-bottom: 20px; line-height: 1.5;
@@ -8009,10 +8038,10 @@
                     margin-bottom: 16px;
                 }
                 .conversations-dialog-section label {
-                    display: block; font-size: 13px; color: #6b7280; margin-bottom: 8px;
+                    display: block; font-size: 13px; color: var(--gh-text-secondary, #6b7280); margin-bottom: 8px;
                 }
                 .conversations-dialog-input {
-                    width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+                    width: 100%; padding: 10px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px;
                     font-size: 14px; box-sizing: border-box;
                 }
                 .conversations-dialog-input:focus {
@@ -8025,9 +8054,9 @@
                     padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s;
                 }
                 .conversations-dialog-btn.cancel {
-                    border: 1px solid #d1d5db; background: white; color: #374151;
+                    border: 1px solid var(--gh-input-border, #d1d5db); background: var(--gh-bg, white); color: var(--gh-text, #374151);
                 }
-                .conversations-dialog-btn.cancel:hover { background: #f3f4f6; }
+                .conversations-dialog-btn.cancel:hover { background: var(--gh-hover, #f3f4f6); }
                 .conversations-dialog-btn.confirm {
                     border: none; background: ${gradient}; color: white;
                 }
@@ -8042,7 +8071,7 @@
                     transition: all 0.2s; font-size: 14px;
                 }
                 .conversations-folder-select-item:hover {
-                    background: #f3f4f6;
+                    background: var(--gh-hover, #f3f4f6);
                 }
 
                 /* Emoji 选择器 */
@@ -8050,10 +8079,10 @@
                     display: flex; flex-wrap: wrap; gap: 4px;
                 }
                 .conversations-emoji-btn {
-                    width: 36px; height: 36px; border: 1px solid #e5e7eb; border-radius: 8px;
-                    background: #f9fafb; font-size: 18px; cursor: pointer; transition: all 0.2s;
+                    width: 36px; height: 36px; border: 1px solid var(--gh-border, #e5e7eb); border-radius: 8px;
+                    background: var(--gh-bg-secondary, #f9fafb); font-size: 18px; cursor: pointer; transition: all 0.2s;
                 }
-                .conversations-emoji-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+                .conversations-emoji-btn:hover { background: var(--gh-hover, #f3f4f6); border-color: var(--gh-input-border, #d1d5db); }
                 .conversations-emoji-btn.selected {
                     background: #e0e7ff; border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.2);
                 }
@@ -8061,20 +8090,20 @@
                 /* 分类管理按钮 */
                 .category-manage-btn {
                     padding: 4px 8px; background: transparent; border: 1px dashed #9ca3af; border-radius: 12px;
-                    font-size: 12px; color: #6b7280; cursor: pointer; transition: all 0.2s; margin-left: 4px;
+                    font-size: 12px; color: var(--gh-text-secondary, #6b7280); cursor: pointer; transition: all 0.2s; margin-left: 4px;
                 }
-                .category-manage-btn:hover { background: #f3f4f6; border-color: #6b7280; color: #374151; }
+                .category-manage-btn:hover { background: var(--gh-hover, #f3f4f6); border-color: var(--gh-text-secondary, #6b7280); color: var(--gh-text, #374151); }
                 /* 分类管理弹窗 */
                 .category-modal-content { max-height: 400px; }
                 .category-list { max-height: 280px; overflow-y: auto; margin: 16px 0; }
                 .category-item {
                     display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;
-                    background: #f9fafb; border-radius: 8px; margin-bottom: 8px; transition: all 0.2s;
+                    background: var(--gh-bg-secondary, #f9fafb); border-radius: 8px; margin-bottom: 8px; transition: all 0.2s;
                 }
-                .category-item:hover { background: #f3f4f6; }
+                .category-item:hover { background: var(--gh-hover, #f3f4f6); }
                 .category-item-info { display: flex; align-items: center; gap: 12px; flex: 1; }
-                .category-item-name { font-weight: 500; color: #1f2937; font-size: 14px; }
-                .category-item-count { font-size: 12px; color: #6b7280; background: #e5e7eb; padding: 2px 8px; border-radius: 10px; }
+                .category-item-name { font-weight: 500; color: var(--gh-text, #1f2937); font-size: 14px; }
+                .category-item-count { font-size: 12px; color: var(--gh-text-secondary, #6b7280); background: var(--gh-border, #e5e7eb); padding: 2px 8px; border-radius: 10px; }
                 .category-item-actions { display: flex; gap: 8px; }
                 .category-action-btn {
                     padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: none; transition: all 0.2s;
@@ -8086,16 +8115,16 @@
                 .category-empty { text-align: center; color: #9ca3af; padding: 40px 0; font-size: 14px; }
                 /* Tab 切换栏 */
                 .prompt-panel-tabs {
-                    display: flex; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+                    display: flex; background: var(--gh-bg-secondary, #f9fafb); border-bottom: 1px solid var(--gh-border, #e5e7eb);
                 }
                 .prompt-panel-tab {
                     flex: 1; padding: 10px 16px; background: transparent; border: none;
-                    font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer;
+                    font-size: 13px; font-weight: 500; color: var(--gh-text-secondary, #6b7280); cursor: pointer;
                     transition: all 0.2s; border-bottom: 2px solid transparent;
                 }
-                .prompt-panel-tab:hover { color: #374151; background: #f3f4f6; }
+                .prompt-panel-tab:hover { color: var(--gh-text, #374151); background: var(--gh-hover, #f3f4f6); }
                 .prompt-panel-tab.active {
-                    color: ${colors.primary}; border-bottom-color: ${colors.primary}; background: white;
+                    color: ${colors.primary}; border-bottom-color: ${colors.primary}; background: var(--gh-bg, white);
                 }
                 /* 面板内容区 */
                 .prompt-panel-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 280px; }
@@ -8105,32 +8134,32 @@
                 .settings-content::-webkit-scrollbar { display: none; }
                 .settings-section { margin-bottom: 24px; }
                 .settings-section-title {
-                    font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 8px;
+                    font-size: 12px; font-weight: 600; color: var(--gh-text-secondary, #6b7280); margin-bottom: 8px;
                     text-transform: uppercase; letter-spacing: 0.5px; padding-left: 4px; border-bottom: none;
                 }
                 .setting-item {
                     display: flex; justify-content: space-between; align-items: center;
-                    padding: 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px;
-                    border: 1px solid #f3f4f6; transition: all 0.2s;
+                    padding: 12px; background: var(--gh-bg-secondary, #f9fafb); border-radius: 8px; margin-bottom: 8px;
+                    border: 1px solid var(--gh-hover, #f3f4f6); transition: all 0.2s;
                 }
-                .setting-item:hover { border-color: linear-gradient(135deg, #4285f4 0%, #34a853 100%); background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+                .setting-item:hover { border-color: linear-gradient(135deg, #4285f4 0%, #34a853 100%); background: var(--gh-bg, white); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
                 .setting-item-info { flex: 1; margin-right: 12px; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-                .setting-item-label { font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 2px; white-space: nowrap; }
+                .setting-item-label { font-size: 14px; font-weight: 500; color: var(--gh-text, #374151); margin-bottom: 2px; white-space: nowrap; }
                 .setting-item-desc { font-size: 12px; color: #9ca3af; line-height: 1.3; }
                 .setting-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
                 .setting-select {
-                    padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;
-                    color: #374151; background: white; outline: none; transition: all 0.2s; height: 32px; box-sizing: border-box;
+                    padding: 6px 8px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px; font-size: 13px;
+                    color: var(--gh-text, #374151); background: var(--gh-bg, white); outline: none; transition: all 0.2s; height: 32px; box-sizing: border-box;
                     min-width: 100px;
                 }
                 .setting-select:focus { border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.1); }
                 .setting-toggle {
-                    width: 44px; height: 24px; background: #d1d5db; border-radius: 12px; position: relative;
+                    width: 44px; height: 24px; background: var(--gh-input-border, #d1d5db); border-radius: 12px; position: relative;
                     cursor: pointer; transition: all 0.3s; flex-shrink: 0;
                 }
                 .setting-toggle::after {
                     content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
-                    background: white; border-radius: 50%; transition: all 0.3s; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    background: var(--gh-bg, white); border-radius: 50%; transition: all 0.3s; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
                 }
                 .setting-toggle.active { background: #4285f4; } /* 默认蓝色，会被JS覆盖 */
                 .setting-toggle.active::after { left: 22px; }
@@ -8141,34 +8170,34 @@
                 }
                 /* 大纲固定工具栏 */
                 .outline-fixed-toolbar {
-                    padding: 10px 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+                    padding: 10px 12px; background: var(--gh-bg-secondary, #f9fafb); border-bottom: 1px solid var(--gh-border, #e5e7eb);
                     flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;
                 }
                 .outline-toolbar-row {
                     display: flex; align-items: center; gap: 8px;
                 }
                 .outline-toolbar-btn {
-                    width: 28px; height: 28px; border: 1px solid #d1d5db; border-radius: 6px;
-                    background: white; color: #6b7280; cursor: pointer; display: flex;
+                    width: 28px; height: 28px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
+                    background: var(--gh-bg, white); color: var(--gh-text-secondary, #6b7280); cursor: pointer; display: flex;
                     align-items: center; justify-content: center; font-size: 14px;
                     transition: all 0.2s; flex-shrink: 0;
                 }
                 .outline-toolbar-btn:hover { border-color: ${colors.primary}; color: ${colors.primary}; background: #f0f9ff; }
                 .outline-toolbar-btn.active { border-color: ${colors.primary}; color: white; background: ${colors.primary}; }
                 .outline-search-input {
-                    flex: 1; height: 28px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 6px;
-                    font-size: 13px; color: #374151; outline: none; transition: all 0.2s;
+                    flex: 1; height: 28px; padding: 0 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
+                    font-size: 13px; color: var(--gh-text, #374151); outline: none; transition: all 0.2s;
                 }
                 .outline-search-input:focus { border-color: ${colors.primary}; box-shadow: 0 0 0 2px rgba(66,133,244,0.1); }
                 .outline-search-input::placeholder { color: #9ca3af; }
                 .outline-search-clear {
                     position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-                    width: 16px; height: 16px; border: none; background: #d1d5db; color: white;
+                    width: 16px; height: 16px; border: none; background: var(--gh-input-border, #d1d5db); color: white;
                     border-radius: 50%; cursor: pointer; font-size: 10px; line-height: 16px; text-align: center;
                 }
                 .outline-search-clear:hover { background: #9ca3af; }
                 .outline-search-wrapper { position: relative; flex: 1; display: flex; align-items: center; }
-                .outline-search-result { font-size: 12px; color: #6b7280; margin-left: 8px; white-space: nowrap; }
+                .outline-search-result { font-size: 12px; color: var(--gh-text-secondary, #6b7280); margin-left: 8px; white-space: nowrap; }
                 .outline-result-bar {
                     padding: 6px 12px; background: #eff6ff; color: #1d4ed8; font-size: 12px;
                     border-bottom: 1px solid #dbeafe; text-align: center; flex-shrink: 0;
@@ -8180,7 +8209,7 @@
                 }
                 .outline-level-slider {
                     flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
-                    background: #e5e7eb; border-radius: 2px; outline: none; cursor: pointer;
+                    background: var(--gh-border, #e5e7eb); border-radius: 2px; outline: none; cursor: pointer;
                 }
                 .outline-level-slider::-webkit-slider-thumb {
                     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
@@ -8197,7 +8226,7 @@
                     position: relative; flex: 1; height: 24px;
                 }
                 .outline-level-dot {
-                    width: 12px; height: 12px; border-radius: 50%; background: #d1d5db;
+                    width: 12px; height: 12px; border-radius: 50%; background: var(--gh-input-border, #d1d5db);
                     cursor: pointer; transition: all 0.2s; position: relative; z-index: 2;
                     border: 2px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
                 }
@@ -8205,14 +8234,14 @@
                 .outline-level-dot.active { background: ${colors.primary}; }
                 .outline-level-dot-tooltip {
                     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-                    background: #374151; color: white; padding: 4px 8px; border-radius: 4px;
+                    background: var(--gh-text, #374151); color: white; padding: 4px 8px; border-radius: 4px;
                     font-size: 11px; white-space: nowrap; opacity: 0; visibility: hidden;
                     transition: all 0.2s; pointer-events: none; margin-bottom: 4px;
                 }
                 .outline-level-dot:hover .outline-level-dot-tooltip { opacity: 1; visibility: visible; }
                 .outline-level-line {
                     position: absolute; left: 10px; right: 10px; top: 50%; height: 4px;
-                    background: #e5e7eb; transform: translateY(-50%); z-index: 1; border-radius: 2px;
+                    background: var(--gh-border, #e5e7eb); transform: translateY(-50%); z-index: 1; border-radius: 2px;
                 }
                 .outline-level-progress {
                     position: absolute; left: 0; top: 0; height: 100%; background: ${colors.primary};
@@ -8224,10 +8253,10 @@
                 .outline-item {
                     padding: 6px 10px 6px 10px; border-radius: 6px; cursor: pointer;
                     background: transparent; border: 1px solid transparent;
-                    font-size: 13px; color: #374151; transition: all 0.15s;
+                    font-size: 13px; color: var(--gh-text, #374151); transition: all 0.15s;
                     display: flex; align-items: center; position: relative;
                 }
-                .outline-item:hover { background: #f3f4f6; }
+                .outline-item:hover { background: var(--gh-hover, #f3f4f6); }
                 .outline-item.highlight { background: #dbeafe; border-color: ${colors.primary}; }
 				.outline-item-toggle {
 					width: 24px; min-width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
@@ -8244,7 +8273,7 @@
                 .outline-level-2 { padding-left: 28px; font-weight: 500; }
                 .outline-level-3 { padding-left: 46px; }
                 .outline-level-4 { padding-left: 64px; font-size: 12px; }
-                .outline-level-5 { padding-left: 82px; font-size: 12px; color: #6b7280; }
+                .outline-level-5 { padding-left: 82px; font-size: 12px; color: var(--gh-text-secondary, #6b7280); }
                 .outline-level-6 { padding-left: 100px; font-size: 12px; color: #9ca3af; }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
                 /* 大纲高亮效果 */
@@ -8255,6 +8284,39 @@
                 }
             `;
             document.head.appendChild(style);
+        }
+
+        /**
+         * 启动主题监听器 (Auto Dark Mode)
+         */
+        monitorTheme() {
+            const panel = document.getElementById('gemini-helper-panel');
+            if (!panel) return;
+
+            const checkTheme = () => {
+                const dataTheme = document.body.dataset.theme || document.documentElement.dataset.theme;
+                const isDarkTheme = dataTheme === 'dark';
+                const bodyClass = document.body.className;
+                const hasDarkClass = /\bdark\b|\bdark-mode\b|\bdark-theme\b/i.test(bodyClass);
+
+                const isDark = isDarkTheme || hasDarkClass;
+
+                if (isDark) {
+                    panel.classList.add('gh-dark');
+                } else {
+                    panel.classList.remove('gh-dark');
+                }
+            };
+
+            checkTheme();
+
+            if (!this.themeObserver) {
+                this.themeObserver = new MutationObserver(() => {
+                    checkTheme();
+                });
+                this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+                this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+            }
         }
 
         createUI() {
@@ -8779,11 +8841,11 @@
 
                         const row = createElement('div', {
                             className: 'site-lock-row',
-                            style: 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;',
+                            style: 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gh-hover, #f3f4f6);',
                         });
 
                         const leftCol = createElement('div', { style: 'display: flex; align-items: center; flex: 1; gap: 12px;' });
-                        const nameLabel = createElement('div', { style: 'font-size: 14px; font-weight: 500; color: #374151; min-width: 80px;' }, adapter.getName());
+                        const nameLabel = createElement('div', { style: 'font-size: 14px; font-weight: 500; color: var(--gh-text, #374151); min-width: 80px;' }, adapter.getName());
                         const toggle = createElement('div', {
                             className: 'setting-toggle' + (siteConfig.enabled ? ' active' : ''),
                             style: 'transform: scale(0.8);',
@@ -9056,7 +9118,7 @@
 
                 const upBtn = createElement('button', {
                     className: 'prompt-panel-btn',
-                    style: 'background: #f3f4f6; color: #4b5563; width: 32px; height: 32px; font-size: 16px; margin-right: 4px; border: 1px solid #e5e7eb;',
+                    style: 'background: var(--gh-hover, #f3f4f6); color: #4b5563; width: 32px; height: 32px; font-size: 16px; margin-right: 4px; border: 1px solid var(--gh-border, #e5e7eb);',
                     title: this.t('moveUp'),
                 });
                 upBtn.textContent = '⬆';
@@ -9064,7 +9126,7 @@
 
                 const downBtn = createElement('button', {
                     className: 'prompt-panel-btn',
-                    style: 'background: #f3f4f6; color: #4b5563; width: 32px; height: 32px; font-size: 16px; border: 1px solid #e5e7eb;',
+                    style: 'background: var(--gh-hover, #f3f4f6); color: #4b5563; width: 32px; height: 32px; font-size: 16px; border: 1px solid var(--gh-border, #e5e7eb);',
                     title: this.t('moveDown'),
                 });
                 downBtn.textContent = '⬇';
@@ -9074,16 +9136,16 @@
                     if (btn.disabled) {
                         btn.style.opacity = '0.4';
                         btn.style.cursor = 'not-allowed';
-                        btn.style.background = '#f3f4f6';
+                        btn.style.background = 'var(--gh-hover, #f3f4f6)';
                     } else {
                         btn.style.opacity = '1';
                         btn.style.cursor = 'pointer';
                         btn.onmouseover = () => {
-                            btn.style.background = '#e5e7eb';
+                            btn.style.background = 'var(--gh-border, #e5e7eb)';
                             btn.style.color = '#111827';
                         };
                         btn.onmouseout = () => {
-                            btn.style.background = '#f3f4f6';
+                            btn.style.background = 'var(--gh-hover, #f3f4f6)';
                             btn.style.color = '#4b5563';
                         };
                     }
