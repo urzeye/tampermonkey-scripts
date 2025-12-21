@@ -8268,7 +8268,7 @@
                 .outline-level-dot.active { background: ${colors.primary}; }
                 .outline-level-dot-tooltip {
                     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-                    background: var(--gh-text, #374151); color: white; padding: 4px 8px; border-radius: 4px;
+                    background: var(--gh-text, #374151); color: var(--gh-bg, white); padding: 4px 8px; border-radius: 4px;
                     font-size: 11px; white-space: nowrap; opacity: 0; visibility: hidden;
                     transition: all 0.2s; pointer-events: none; margin-bottom: 4px;
                 }
