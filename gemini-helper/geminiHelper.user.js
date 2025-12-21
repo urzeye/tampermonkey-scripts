@@ -6020,7 +6020,11 @@
                         if (confirm(this.t('confirmDelete') || '确定删除?')) {
                             this.deleteTag(tag.id);
                             renderList();
-                            if (conv) this.renderConversationList(conv.folderId, this.container.querySelector('.conversations-list'));
+                            // 刷新所有可见的会话列表
+                            this.container.querySelectorAll('.conversations-list').forEach((list) => {
+                                const fid = list.dataset.folderId;
+                                if (fid) this.renderConversationList(fid, list);
+                            });
                         }
                     });
                     actions.appendChild(delBtn);
@@ -6211,10 +6215,12 @@
                     nameInput.value = '';
                     // Reset color selection? Maybe keep it.
                     renderList();
-                    if (conv) {
-                        const list = this.container.querySelector(`.conversations-list[data-folder-id="${conv.folderId}"]`);
-                        if (list) this.renderConversationList(conv.folderId, list);
-                    }
+
+                    // 刷新所有可见的会话列表 (因为标签修改会影响所有使用了该标签的会话)
+                    this.container.querySelectorAll('.conversations-list').forEach((list) => {
+                        const fid = list.dataset.folderId;
+                        if (fid) this.renderConversationList(fid, list);
+                    });
                 }
                 // If result is null, validation failed (toast already shown), keep input for user to fix
             });
