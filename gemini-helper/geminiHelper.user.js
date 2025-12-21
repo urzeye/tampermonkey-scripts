@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.9.1
-// @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
+// @version      1.9.2
+// @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 // @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
 // @homepage     https://github.com/urzeye
@@ -163,6 +163,7 @@
             confirmDelete: '确定删除?',
             // 设置面板
             settingsTitle: '通用设置',
+            panelSettingsTitle: '面板设置',
             clearOnSendLabel: '发送后自动修复中文输入',
             clearOnSendDesc: '发送消息后插入零宽字符，修复下次输入首字母问题（仅 Gemini Business）',
             settingOn: '开',
@@ -279,6 +280,12 @@
             showCollapsedAnchorDesc: '当面板收起时，在侧边浮动条中显示锚点按钮',
             preventAutoScrollLabel: '防止自动滚动',
             preventAutoScrollDesc: '当 AI 生成长内容时，阻止页面自动滚动到底部，方便阅读上文',
+            // 界面排版开关
+            defaultPanelStateLabel: '默认显示面板',
+            defaultPanelStateDesc: '刷新页面后面板默认保持展开状态',
+            autoHidePanelLabel: '自动隐藏面板',
+            autoHidePanelDesc: '点击面板外部（如左侧侧边栏、聊天区、输入框）时自动隐藏',
+
             // 界面排版开关
             disableOutline: '禁用大纲',
             togglePrompts: '启用/禁用提示词',
@@ -7143,6 +7150,8 @@
                 tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
                 readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) },
                 conversations: { enabled: true },
+                defaultPanelState: GM_getValue('gemini_default_panel_state', true),
+                autoHidePanel: GM_getValue('gemini_default_auto_hide', false),
             };
         }
 
@@ -7180,6 +7189,8 @@
             if (settings.conversations) {
                 GM_setValue('gemini_conversations_settings', settings.conversations);
             }
+            GM_setValue('gemini_default_panel_state', settings.defaultPanelState);
+            GM_setValue('gemini_default_auto_hide', settings.autoHidePanel);
         }
     }
 
@@ -7194,13 +7205,15 @@
             // 保持 siteAdapter 引用以便兼容旧代码，指向当前匹配的站点
             this.siteAdapter = siteRegistry.getCurrent();
             this.selectedPrompt = null;
-            this.isCollapsed = false;
             this.isScrolling = false; // 滚动状态锁
             this.anchorScrollTop = null; // 阅读锚点位置
             this.lang = detectLanguage(); // 当前语言
             this.i18n = I18N[this.lang]; // 当前语言文本
             this.settingsManager = new SettingsManager();
             this.settings = this.loadSettings(); // 加载设置
+
+            // 根据设置初始化面板折叠状态 (默认显示面板 -> !collapsed)
+            this.isCollapsed = !this.settings.defaultPanelState;
 
             // 初始化当前 Tab：优先使用设置的第一个 Tab
             this.currentTab = this.settings.tabOrder && this.settings.tabOrder.length > 0 ? this.settings.tabOrder[0] : 'prompts';
@@ -8364,7 +8377,10 @@
             if (existingBar) existingBar.remove();
             if (existingBtnGroup) existingBtnGroup.remove();
 
-            const panel = createElement('div', { id: 'gemini-helper-panel' });
+            const panel = createElement('div', {
+                id: 'gemini-helper-panel',
+                className: this.isCollapsed ? 'collapsed' : '',
+            });
 
             // Header
             const header = createElement('div', { className: 'prompt-panel-header' });
@@ -8407,7 +8423,8 @@
                     id: 'toggle-panel',
                     title: this.t('collapse'),
                 },
-                '−',
+
+                this.isCollapsed ? '+' : '−', // 根据初始状态设置图标
             );
             // 注意：toggleBtn 的事件监听在 bindEvents 中统一绑定，避免重复绑定
             // 新建标签页按钮
@@ -8621,7 +8638,10 @@
             selectedBar.appendChild(clearBtn);
             document.body.appendChild(selectedBar);
 
-            const quickBtnGroup = createElement('div', { className: 'quick-btn-group hidden', id: 'quick-btn-group' });
+            const quickBtnGroup = createElement('div', {
+                className: 'quick-btn-group' + (this.isCollapsed ? '' : ' hidden'),
+                id: 'quick-btn-group',
+            });
             const quickBtn = createElement('button', { className: 'quick-prompt-btn', title: this.t('panelTitle') }, '✨');
             const quickScrollTop = createElement(
                 'button',
@@ -9322,33 +9342,10 @@
             anchorContainer.appendChild(anchorAutoRestoreItem);
             anchorContainer.appendChild(anchorCleanupItem);
 
-            // 折叠面板显示锚点
-            const showAnchorItem = createElement('div', { className: 'setting-item' });
-            const showAnchorInfo = createElement('div', { className: 'setting-item-info' });
-            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showCollapsedAnchorLabel')));
-            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showCollapsedAnchorDesc')));
-
-            const showAnchorToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.showCollapsedAnchor ? ' active' : ''),
-                id: 'toggle-show-collapsed-anchor',
-            });
-            showAnchorToggle.addEventListener('click', () => {
-                this.settings.showCollapsedAnchor = !this.settings.showCollapsedAnchor;
-                showAnchorToggle.classList.toggle('active', this.settings.showCollapsedAnchor);
-                this.saveSettings();
-
-                // 实时更新UI
-                GM_setValue('gemini_show_collapsed_anchor', this.settings.showCollapsedAnchor);
-                const quickAnchor = document.getElementById('quick-anchor-btn');
-                if (quickAnchor) {
-                    quickAnchor.style.display = this.settings.showCollapsedAnchor ? 'flex' : 'none';
-                }
-
-                showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
-            });
-            showAnchorItem.appendChild(showAnchorInfo);
-            showAnchorItem.appendChild(showAnchorToggle);
-            anchorContainer.appendChild(showAnchorItem);
+            // showCollapsedAnchor has been moved to Panel Settings
+            anchorContainer.appendChild(anchorPersistenceItem);
+            anchorContainer.appendChild(anchorAutoRestoreItem);
+            anchorContainer.appendChild(anchorCleanupItem);
 
             const anchorSection = this.createCollapsibleSection(this.t('readingNavigationSettings'), anchorContainer);
 
@@ -9403,6 +9400,79 @@
             outlineSettingsContainer.appendChild(updateIntervalItem);
 
             const outlineSettingsSection = this.createCollapsibleSection(this.t('outlineSettings'), outlineSettingsContainer, { defaultExpanded: false });
+
+            // 5.5 面板设置
+            const panelSettingsContainer = createElement('div', {});
+
+            // 5.5.1 默认显示面板开关
+            const defaultPanelStateItem = createElement('div', { className: 'setting-item' });
+            const defaultPanelStateInfo = createElement('div', { className: 'setting-item-info' });
+            defaultPanelStateInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('defaultPanelStateLabel')));
+            defaultPanelStateInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('defaultPanelStateDesc')));
+
+            const defaultPanelStateToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.defaultPanelState ? ' active' : ''),
+                id: 'toggle-default-panel-state',
+            });
+            defaultPanelStateToggle.addEventListener('click', () => {
+                this.settings.defaultPanelState = !this.settings.defaultPanelState;
+                defaultPanelStateToggle.classList.toggle('active', this.settings.defaultPanelState);
+                this.saveSettings();
+                showToast(this.settings.defaultPanelState ? this.t('settingOn') : this.t('settingOff'));
+            });
+            defaultPanelStateItem.appendChild(defaultPanelStateInfo);
+            defaultPanelStateItem.appendChild(defaultPanelStateToggle);
+            panelSettingsContainer.appendChild(defaultPanelStateItem);
+
+            // 5.5.2 自动隐藏面板开关
+            const autoHidePanelItem = createElement('div', { className: 'setting-item' });
+            const autoHidePanelInfo = createElement('div', { className: 'setting-item-info' });
+            autoHidePanelInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('autoHidePanelLabel')));
+            autoHidePanelInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('autoHidePanelDesc')));
+
+            const autoHidePanelToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.autoHidePanel ? ' active' : ''),
+                id: 'toggle-auto-hide-panel',
+            });
+            autoHidePanelToggle.addEventListener('click', () => {
+                this.settings.autoHidePanel = !this.settings.autoHidePanel;
+                autoHidePanelToggle.classList.toggle('active', this.settings.autoHidePanel);
+                this.saveSettings();
+                showToast(this.settings.autoHidePanel ? this.t('settingOn') : this.t('settingOff'));
+            });
+            autoHidePanelItem.appendChild(autoHidePanelInfo);
+            autoHidePanelItem.appendChild(autoHidePanelToggle);
+            panelSettingsContainer.appendChild(autoHidePanelItem);
+
+            // 5.5.3 折叠面板显示锚点
+            const showAnchorItem = createElement('div', { className: 'setting-item' });
+            const showAnchorInfo = createElement('div', { className: 'setting-item-info' });
+            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showCollapsedAnchorLabel')));
+            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showCollapsedAnchorDesc')));
+
+            const showAnchorToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.showCollapsedAnchor ? ' active' : ''),
+                id: 'toggle-show-collapsed-anchor',
+            });
+            showAnchorToggle.addEventListener('click', () => {
+                this.settings.showCollapsedAnchor = !this.settings.showCollapsedAnchor;
+                showAnchorToggle.classList.toggle('active', this.settings.showCollapsedAnchor);
+                this.saveSettings();
+
+                // 实时更新UI
+                GM_setValue('gemini_show_collapsed_anchor', this.settings.showCollapsedAnchor);
+                const quickAnchor = document.getElementById('quick-anchor-btn');
+                if (quickAnchor) {
+                    quickAnchor.style.display = this.settings.showCollapsedAnchor ? 'flex' : 'none';
+                }
+
+                showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
+            });
+            showAnchorItem.appendChild(showAnchorInfo);
+            showAnchorItem.appendChild(showAnchorToggle);
+            panelSettingsContainer.appendChild(showAnchorItem);
+
+            const panelSettingsSection = this.createCollapsibleSection(this.t('panelSettingsTitle'), panelSettingsContainer, { defaultExpanded: false });
 
             // 6. 标签页设置
             const tabSettingsContainer = createElement('div', {});
@@ -9699,9 +9769,18 @@
 
             const otherSettingsSection = this.createCollapsibleSection(this.t('otherSettingsTitle'), otherSettingsContainer, { defaultExpanded: false });
 
-            // ========== 统一管理分类顺序 ==========
+            // 7.5. 面板可见性设置 (添加到通用设置/其他设置中，这里选择添加到"界面排版"更合适，或者单独的通用设置区域)
+            // 根据用户描述"在通用设置里"，我们找一个合适的位置。
+            // 之前的 otherSettingsSection 标题是 "其他设置"，我们可以把 面板可见性 加到这里，或者 layoutSection "界面排版"
+            // 考虑到这是界面行为，放在 layoutSection 或者一个新的 "通用设置" 区域比较好。
+            // 但现有的 layoutSection 是 Tab 顺序。
+            // 让我们把它加到 otherSettingsSection (其他设置) 作为一个子项，或者在 createSettingsContent 开头创建一个新的 General Section。
+            // 鉴于 otherSettingsSection 包含 "折叠面板显示锚点" 等，放在这里比较合适。
+
             // 1. 通用设置（语言）- 已在上方添加
-            // 2. 标签页设置
+            // 2. 面板设置 (New)
+            content.appendChild(panelSettingsSection);
+            // 3. 标签页设置
             if (tabSettingsSection) content.appendChild(tabSettingsSection);
             // 3. 阅读导航
             content.appendChild(anchorSection);
@@ -10357,7 +10436,33 @@
                 true,
             ); // 使用捕获阶段确保在 Shadow DOM 场景下也能捕获
 
-            document.getElementById('toggle-panel')?.addEventListener('click', () => this.togglePanel());
+            document.getElementById('toggle-panel')?.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止冒泡，避免触发 auto-hide
+                this.togglePanel();
+            });
+
+            // 4. 全局点击监听（处理自动隐藏）
+            document.addEventListener('click', (e) => {
+                // 如果是自动隐藏开启，且面板是展开的
+                if (this.settings.autoHidePanel && !this.isCollapsed) {
+                    const panel = document.getElementById('gemini-helper-panel');
+                    const toggleBtn = document.getElementById('toggle-panel');
+                    const quickBtnGroup = document.getElementById('quick-btn-group');
+
+                    // 检查点击目标是否在面板外部
+                    // 注意：需要排除 toggleBtn 和 quickBtnGroup，以及 panel 本身
+                    // 同时排除面板内的任何元素
+                    if (panel && !panel.contains(e.target) && !toggleBtn?.contains(e.target) && !quickBtnGroup?.contains(e.target)) {
+                        // 额外的安全检查：确保不是点击了面板内的弹出层（如 modal）
+                        // 通常 modal 是直接挂在 body 上的，所以如果 modal 打开时，点击 modal 内容不应该隐藏
+                        // 但是 modal 通常覆盖全屏，点击 modal 遮罩通过 modal 自己的逻辑关闭。
+                        // 这里主要关注点击页面其他部分。
+
+                        this.togglePanel();
+                    }
+                }
+            });
+
             this.makeDraggable();
 
             // 初始化 URL 监听 (处理 SPA 页面跳转)
