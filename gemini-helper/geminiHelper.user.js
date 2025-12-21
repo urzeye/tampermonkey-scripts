@@ -321,6 +321,7 @@
             conversationsSyncDeleteDesc: '删除本地会话记录时，同时从 {site} 云端删除',
             conversationsSyncRenameLabel: '重命名时同步云端',
             conversationsSyncRenameDesc: '修改会话标题时，同时在 {site} 侧边栏更新标题',
+            conversationsCustomIcon: '自定义图标',
             batchSelected: '已选 {n} 个',
             batchMove: '移动',
             batchDelete: '删除',
@@ -544,6 +545,7 @@
             conversationsSyncDeleteDesc: '刪除本地會話記錄時，同時從 {site} 雲端刪除',
             conversationsSyncRenameLabel: '重命名時同步雲端',
             conversationsSyncRenameDesc: '修改會話標題時，同時在 {site} 側邊欄更新標題',
+            conversationsCustomIcon: '自定義圖示',
             batchSelected: '已選 {n} 個',
             batchMove: '移動',
             batchDelete: '刪除',
@@ -766,6 +768,7 @@
             conversationsSyncDeleteDesc: 'When deleting local record, also delete from {site} cloud',
             conversationsSyncRenameLabel: 'Sync rename to cloud',
             conversationsSyncRenameDesc: 'When renaming conversation, also update title in {site} sidebar',
+            conversationsCustomIcon: 'Custom Icon',
             batchSelected: 'Selected {n}',
             batchMove: 'Move',
             batchDelete: 'Delete',
@@ -5509,7 +5512,8 @@
 
             cancelBtn.addEventListener('click', () => overlay.remove());
             confirmBtn.addEventListener('click', () => {
-                const selectedIcon = emojiPicker.querySelector('.selected')?.textContent || icon;
+                const customInput = emojiPicker.querySelector('input');
+                const selectedIcon = customInput ? customInput.value : emojiPicker.querySelector('.selected')?.textContent || icon;
                 onConfirm(nameInput.value, selectedIcon);
                 overlay.remove();
             });
@@ -5532,29 +5536,197 @@
         }
 
         /**
-         * 创建 Emoji 选择器
+         * 创建 Emoji 选择器 (增强版)
          */
         createEmojiPicker(selectedEmoji = '📁') {
-            const container = createElement('div', { className: 'conversations-emoji-picker' });
+            const container = createElement('div', {
+                className: 'conversations-emoji-picker',
+                style: 'display: flex; flex-direction: column; gap: 8px;',
+            });
 
-            // 预设 emoji 列表
-            const presetEmojis = ['📁', '📂', '📥', '⭐', '💼', '🎯', '🔖', '💡', '🎨', '🛠️', '📚', '🎮', '🎵', '✈️', '🏠', '❤️'];
+            // 1. 自定义输入区域
+            const customRow = createElement('div', {
+                className: 'conversations-emoji-custom-row',
+                style: 'display: flex; align-items: center; gap: 8px; padding: 4px; background: #f9fafb; border-radius: 4px; border: 1px solid #e5e7eb;',
+            });
+
+            const customLabel = createElement('span', { style: 'font-size: 12px; color: #6b7280; flex-shrink: 0;' }, this.t('conversationsCustomIcon') || '自定义:');
+
+            const customInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-emoji-custom-input',
+                value: selectedEmoji,
+                maxLength: 4, // 稍微放宽长度
+                placeholder: '☺',
+                style: 'width: 60px; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px; font-size: 16px;',
+            });
+
+            customRow.appendChild(customLabel);
+            customRow.appendChild(customInput);
+            container.appendChild(customRow);
+
+            // 2. 预设列表区域
+            const listContainer = createElement('div', {
+                className: 'conversations-emoji-list',
+                style: 'display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; max-height: 120px; overflow-y: auto; padding: 2px;',
+            });
+
+            // 扩充的预设 Emoji 库 (64个)
+            const presetEmojis = [
+                // 📂 基础文件夹
+                '📁',
+                '📂',
+                '📥',
+                '🗂️',
+                '📊',
+                '📈',
+                '📉',
+                '📋',
+                // 💼 办公/工作
+                '💼',
+                '📅',
+                '📌',
+                '📎',
+                '📝',
+                '✒️',
+                '🔍',
+                '💡',
+                // 💻 编程/技术
+                '💻',
+                '⌨️',
+                '🖥️',
+                '🖱️',
+                '🐛',
+                '🔧',
+                '🔨',
+                '⚙️',
+                // 🤖 AI/机器人
+                '🤖',
+                '👾',
+                '🧠',
+                '⚡',
+                '🔥',
+                '✨',
+                '🎓',
+                '📚',
+                // 🎨 创意/艺术
+                '🎨',
+                '🎭',
+                '🎬',
+                '🎹',
+                '🎵',
+                '📷',
+                '🖌️',
+                '🖍️',
+                // 🏠 生活/日常
+                '🏠',
+                '🛒',
+                '✈️',
+                '🎮',
+                '⚽',
+                '🍔',
+                '☕',
+                '❤️',
+                // 🌈 颜色/标记
+                '🔴',
+                '🟠',
+                '🟡',
+                '🟢',
+                '🔵',
+                '🟣',
+                '⚫',
+                '⚪',
+                // ⭐ 其他
+                '⭐',
+                '🌟',
+                '🎉',
+                '🔒',
+                '🔑',
+                '🚫',
+                '✅',
+                '❓',
+            ];
+
+            // 选中状态管理
+            let currentSelectedBtn = null;
 
             presetEmojis.forEach((emoji) => {
                 const btn = createElement(
                     'button',
                     {
                         className: 'conversations-emoji-btn' + (emoji === selectedEmoji ? ' selected' : ''),
+                        style: 'width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 4px; font-size: 16px;',
                     },
                     emoji,
                 );
+
+                if (emoji === selectedEmoji) currentSelectedBtn = btn;
+
                 btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    container.querySelectorAll('.conversations-emoji-btn').forEach((b) => b.classList.remove('selected'));
+                    e.preventDefault(); // 防止触发表单提交等意外行为
+
+                    // 更新按钮选中状态
+                    if (currentSelectedBtn) {
+                        currentSelectedBtn.classList.remove('selected');
+                        currentSelectedBtn.style.backgroundColor = 'transparent';
+                    }
                     btn.classList.add('selected');
+                    btn.style.backgroundColor = '#dbeafe'; // 浅蓝背景表示选中
+                    currentSelectedBtn = btn;
+
+                    // 同步到自定义输入框
+                    customInput.value = emoji;
+                    // 标记为用户手动选择的 (通过 class，供外部获取值时优先使用输入框的值)
+                    customInput.classList.add('selected');
                 });
-                container.appendChild(btn);
+
+                // Hover 效果
+                btn.onmouseenter = () => {
+                    if (!btn.classList.contains('selected')) btn.style.backgroundColor = '#f3f4f6';
+                };
+                btn.onmouseleave = () => {
+                    if (!btn.classList.contains('selected')) btn.style.backgroundColor = 'transparent';
+                };
+
+                listContainer.appendChild(btn);
             });
+
+            container.appendChild(listContainer);
+
+            // 自定义输入监听
+            customInput.addEventListener('input', (e) => {
+                let val = e.target.value;
+
+                // 简单的 Emoji 校验：利用 Unicode 属性 \p{Extended_Pictographic}
+                const emojiRegex = /[^\p{Extended_Pictographic}\u200d\ufe0f]/gu;
+                if (val && emojiRegex.test(val)) {
+                    val = val.replace(emojiRegex, '');
+                    e.target.value = val;
+                }
+
+                // 清除按钮选中状态，因为现在是自定义的
+                if (currentSelectedBtn) {
+                    currentSelectedBtn.classList.remove('selected');
+                    currentSelectedBtn.style.backgroundColor = 'transparent';
+                    currentSelectedBtn = null;
+                }
+
+                // 尝试反向匹配：如果输入的内容刚好在预设里，把那个按钮高亮
+                const matchBtn = Array.from(listContainer.children).find((b) => b.textContent === val);
+                if (matchBtn) {
+                    matchBtn.classList.add('selected');
+                    matchBtn.style.backgroundColor = '#dbeafe';
+                    currentSelectedBtn = matchBtn;
+                }
+
+                // 给 input 加个标记类
+                customInput.classList.add('selected');
+            });
+
+            // 初始高亮颜色
+            if (currentSelectedBtn) {
+                currentSelectedBtn.style.backgroundColor = '#dbeafe';
+            }
 
             return container;
         }
