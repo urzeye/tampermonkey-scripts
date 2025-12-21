@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.8.2
-// @description  Gemini 助手：支持对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版/Genspark
-// @description:en Gemini Helper: Supports outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart adaptation for Gemini Standard/Enterprise/Genspark
+// @version      1.9.0
+// @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版
+// @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
 // @homepage     https://github.com/urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
@@ -20,7 +20,7 @@
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
-// @require      https://update.greasyfork.org/scripts/559176/1715343/domToolkit.js
+// @require      https://update.greasyfork.org/scripts/559176/1718116/domToolkit.js
 // @license      MIT
 // @downloadURL https://update.greasyfork.org/scripts/558318/gemini-helper.user.js
 // @updateURL https://update.greasyfork.org/scripts/558318/gemini-helper.meta.js
@@ -35,7 +35,6 @@
     }
     window.geminiHelperInitialized = true;
 
-
     // ==================== 设置项与多语言 ====================
 
     const SETTING_KEYS = {
@@ -48,33 +47,77 @@
         PROMPTS_SETTINGS: 'gemini_prompts_settings',
         READING_HISTORY: 'gemini_reading_history_settings',
         TAB_SETTINGS: 'gemini_tab_settings',
+        CONVERSATIONS: 'gemini_conversations',
     };
 
-    // 默认 Tab 顺序
-    const DEFAULT_TAB_ORDER = ['prompts', 'outline', 'settings'];
-    const DEFAULT_PROMPTS_SETTINGS = {enabled: true};
+    // 默认 Tab 顺序（settings 已移到 header 按钮，不参与排序）
+    const DEFAULT_TAB_ORDER = ['prompts', 'outline', 'conversations'];
+    const DEFAULT_PROMPTS_SETTINGS = { enabled: true };
     const DEFAULT_READING_HISTORY_SETTINGS = {
         persistence: true,
         autoRestore: false,
-        cleanupDays: 30
+        cleanupDays: 30,
     };
     const DEFAULT_TAB_SETTINGS = {
-        openInNewTab: true,        // 新标签页打开新对话
-        autoRenameTab: true,       // 自动重命名标签页
-        renameInterval: 3,         // 检测频率(秒)
-        showStatus: true,          // 显示生成状态图标 (⏳/✅)
-        showNotification: false,   // 发送桌面通知
-        autoFocus: false,          // 生成完成后自动将窗口置顶
-        privacyMode: false,        // 隐私模式
-        privacyTitle: 'Google',    // 隐私模式下的伪装标题
-        titleFormat: '{status}{title}-{model}'  // 自定义标题格式，支持 {status}、{title}、{model}
+        openInNewTab: true, // 新标签页打开新对话
+        autoRenameTab: true, // 自动重命名标签页
+        renameInterval: 3, // 检测频率(秒)
+        showStatus: true, // 显示生成状态图标 (⏳/✅)
+        showNotification: false, // 发送桌面通知
+        autoFocus: false, // 生成完成后自动将窗口置顶
+        privacyMode: false, // 隐私模式
+        privacyTitle: 'Google', // 隐私模式下的伪装标题
+        titleFormat: '{status}{title}-{model}', // 自定义标题格式，支持 {status}、{title}、{model}
     };
+
+    // 默认会话数据结构
+    const DEFAULT_CONVERSATION_DATA = {
+        folders: [{ id: 'inbox', name: '📥 收件箱', icon: '📥', isDefault: true }],
+        tags: [], // 标签定义数组 { id, name, color }
+        conversations: {}, // 会话数据，key 为 conversationId
+        lastUsedFolderId: 'inbox',
+    };
+
+    // 预设标签颜色 (29色 - 中国传统色精选 - 优化对比度)
+    const TAG_COLORS = [
+        '#ff461f', // 朱砂
+        '#e35c64', // 桃夭
+        '#db5a6b', // 海棠红
+        '#f2481b', // 榴花红
+        '#9d2933', // 胭脂
+        '#ffa631', // 杏黄
+        '#d6a01d', // 姜黄
+        '#f0c239', // 缃色
+        '#d9b611', // 秋香色
+        '#8cc540', // 柳绿
+        '#0eb83a', // 葱绿
+        '#227d51', // 官绿
+        '#789262', // 竹青
+        '#29b7cb', // 湖蓝
+        '#177cb0', // 靛蓝
+        '#1685a9', // 石青
+        '#4b5cc4', // 宝蓝
+        '#2e4e7e', // 藏蓝
+        '#b088d1', // 丁香
+        '#b359ab', // 雪青
+        '#8d4bbb', // 紫罗兰
+        '#4c221b', // 紫檀
+        '#a88462', // 驼色
+        '#ca6924', // 琥珀
+        '#845a33', // 赭石
+        '#75878a', // 苍色
+        '#57c3c2', // 天水碧
+        '#ce97a8', // 藕荷
+        '#5d513c', // 墨灰
+        '#9b95c9', // 长春花 (新增第30色)
+    ];
 
     // Tab 定义（用于渲染和显示）
     const TAB_DEFINITIONS = {
-        'prompts': {id: 'prompts', labelKey: 'tabPrompts', icon: '📝'},
-        'outline': {id: 'outline', labelKey: 'tabOutline', icon: '📑'},
-        'settings': {id: 'settings', labelKey: 'tabSettings', icon: '⚙️'}
+        prompts: { id: 'prompts', labelKey: 'tabPrompts', icon: '✏️' },
+        outline: { id: 'outline', labelKey: 'tabOutline', icon: '📋' },
+        conversations: { id: 'conversations', labelKey: 'tabConversations', icon: '💬' },
+        settings: { id: 'settings', labelKey: 'tabSettings', icon: '⚙️' },
     };
 
     const I18N = {
@@ -190,6 +233,8 @@
             outlineLevel2: '至 2 级',
             outlineLevel3: '至 3 级',
             // 刷新按钮提示
+            togglePrompts: '显示/隐藏提示词',
+            toggleConversations: '显示/隐藏会话管理',
             refreshPrompts: '刷新提示词',
             refreshOutline: '刷新大纲',
             refreshSettings: '刷新设置',
@@ -236,7 +281,75 @@
             preventAutoScrollDesc: '当 AI 生成长内容时，阻止页面自动滚动到底部，方便阅读上文',
             // 界面排版开关
             disableOutline: '禁用大纲',
-            togglePrompts: '启用/禁用提示词'
+            togglePrompts: '启用/禁用提示词',
+            toggleConversations: '启用/禁用会话',
+            // 会话功能
+            tabConversations: '会话',
+            conversationsEmpty: '暂无会话数据',
+            conversationsEmptyHint: '点击上方同步按钮从侧边栏导入会话',
+            conversationsSync: '同步会话',
+            conversationsSyncing: '正在同步...',
+            conversationsSynced: '同步完成',
+            conversationsAddFolder: '新建文件夹',
+            conversationsRename: '重命名',
+            conversationsDelete: '删除',
+            conversationsDeleteConfirm: '确定删除此文件夹吗？其中的会话将移到收件箱。',
+            conversationsFolderCreated: '文件夹已创建',
+            conversationsFolderRenamed: '文件夹已重命名',
+            conversationsFolderDeleted: '文件夹已删除',
+            conversationsCannotDeleteDefault: '无法删除默认文件夹',
+            conversationsIcon: '图标',
+            conversationsFolderName: '名称',
+            conversationsFolderNamePlaceholder: '输入文件夹名称',
+            cancel: '取消',
+            confirm: '确定',
+            conversationsSyncEmpty: '未找到会话',
+            conversationsSyncNoChange: '无新会话',
+            justNow: '刚刚',
+            minutesAgo: '分钟前',
+            hoursAgo: '小时前',
+            daysAgo: '天前',
+            conversationsSelectFolder: '选择同步目标文件夹',
+            conversationsMoveTo: '移动到...',
+            conversationsMoved: '已移动到',
+            conversationsSyncDeleteTitle: '同步删除',
+            conversationsSyncDeleteMsg: '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？',
+            conversationsDeleted: '已移除',
+            // 会话设置
+            conversationsSettingsTitle: '会话设置',
+            conversationsSyncDeleteLabel: '删除时同步删除云端',
+            conversationsSyncDeleteDesc: '删除本地会话记录时，同时从 {site} 云端删除',
+            conversationsSyncRenameLabel: '重命名时同步云端',
+            conversationsSyncRenameDesc: '修改会话标题时，同时在 {site} 侧边栏更新标题',
+            conversationsCustomIcon: '自定义图标',
+            batchSelected: '已选 {n} 个',
+            batchMove: '移动',
+            batchDelete: '删除',
+            batchExit: '退出',
+            conversationsRefresh: '刷新会话列表',
+            conversationsSearchPlaceholder: '搜索会话...',
+            conversationsSearchResult: '个结果',
+            conversationsNoSearchResult: '未找到匹配结果',
+            conversationsSetTags: '设置标签',
+            conversationsNewTag: '新建标签',
+            conversationsTagName: '标签名称',
+            conversationsTagColor: '标签颜色',
+            conversationsFilterByTags: '按标签筛选',
+            conversationsClearTags: '清除筛选',
+            conversationsTagCreated: '标签已创建',
+            conversationsTagUpdated: '标签已更新',
+            conversationsTagDeleted: '标签已删除',
+            conversationsTagExists: '标签名称已存在',
+            conversationsUpdateTag: '更新标签',
+            conversationsNoTags: '暂无标签',
+            conversationsManageTags: '管理标签',
+            conversationsPin: '置顶📌',
+            conversationsUnpin: '取消置顶',
+            conversationsPinned: '已置顶',
+            conversationsUnpinned: '已取消置顶',
+            conversationsFilterPinned: '筛选置顶',
+            conversationsClearAll: '清除所有筛选',
+            conversationsBatchMode: '批量操作',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -392,9 +505,77 @@
             preventAutoScrollDesc: '當 AI 生成長內容時，阻止頁面自動滾動到底部，方便閱讀上文',
             // 介面排版開關
             disableOutline: '禁用大綱',
-            togglePrompts: '啟用/禁用提示詞'
+            togglePrompts: '啟用/禁用提示詞',
+            toggleConversations: '啟用/禁用會話',
+            // 會話功能
+            tabConversations: '會話',
+            conversationsEmpty: '暫無會話數據',
+            conversationsEmptyHint: '點擊上方同步按鈕從側邊欄導入會話',
+            conversationsSync: '同步會話',
+            conversationsSyncing: '正在同步...',
+            conversationsSynced: '同步完成',
+            conversationsAddFolder: '新建資料夾',
+            conversationsRename: '重命名',
+            conversationsDelete: '刪除',
+            conversationsDeleteConfirm: '確定刪除此資料夾嗎？其中的會話將移到收件箱。',
+            conversationsFolderCreated: '資料夾已創建',
+            conversationsFolderRenamed: '資料夾已重命名',
+            conversationsFolderDeleted: '資料夾已刪除',
+            conversationsCannotDeleteDefault: '無法刪除預設資料夾',
+            conversationsIcon: '圖標',
+            conversationsFolderName: '名稱',
+            conversationsFolderNamePlaceholder: '輸入資料夾名稱',
+            cancel: '取消',
+            confirm: '確定',
+            conversationsSyncEmpty: '未找到會話',
+            conversationsSyncNoChange: '無新會話',
+            justNow: '剛剛',
+            minutesAgo: '分鐘前',
+            hoursAgo: '小時前',
+            daysAgo: '天前',
+            conversationsSelectFolder: '選擇同步目標資料夾',
+            conversationsMoveTo: '移動到...',
+            conversationsMoved: '已移動到',
+            conversationsSyncDeleteTitle: '同步刪除',
+            conversationsSyncDeleteMsg: '檢測到 {count} 個會話已在雲端刪除，是否同步刪除本地記錄？',
+            conversationsDeleted: '已移除',
+            // 會話設置
+            conversationsSettingsTitle: '會話設置',
+            conversationsSyncDeleteLabel: '刪除時同步刪除雲端',
+            conversationsSyncDeleteDesc: '刪除本地會話記錄時，同時從 {site} 雲端刪除',
+            conversationsSyncRenameLabel: '重命名時同步雲端',
+            conversationsSyncRenameDesc: '修改會話標題時，同時在 {site} 側邊欄更新標題',
+            conversationsCustomIcon: '自定義圖示',
+            batchSelected: '已選 {n} 個',
+            batchMove: '移動',
+            batchDelete: '刪除',
+            batchExit: '退出',
+            conversationsRefresh: '刷新會話列表',
+            conversationsSearchPlaceholder: '搜尋會話...',
+            conversationsSearchResult: '個結果',
+            conversationsNoSearchResult: '未找到匹配結果',
+            conversationsSetTags: '設定標籤',
+            conversationsNewTag: '新建標籤',
+            conversationsTagName: '標籤名稱',
+            conversationsTagColor: '標籤顏色',
+            conversationsFilterByTags: '按標籤篩選',
+            conversationsClearTags: '清除篩選',
+            conversationsTagCreated: '標籤已建立',
+            conversationsTagUpdated: '標籤已更新',
+            conversationsTagDeleted: '標籤已刪除',
+            conversationsTagExists: '標籤名稱已存在',
+            conversationsUpdateTag: '更新標籤',
+            conversationsNoTags: '暫無標籤',
+            conversationsManageTags: '管理標籤',
+            conversationsPin: '置頂📌',
+            conversationsUnpin: '取消置頂',
+            conversationsPinned: '已置頂',
+            conversationsUnpinned: '已取消置頂',
+            conversationsFilterPinned: '篩選置頂',
+            conversationsClearAll: '清除所有篩選',
+            conversationsBatchMode: '批次操作',
         },
-        'en': {
+        en: {
             panelTitle: 'Gemini Helper',
             tabPrompts: 'Prompts',
             tabSettings: 'Settings',
@@ -547,8 +728,87 @@
             preventAutoScrollDesc: 'Stop page from auto-scrolling to bottom during AI generation',
             // Interface Toggle
             disableOutline: 'Disable Outline',
-            togglePrompts: 'Toggle Prompts'
-        }
+            togglePrompts: 'Toggle Prompts',
+            toggleConversations: 'Toggle Conversations',
+            // Conversations
+            tabConversations: 'Conversations',
+            conversationsEmpty: 'No conversations yet',
+            conversationsEmptyHint: 'Click sync button above to import from sidebar',
+            conversationsSync: 'Sync',
+            conversationsSyncing: 'Syncing...',
+            conversationsSynced: 'Synced',
+            conversationsAddFolder: 'New Folder',
+            conversationsRename: 'Rename',
+            conversationsDelete: 'Delete',
+            conversationsDeleteConfirm: 'Delete this folder? Conversations will be moved to Inbox.',
+            conversationsFolderCreated: 'Folder created',
+            conversationsFolderRenamed: 'Folder renamed',
+            conversationsFolderDeleted: 'Folder deleted',
+            conversationsCannotDeleteDefault: 'Cannot delete default folder',
+            conversationsIcon: 'Icon',
+            conversationsFolderName: 'Name',
+            conversationsFolderNamePlaceholder: 'Enter folder name',
+            cancel: 'Cancel',
+            confirm: 'Confirm',
+            conversationsSyncEmpty: 'No conversations found',
+            conversationsSyncNoChange: 'No new conversations',
+            justNow: 'Just now',
+            minutesAgo: 'm ago',
+            hoursAgo: 'h ago',
+            daysAgo: 'd ago',
+            conversationsSelectFolder: 'Select sync folder',
+            conversationsMoveTo: 'Move to...',
+            conversationsMoved: 'Moved to',
+            conversationsSyncDeleteTitle: 'Sync Deletion',
+            conversationsSyncDeleteMsg: '{count} conversation(s) have been deleted from cloud. Remove local records?',
+            conversationsDeleted: 'Removed',
+            // Conversation settings
+            conversationsSettingsTitle: 'Conversation Settings',
+            conversationsSyncDeleteLabel: 'Sync delete to cloud',
+            conversationsSyncDeleteDesc: 'When deleting local record, also delete from {site} cloud',
+            conversationsSyncRenameLabel: 'Sync rename to cloud',
+            conversationsSyncRenameDesc: 'When renaming conversation, also update title in {site} sidebar',
+            conversationsCustomIcon: 'Custom Icon',
+            batchSelected: 'Selected {n}',
+            batchMove: 'Move',
+            batchDelete: 'Delete',
+            batchExit: 'Exit',
+            conversationsRefresh: 'Refresh List',
+            conversationsSearchPlaceholder: 'Search conversations...',
+            conversationsSearchResult: 'result(s)',
+            conversationsNoSearchResult: 'No matching results',
+            conversationsSetTags: 'Set Tags',
+            conversationsNewTag: 'New Tag',
+            conversationsTagName: 'Tag Name',
+            conversationsTagColor: 'Tag Color',
+            conversationsFilterByTags: 'Filter by Tags',
+            conversationsClearTags: 'Clear Filter',
+            conversationsTagCreated: 'Tag Created',
+            conversationsTagUpdated: 'Tag Updated',
+            conversationsTagDeleted: 'Tag Deleted',
+            conversationsTagExists: 'Tag name already exists',
+            conversationsUpdateTag: 'Update Tag',
+            conversationsNoTags: 'No Tags',
+            conversationsManageTags: 'Manage Tags',
+            conversationsSetTags: 'Set Tags',
+            conversationsNewTag: 'New Tag',
+            conversationsTagName: 'Tag Name',
+            conversationsTagColor: 'Tag Color',
+            conversationsFilterByTags: 'Filter by Tags',
+            conversationsClearTags: 'Clear Filter',
+            conversationsTagCreated: 'Tag Created',
+            conversationsTagUpdated: 'Tag Updated',
+            conversationsTagDeleted: 'Tag Deleted',
+            conversationsNoTags: 'No Tags',
+            conversationsManageTags: 'Manage Tags',
+            conversationsPin: 'Pin📌',
+            conversationsUnpin: 'Unpin',
+            conversationsPinned: 'Pinned',
+            conversationsUnpinned: 'Unpinned',
+            conversationsFilterPinned: 'Filter Pinned',
+            conversationsClearAll: 'Clear all filters',
+            conversationsBatchMode: 'Batch Mode',
+        },
     };
 
     // ============= 默认提示词库 =============
@@ -557,29 +817,29 @@
             id: 'default_1',
             title: '代码优化',
             content: '请帮我优化以下代码，提高性能和可读性：\n\n',
-            category: '编程'
+            category: '编程',
         },
         {
             id: 'default_2',
             title: '翻译助手',
             content: '请将以下内容翻译成中文，保持专业术语的准确性：\n\n',
-            category: '翻译'
+            category: '翻译',
         },
     ];
 
     // ============= 页面宽度默认配置 =============
     const DEFAULT_WIDTH_SETTINGS = {
-        'gemini': {enabled: false, value: '70', unit: '%'},
-        'gemini-business': {enabled: false, value: '1600', unit: 'px'},
-        'genspark': {enabled: false, value: '70', unit: '%'}
+        gemini: { enabled: false, value: '70', unit: '%' },
+        'gemini-business': { enabled: false, value: '1600', unit: 'px' },
+        genspark: { enabled: false, value: '70', unit: '%' },
     };
 
     // ============= 大纲功能默认配置 =============
     const DEFAULT_OUTLINE_SETTINGS = {
         enabled: true,
-        maxLevel: 6,  // 显示到几级标题 (1-6)
+        maxLevel: 6, // 显示到几级标题 (1-6)
         autoUpdate: true,
-        updateInterval: 3
+        updateInterval: 3,
     };
 
     // 语言检测函数（支持手动设置）
@@ -642,7 +902,7 @@
         getSessionId() {
             // 优化实现：先去除 URL 中的查询参数 (?及后面内容)，再获取最后一段
             const urlWithoutQuery = window.location.href.split('?')[0];
-            const parts = urlWithoutQuery.split('/').filter(p => p);
+            const parts = urlWithoutQuery.split('/').filter((p) => p);
             return parts.length > 0 ? parts[parts.length - 1] : 'default';
         }
 
@@ -695,6 +955,67 @@
          */
         isNewConversation() {
             return false;
+        }
+
+        /**
+         * 获取侧边栏会话列表
+         * 子类应覆盖此方法从站点 DOM 提取会话数据
+         * @returns {Array<{id: string, title: string, url: string, isActive: boolean}>}
+         */
+        getConversationList() {
+            return [];
+        }
+
+        /**
+         * 获取侧边栏可滚动容器
+         * 子类应覆盖此方法返回侧边栏的可滚动容器元素
+         * @returns {Element|null}
+         */
+        getSidebarScrollContainer() {
+            return null;
+        }
+
+        /**
+         * 获取会话观察器配置（用于侧边栏实时监听）
+         * 子类应覆盖此方法提供站点特定的配置
+         * @returns {{
+         *   selector: string,                    // 会话元素 CSS 选择器
+         *   shadow: boolean,                     // 是否需要 Shadow DOM 穿透
+         *   extractInfo: function(Element): Object|null, // 从元素提取会话信息
+         *   getTitleElement: function(Element): Element  // 获取标题元素（用于监听变化）
+         * }|null} 返回 null 表示不支持
+         */
+        getConversationObserverConfig() {
+            return null;
+        }
+
+        /**
+         * 滚动加载全部会话
+         * 模拟滚动侧边栏到底部，直到所有会话都加载完成
+         * @returns {Promise<void>}
+         */
+        async loadAllConversations() {
+            const container = this.getSidebarScrollContainer();
+            if (!container) return;
+
+            let lastCount = 0;
+            let stableRounds = 0;
+            const maxStableRounds = 3; // 连续3次无新增则停止
+
+            while (stableRounds < maxStableRounds) {
+                container.scrollTop = container.scrollHeight;
+                await new Promise((r) => setTimeout(r, 500));
+
+                // 使用 DOMToolkit 穿透 Shadow DOM 查询会话数量
+                const conversations = DOMToolkit.query('.conversation', { all: true, shadow: true }) || [];
+                const currentCount = conversations.length;
+                if (currentCount === lastCount) {
+                    stableRounds++;
+                } else {
+                    lastCount = currentCount;
+                    stableRounds = 0;
+                }
+            }
         }
 
         /**
@@ -802,7 +1123,7 @@
         clearTextarea() {
             if (this.textarea) {
                 this.textarea.value = '';
-                this.textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }
 
@@ -814,15 +1135,15 @@
             // 使用 DOMToolkit 查找滚动容器，传入站点特定选择器
             return DOMToolkit.findScrollContainer({
                 selectors: [
+                    'infinite-scroller.chat-history', // Gemini 主对话滚动容器（精确匹配，避免与侧边栏混淆）
                     '.chat-mode-scroller',
                     'main',
                     '[role="main"]',
                     '.conversation-container',
-                    '.chat-container'
-                ]
+                    '.chat-container',
+                ],
             });
         }
-
 
         /**
          * 获取当前视口中可见的锚点元素信息 (用于精准定位)
@@ -865,13 +1186,13 @@
                 if (id) {
                     selector = `[data-message-id="${id}"]`;
                     if (!bestElement.matches(selector)) selector = `#${id}`;
-                    return {type: 'selector', selector: selector, offset: offset};
+                    return { type: 'selector', selector: selector, offset: offset };
                 } else {
                     const globalIndex = candidates.indexOf(bestElement);
                     if (globalIndex !== -1) {
                         // 增强：记录文本指纹，防止历史加载导致索引偏移
                         const textSignature = (bestElement.textContent || '').trim().substring(0, 50);
-                        return {type: 'index', index: globalIndex, offset: offset, textSignature: textSignature};
+                        return { type: 'index', index: globalIndex, offset: offset, textSignature: textSignature };
                     }
                 }
             }
@@ -906,14 +1227,14 @@
                         // 此时尝试全列表搜索
                         if (currentText !== anchorData.textSignature) {
                             // console.log('Anchor index mismatch, searching by text signature...');
-                            const found = candidates.find(c => (c.textContent || '').trim().substring(0, 50) === anchorData.textSignature);
+                            const found = candidates.find((c) => (c.textContent || '').trim().substring(0, 50) === anchorData.textSignature);
                             if (found) targetElement = found;
                         }
                     }
                 } else {
                     // 索引越界（可能消息被删了？），尝试文本搜索
                     if (anchorData.textSignature) {
-                        const found = candidates.find(c => (c.textContent || '').trim().substring(0, 50) === anchorData.textSignature);
+                        const found = candidates.find((c) => (c.textContent || '').trim().substring(0, 50) === anchorData.textSignature);
                         if (found) targetElement = found;
                     }
                 }
@@ -921,7 +1242,7 @@
 
             if (targetElement) {
                 const targetTop = targetElement.offsetTop + (anchorData.offset || 0);
-                container.scrollTo({top: targetTop, behavior: 'instant'});
+                container.scrollTo({ top: targetTop, behavior: 'instant' });
                 return true;
             }
             return false;
@@ -932,7 +1253,7 @@
          * @param {Object} options - 配置项 { clearOnInit: boolean, lockModel: boolean }
          */
         afterPropertiesSet(options = {}) {
-            const {modelLockConfig} = options;
+            const { modelLockConfig } = options;
             // 默认初始化逻辑：如果有模型锁定配置且启用，尝试锁定模型
             if (modelLockConfig && modelLockConfig.enabled) {
                 console.log(`[${this.getName()}] Triggering auto model lock:`, modelLockConfig.keyword);
@@ -982,7 +1303,6 @@
             return false; // 默认不支持，除非子类明确声明
         }
 
-
         // ============= 新对话监听 =============
 
         /**
@@ -1008,24 +1328,28 @@
             });
 
             // 2. 按钮点击监听
-            document.addEventListener('click', (e) => {
-                const selectors = this.getNewChatButtonSelectors();
-                if (selectors.length === 0) return;
+            document.addEventListener(
+                'click',
+                (e) => {
+                    const selectors = this.getNewChatButtonSelectors();
+                    if (selectors.length === 0) return;
 
-                // 使用 composedPath() 以支持 Shadow DOM 中的元素匹配
-                const path = e.composedPath();
-                for (const target of path) {
-                    if (target === document || target === window) break;
+                    // 使用 composedPath() 以支持 Shadow DOM 中的元素匹配
+                    const path = e.composedPath();
+                    for (const target of path) {
+                        if (target === document || target === window) break;
 
-                    for (const selector of selectors) {
-                        if (target.matches && target.matches(selector)) {
-                            console.log(`[${this.getName()}] New chat button clicked.`);
-                            setTimeout(callback, 500);
-                            return;
+                        for (const selector of selectors) {
+                            if (target.matches && target.matches(selector)) {
+                                console.log(`[${this.getName()}] New chat button clicked.`);
+                                setTimeout(callback, 500);
+                                return;
+                            }
                         }
                     }
-                }
-            }, true); // 使用捕获阶段确保捕获
+                },
+                true,
+            ); // 使用捕获阶段确保捕获
         }
 
         // ============= 模型锁定功能（抽象接口） =============
@@ -1035,7 +1359,7 @@
          * @returns {{ enabled: boolean, keyword: string }}
          */
         getDefaultLockSettings() {
-            return {enabled: false, keyword: ''};
+            return { enabled: false, keyword: '' };
         }
 
         /**
@@ -1056,29 +1380,22 @@
         }
 
         /**
-         /**
-         * 通用模型锁定实现
-         * 基于 getModelSwitcherConfig() 返回的配置执行锁定逻辑
-         * @param {string} keyword - 目标模型关键字
-         * @param {Function} onSuccess 成功后的回调（可选）
-         */
+		 /**
+		 * 通用模型锁定实现
+		 * 基于 getModelSwitcherConfig() 返回的配置执行锁定逻辑
+		 * @param {string} keyword - 目标模型关键字
+		 * @param {Function} onSuccess 成功后的回调（可选）
+		 */
         lockModel(keyword, onSuccess = null) {
             const config = this.getModelSwitcherConfig(keyword);
             if (!config) return;
 
-            const {
-                targetModelKeyword,
-                selectorButtonSelectors,
-                menuItemSelector,
-                checkInterval = 1500,
-                maxAttempts = 20,
-                menuRenderDelay = 500
-            } = config;
+            const { targetModelKeyword, selectorButtonSelectors, menuItemSelector, checkInterval = 1500, maxAttempts = 20, menuRenderDelay = 500 } = config;
 
             let attempts = 0;
             let isSelecting = false;
             // 辅助函数：标准化文本（小写 + 去空）
-            const normalize = str => (str || '').toLowerCase().trim();
+            const normalize = (str) => (str || '').toLowerCase().trim();
             const target = normalize(targetModelKeyword);
 
             const timer = setInterval(() => {
@@ -1148,7 +1465,6 @@
                         document.body.click(); // 尝试关闭以重置状态
                     }
                 }, menuRenderDelay);
-
             }, checkInterval);
         }
 
@@ -1159,7 +1475,7 @@
          */
         findElementBySelectors(selectors) {
             // 使用 DOMToolkit 进行 Shadow DOM 穿透查找
-            return DOMToolkit.query(selectors, {shadow: true});
+            return DOMToolkit.query(selectors, { shadow: true });
         }
 
         /**
@@ -1169,7 +1485,7 @@
          */
         findAllElementsBySelector(selector) {
             // 使用 DOMToolkit 进行 Shadow DOM 穿透查找（返回所有匹配）
-            return DOMToolkit.query(selector, {all: true, shadow: true});
+            return DOMToolkit.query(selector, { all: true, shadow: true });
         }
     }
 
@@ -1178,8 +1494,7 @@
      */
     class GeminiAdapter extends SiteAdapter {
         match() {
-            return window.location.hostname.includes('gemini.google') &&
-                !window.location.hostname.includes('business.gemini.google');
+            return window.location.hostname.includes('gemini.google') && !window.location.hostname.includes('business.gemini.google');
         }
 
         getSiteId() {
@@ -1191,7 +1506,7 @@
         }
 
         getThemeColors() {
-            return {primary: '#4285f4', secondary: '#34a853'};
+            return { primary: '#4285f4', secondary: '#34a853' };
         }
 
         getNewTabUrl() {
@@ -1201,6 +1516,60 @@
         isNewConversation() {
             const path = window.location.pathname;
             return path === '/app' || path === '/app/';
+        }
+
+        /**
+         * 从侧边栏提取会话列表
+         * @returns {Array<{id: string, title: string, url: string, isActive: boolean}>}
+         */
+        getConversationList() {
+            const items = DOMToolkit.query('.conversation', { all: true }) || [];
+            return Array.from(items)
+                .map((el) => {
+                    // 从 jslog 属性中提取会话 ID (Use safer regex that allows dashes/underscores)
+                    const jslog = el.getAttribute('jslog') || '';
+                    const idMatch = jslog.match(/\["c_([^"]+)"/);
+                    const id = idMatch ? idMatch[1] : '';
+                    const title = el.textContent?.trim() || '';
+
+                    return {
+                        id: id,
+                        title: title,
+                        url: id ? `https://gemini.google.com/app/${id}` : '',
+                        isActive: el.classList.contains('selected'),
+                    };
+                })
+                .filter((c) => c.id); // 过滤掉没有 ID 的项
+        }
+
+        /**
+         * 获取侧边栏可滚动容器
+         * @returns {Element|null}
+         */
+        getSidebarScrollContainer() {
+            return DOMToolkit.query('infinite-scroller[scrollable="true"]') || DOMToolkit.query('infinite-scroller');
+        }
+
+        /**
+         * 获取会话观察器配置（用于侧边栏实时监听）
+         */
+        getConversationObserverConfig() {
+            return {
+                selector: '.conversation',
+                shadow: false,
+                extractInfo: (el) => {
+                    const jslog = el.getAttribute('jslog') || '';
+                    const idMatch = jslog.match(/\["c_([^"]+)"/);
+                    const id = idMatch ? idMatch[1] : '';
+                    if (!id) return null;
+                    return {
+                        id,
+                        title: el.textContent?.trim() || '',
+                        url: `https://gemini.google.com/app/${id}`,
+                    };
+                },
+                getTitleElement: (el) => el,
+            };
         }
 
         getSessionName() {
@@ -1226,48 +1595,38 @@
                 '[data-test-id="expanded-button"]',
                 // 临时对话按钮
                 '[data-test-id="temp-chat-button"]',
-                'button[aria-label="临时对话"]'
+                'button[aria-label="临时对话"]',
             ];
         }
 
         getWidthSelectors() {
             return [
-                {selector: '.conversation-container', property: 'max-width'},
-                {selector: '.input-area-container', property: 'max-width'},
+                { selector: '.conversation-container', property: 'max-width' },
+                { selector: '.input-area-container', property: 'max-width' },
                 // 用户消息右对齐
                 {
                     selector: 'user-query',
                     property: 'max-width',
                     value: '100%',
                     noCenter: true,
-                    extraCss: 'display: flex !important; justify-content: flex-end !important;'
+                    extraCss: 'display: flex !important; justify-content: flex-end !important;',
                 },
                 {
                     selector: '.user-query-container',
                     property: 'max-width',
                     value: '100%',
                     noCenter: true,
-                    extraCss: 'justify-content: flex-end !important;'
-                }
+                    extraCss: 'justify-content: flex-end !important;',
+                },
             ];
         }
 
         getTextareaSelectors() {
-            return [
-                'div[contenteditable="true"].ql-editor',
-                'div[contenteditable="true"]',
-                '[role="textbox"]',
-                '[aria-label*="Enter a prompt"]'
-            ];
+            return ['div[contenteditable="true"].ql-editor', 'div[contenteditable="true"]', '[role="textbox"]', '[aria-label*="Enter a prompt"]'];
         }
 
         getSubmitButtonSelectors() {
-            return [
-                'button[aria-label*="Send"]',
-                'button[aria-label*="发送"]',
-                '.send-button',
-                '[data-testid*="send"]'
-            ];
+            return ['button[aria-label*="Send"]', 'button[aria-label*="发送"]', '.send-button', '[data-testid*="send"]'];
         }
 
         isValidTextarea(element) {
@@ -1278,7 +1637,7 @@
             // 排除脚本自身的 UI
             if (element.closest('#gemini-helper-panel')) return false;
 
-            return (isContentEditable || isTextbox) || element.classList.contains('ql-editor');
+            return isContentEditable || isTextbox || element.classList.contains('ql-editor');
         }
 
         insertPrompt(content) {
@@ -1297,8 +1656,8 @@
             } catch (e) {
                 // 降级方案：直接替换内容，不叠加
                 editor.textContent = content;
-                editor.dispatchEvent(new Event('input', {bubbles: true}));
-                editor.dispatchEvent(new Event('change', {bubbles: true}));
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+                editor.dispatchEvent(new Event('change', { bubbles: true }));
             }
             return true;
         }
@@ -1316,13 +1675,7 @@
         }
 
         getChatContentSelectors() {
-            return [
-                '.model-response-container',
-                'model-response',
-                '.response-container',
-                '[data-message-id]',
-                'message-content'
-            ];
+            return ['.model-response-container', 'model-response', '.response-container', '[data-message-id]', 'message-content'];
         }
 
         extractOutline(maxLevel = 6) {
@@ -1337,13 +1690,13 @@
             }
 
             const headings = container.querySelectorAll(headingSelectors.join(', '));
-            headings.forEach(heading => {
+            headings.forEach((heading) => {
                 const level = parseInt(heading.tagName.charAt(1), 10);
                 if (level <= maxLevel) {
                     outline.push({
                         level,
                         text: heading.textContent.trim(),
-                        element: heading
+                        element: heading,
                     });
                 }
             });
@@ -1395,34 +1748,26 @@
             return {
                 // 注意：不要使用 batchexecute，它是通用 RPC 方法，会在后台频繁调用
                 urlPatterns: ['BardFrontendService', 'StreamGenerate'],
-                silenceThreshold: 3000
+                silenceThreshold: 3000,
             };
         }
 
-
         // ============= 模型锁定配置 =============
         getDefaultLockSettings() {
-            return {enabled: false, keyword: ''};
+            return { enabled: false, keyword: '' };
         }
 
         getModelSwitcherConfig(keyword) {
             return {
                 targetModelKeyword: keyword,
                 // 尝试匹配 Gemini 普通版的模型选择器
-                selectorButtonSelectors: [
-                    '.input-area-switch-label',
-                    '.model-selector',
-                    '[data-test-id="model-selector"]',
-                    '[aria-label*="model"]',
-                    'button[aria-haspopup="menu"]'
-                ],
+                selectorButtonSelectors: ['.input-area-switch-label', '.model-selector', '[data-test-id="model-selector"]', '[aria-label*="model"]', 'button[aria-haspopup="menu"]'],
                 menuItemSelector: '.mode-title, [role="menuitem"], [role="option"]',
                 checkInterval: 1000,
                 maxAttempts: 15,
-                menuRenderDelay: 300
+                menuRenderDelay: 300,
             };
         }
-
     }
 
     /**
@@ -1442,7 +1787,7 @@
         }
 
         getThemeColors() {
-            return {primary: '#4285f4', secondary: '#34a853'};
+            return { primary: '#4285f4', secondary: '#34a853' };
         }
 
         getNewTabUrl() {
@@ -1455,6 +1800,181 @@
 
         isNewConversation() {
             return !window.location.pathname.includes('/session/');
+        }
+
+        /**
+         * 获取当前会话名称（用于标签页重命名）
+         * 从 Shadow DOM 中的侧边栏获取当前活动会话的标题
+         * @returns {string|null}
+         */
+        getSessionName() {
+            // DOMToolkit 在 Shadow DOM 穿透时，复杂后代选择器可能不生效
+            // 所以遍历所有会话，找到活动的那个
+            const conversations = DOMToolkit.query('.conversation', { all: true, shadow: true });
+
+            for (const conv of conversations) {
+                const button = conv.querySelector('button.list-item') || conv.querySelector('button');
+                if (!button) continue;
+
+                // 检查是否为活动会话
+                const isActive = button.classList.contains('selected') || button.classList.contains('active') || button.getAttribute('aria-selected') === 'true';
+
+                if (isActive) {
+                    const titleEl = button.querySelector('.conversation-title');
+                    if (titleEl) {
+                        const name = titleEl.textContent?.trim();
+                        if (name) return name;
+                    }
+                }
+            }
+
+            // 回退到基类默认实现（从 document.title 提取）
+            return super.getSessionName();
+        }
+
+        /**
+         * 获取当前的团队
+         */
+        getCurrentCid() {
+            const currentPath = window.location.pathname;
+            const cidMatch = currentPath.match(/\/home\/cid\/([^\/]+)/);
+            return cidMatch ? cidMatch[1] : '';
+        }
+
+        /**
+         * 从侧边栏提取会话列表
+         * @returns {Array<{id: string, title: string, url: string, isActive: boolean}>}
+         */
+        getConversationList() {
+            // 1. 获取当前 Team ID (CID)
+            let cid = this.getCurrentCid();
+
+            // 2. 查找会话列表
+            // 注意：DOMToolkit 在 Shadow DOM 穿透时，后代选择器可能不生效
+            // 所以使用简单选择器 + 后续过滤来排除智能体
+            const items = DOMToolkit.query('.conversation', { all: true, shadow: true });
+
+            return Array.from(items)
+                .map((el) => {
+                    // 注意：DOMToolkit.query 使用 parent 参数，不是 root
+                    const button = el.querySelector('button.list-item') || el.querySelector('button');
+                    if (!button) return null;
+
+                    // 从操作菜单按钮 ID 提取 Session ID
+                    // 会话格式: menu-8823153884416423953 (纯数字)
+                    // 智能体格式: menu-deep_research (包含字母/下划线)
+                    const menuBtn = button.querySelector('.conversation-action-menu-button');
+                    let id = '';
+                    if (menuBtn && menuBtn.id && menuBtn.id.startsWith('menu-')) {
+                        id = menuBtn.id.replace('menu-', '');
+                    }
+
+                    // 关键过滤：真正的会话 ID 是纯数字，智能体 ID 包含字母
+                    // 例如：会话 ID = "452535969834780805"，智能体 ID = "deep_research"
+                    if (!id || !/^\d+$/.test(id)) return null;
+
+                    // 获取标题
+                    const titleEl = button.querySelector('.conversation-title');
+                    const title = titleEl ? titleEl.textContent.trim() : '';
+
+                    const isActive = button.classList.contains('selected') || button.classList.contains('active') || button.getAttribute('aria-selected') === 'true';
+
+                    // 构建完整 URL
+                    // 格式: https://business.gemini.google/home/cid/{cid}/r/session/{id}
+                    let url = `https://business.gemini.google/session/${id}`; // 默认(如果没 cid)
+                    if (cid) {
+                        url = `https://business.gemini.google/home/cid/${cid}/r/session/${id}`;
+                    }
+
+                    return {
+                        id: id,
+                        title: title,
+                        url: url,
+                        isActive: isActive,
+                        cid: cid,
+                    };
+                })
+                .filter((c) => c); // 过滤掉 null
+        }
+
+        /**
+         * 获取侧边栏可滚动容器
+         * @returns {Element|null}
+         */
+        getSidebarScrollContainer() {
+            return DOMToolkit.query('.conversation-list', { shadow: true }) || DOMToolkit.query('mat-sidenav', { shadow: true });
+        }
+
+        /**
+         * 获取会话观察器配置（用于侧边栏实时监听）
+         */
+        getConversationObserverConfig() {
+            const self = this;
+            return {
+                selector: '.conversation',
+                shadow: true,
+                extractInfo: (el) => {
+                    const button = el.querySelector('button.list-item') || el.querySelector('button');
+                    if (!button) return null;
+
+                    const menuBtn = button.querySelector('.conversation-action-menu-button');
+                    if (!menuBtn || !menuBtn.id?.startsWith('menu-')) return null;
+
+                    const id = menuBtn.id.replace('menu-', '');
+                    if (!/^\d+$/.test(id)) return null; // 排除智能体
+
+                    const titleEl = button.querySelector('.conversation-title');
+                    const title = titleEl?.textContent?.trim() || '';
+
+                    const cid = self.getCurrentCid();
+                    let url = `https://business.gemini.google/home/cid/${cid}/r/session/${id}`;
+
+                    return { id, title, url, cid };
+                },
+                getTitleElement: (el) => {
+                    const button = el.querySelector('button.list-item') || el.querySelector('button');
+                    return button?.querySelector('.conversation-title') || el;
+                },
+            };
+        }
+
+        /**
+         * 加载所有会话
+         * 通过点击"展开"按钮来加载更多会话，而不是滚动
+         * @returns {Promise<void>}
+         */
+        async loadAllConversations() {
+            let expandedCount = 0;
+            const maxIterations = 20; // 防止无限循环
+
+            for (let i = 0; i < maxIterations; i++) {
+                // 查找所有按钮（穿透 Shadow DOM）
+                const allBtns = DOMToolkit.query('button.show-more', { all: true, shadow: true }) || [];
+
+                // 过滤出未展开的按钮（icon 没有 more-visible class）
+                const expandBtns = allBtns.filter((btn) => {
+                    const icon = btn.querySelector('.show-more-icon');
+                    // 已展开的按钮 icon 有 more-visible class
+                    return icon && !icon.classList.contains('more-visible');
+                });
+
+                if (expandBtns.length === 0) {
+                    break; // 没有更多需要展开的按钮
+                }
+
+                // 点击所有展开按钮
+                for (const btn of expandBtns) {
+                    btn.click();
+                    expandedCount++;
+                }
+
+                // 等待会话加载
+                await new Promise((r) => setTimeout(r, 300));
+            }
+
+            if (expandedCount > 0) {
+                console.log(`[GeminiBusinessAdapter] 展开了 ${expandedCount} 个会话分组`);
+            }
         }
 
         // 排除侧边栏 (mat-sidenav, mat-drawer) 中的 Shadow DOM
@@ -1476,7 +1996,7 @@
                 property: 'max-width',
                 value,
                 extraCss,
-                noCenter
+                noCenter,
             });
 
             return [
@@ -1492,27 +2012,16 @@
                 config('.conversation-container'),
 
                 // 输入框容器：不居中，使用 left/right 定位
-                config('.input-area-container', undefined, 'left: 0 !important; right: 0 !important;', true)
+                config('.input-area-container', undefined, 'left: 0 !important; right: 0 !important;', true),
             ];
         }
 
         getTextareaSelectors() {
-            return [
-                'div.ProseMirror',
-                '.ProseMirror',
-                '[contenteditable="true"]:not([type="search"])',
-                '[role="textbox"]',
-                'textarea:not([type="search"])'
-            ];
+            return ['div.ProseMirror', '.ProseMirror', '[contenteditable="true"]:not([type="search"])', '[role="textbox"]', 'textarea:not([type="search"])'];
         }
 
         getSubmitButtonSelectors() {
-            return [
-                'button[aria-label*="Submit"]',
-                'button[aria-label*="提交"]',
-                '.send-button',
-                '[data-testid*="send"]'
-            ];
+            return ['button[aria-label*="Submit"]', 'button[aria-label*="提交"]', '.send-button', '[data-testid*="send"]'];
         }
 
         isValidTextarea(element) {
@@ -1538,7 +2047,7 @@
             // filter 参数实现了 isValidTextarea 的验证逻辑
             const element = DOMToolkit.query(this.getTextareaSelectors(), {
                 shadow: true,
-                filter: (el) => this.isValidTextarea(el)
+                filter: (el) => this.isValidTextarea(el),
             });
 
             if (element) {
@@ -1588,13 +2097,13 @@
                                 bubbles: true,
                                 cancelable: true,
                                 inputType: 'insertText',
-                                data: content
+                                data: content,
                             });
                             editor.dispatchEvent(inputEvent);
-                            editor.dispatchEvent(new Event('change', {bubbles: true}));
+                            editor.dispatchEvent(new Event('change', { bubbles: true }));
 
                             // 尝试触发 keyup 事件
-                            editor.dispatchEvent(new KeyboardEvent('keyup', {bubbles: true}));
+                            editor.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
                             resolve(true);
                         }
                     }, 100);
@@ -1666,7 +2175,6 @@
             });
         }
 
-
         /**
          * 检测 AI 是否正在生成响应
          * Gemini Business：检查 Shadow DOM 中的 "Stop" 按钮或 loading 指示器
@@ -1678,18 +2186,12 @@
                 if (depth > 10) return false;
 
                 // 检查当前层级
-                const stopButton = root.querySelector(
-                    'button[aria-label*="Stop"], button[aria-label*="停止"], ' +
-                    '[data-test-id="stop-button"], .stop-button, md-icon-button[aria-label*="Stop"]'
-                );
+                const stopButton = root.querySelector('button[aria-label*="Stop"], button[aria-label*="停止"], ' + '[data-test-id="stop-button"], .stop-button, md-icon-button[aria-label*="Stop"]');
                 if (stopButton && stopButton.offsetParent !== null) {
                     return true;
                 }
 
-                const spinner = root.querySelector(
-                    'mat-spinner, md-spinner, .loading-spinner, [role="progressbar"], ' +
-                    '.generating-indicator, .response-loading'
-                );
+                const spinner = root.querySelector('mat-spinner, md-spinner, .loading-spinner, [role="progressbar"], ' + '.generating-indicator, .response-loading');
                 if (spinner && spinner.offsetParent !== null) {
                     return true;
                 }
@@ -1720,13 +2222,7 @@
                 if (depth > 10) return null;
 
                 // 检查模型选择器
-                const modelSelectors = [
-                    '#model-selector-menu-anchor',
-                    '.action-model-selector',
-                    '.model-selector',
-                    '[data-test-id="model-selector"]',
-                    '.current-model'
-                ];
+                const modelSelectors = ['#model-selector-menu-anchor', '.action-model-selector', '.model-selector', '[data-test-id="model-selector"]', '.current-model'];
 
                 for (const selector of modelSelectors) {
                     const el = root.querySelector(selector);
@@ -1757,12 +2253,10 @@
             return findInShadow(document);
         }
 
-
         // ============= 模型锁定配置 =============
 
-
         getDefaultLockSettings() {
-            return {enabled: true, keyword: '3 Pro'};
+            return { enabled: true, keyword: '3 Pro' };
         }
 
         getModelSwitcherConfig(keyword) {
@@ -1772,7 +2266,7 @@
                 menuItemSelector: 'md-menu-item',
                 checkInterval: 1500,
                 maxAttempts: 20,
-                menuRenderDelay: 500
+                menuRenderDelay: 500,
             };
         }
 
@@ -1787,7 +2281,7 @@
                 '.message-content',
                 '[data-message-id]', // 常见消息标识
                 'ucs-conversation-message', // 企业版特定
-                '.conversation-message'
+                '.conversation-message',
             ];
         }
 
@@ -1804,18 +2298,20 @@
 
             // 在当前层级查找标题（h1-h6）
             if (root !== document) {
-                const headingSelector = Array.from({length: maxLevel}, (_, i) => `h${i + 1}`).join(', ');
+                const headingSelector = Array.from({ length: maxLevel }, (_, i) => `h${i + 1}`).join(', ');
                 try {
                     const headings = root.querySelectorAll(headingSelector);
-                    headings.forEach(heading => {
+                    headings.forEach((heading) => {
                         // 只匹配包含 data-markdown-start-index 的标题（排除 logo 等非 AI 回复内容）
                         // 标题内可能包含多个 span，需要遍历所有 span 并拼接文本
                         const spans = heading.querySelectorAll('span[data-markdown-start-index]');
                         if (spans.length > 0) {
                             const level = parseInt(heading.tagName[1], 10);
-                            const text = Array.from(spans).map(s => s.textContent.trim()).join('');
+                            const text = Array.from(spans)
+                                .map((s) => s.textContent.trim())
+                                .join('');
                             if (text) {
-                                outline.push({level, text, element: heading});
+                                outline.push({ level, text, element: heading });
                             }
                         }
                     });
@@ -1851,7 +2347,7 @@
         }
 
         getThemeColors() {
-            return {primary: '#667eea', secondary: '#764ba2'};
+            return { primary: '#667eea', secondary: '#764ba2' };
         }
 
         getNewTabUrl() {
@@ -1869,38 +2365,24 @@
         }
 
         getTextareaSelectors() {
-            return [
-                'textarea[name="query"]',
-                'textarea.search-input',
-                '.textarea-wrapper textarea',
-                'textarea[placeholder*="Message"]'
-            ];
+            return ['textarea[name="query"]', 'textarea.search-input', '.textarea-wrapper textarea', 'textarea[placeholder*="Message"]'];
         }
 
         getSubmitButtonSelectors() {
-            return [
-                'button[aria-label*="Send"]',
-                'button[aria-label*="发送"]',
-                '.send-button',
-                '[data-testid*="send"]'
-            ];
+            return ['button[aria-label*="Send"]', 'button[aria-label*="发送"]', '.send-button', '[data-testid*="send"]'];
         }
 
         getChatContentSelectors() {
-            return [
-                '.message-content',
-                '.markdown-body',
-                '[data-testid="chat-message"]'
-            ];
+            return ['.message-content', '.markdown-body', '[data-testid="chat-message"]'];
         }
 
         insertPrompt(content) {
             if (!this.textarea) return false;
 
             const currentContent = this.textarea.value.trim();
-            this.textarea.value = currentContent ? (content + '\n\n' + currentContent) : (content + '\n\n');
+            this.textarea.value = currentContent ? content + '\n\n' + currentContent : content + '\n\n';
             this.adjustTextareaHeight();
-            this.textarea.dispatchEvent(new Event('input', {bubbles: true}));
+            this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
             this.textarea.focus();
             return true;
         }
@@ -1915,7 +2397,7 @@
         clearTextarea() {
             if (this.textarea) {
                 this.textarea.value = '';
-                this.textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 this.adjustTextareaHeight();
             }
         }
@@ -1976,7 +2458,7 @@
                 urlPatterns: this._networkConfig.urlPatterns,
                 silenceThreshold: this._networkConfig.silenceThreshold || 3000,
                 onStart: () => this._setAiState('generating'),
-                onComplete: () => this._onAiComplete()
+                onComplete: () => this._onAiComplete(),
             });
             this.networkMonitor.start();
         }
@@ -2016,7 +2498,7 @@
                     title: this.t('notificationTitle').replace('{site}', this.adapter.getName()),
                     text: this.lastSessionName || this.t('notificationBody'),
                     timeout: 5000,
-                    onclick: () => window.focus()
+                    onclick: () => window.focus(),
                 });
             }
 
@@ -2112,14 +2594,10 @@
             this._lastAiState = isGenerating ? 'generating' : 'idle';
 
             // 构建标题
-            const statusPrefix = (tabSettings.showStatus !== false)
-                ? (isGenerating ? '⏳ ' : '✅ ')
-                : '';
+            const statusPrefix = tabSettings.showStatus !== false ? (isGenerating ? '⏳ ' : '✅ ') : '';
 
             const format = tabSettings.titleFormat || '{status}{title}';
-            const modelName = format.includes('{model}')
-                ? (this.adapter.getModelName() || '')
-                : '';
+            const modelName = format.includes('{model}') ? this.adapter.getModelName() || '' : '';
 
             let finalTitle = format
                 .replace('{status}', statusPrefix)
@@ -2154,12 +2632,13 @@
                 return false;
             };
 
-            if (isPolluted(sessionName)) {
-                sessionName = this.lastSessionName;
-            } else if (sessionName && sessionName !== this.lastSessionName) {
+            // 如果获取到有效且非污染的标题，更新缓存并返回
+            if (sessionName && !isPolluted(sessionName)) {
                 this.lastSessionName = sessionName;
+                return sessionName;
             }
 
+            // 否则返回缓存的标题（可能为 null）
             return this.lastSessionName;
         }
 
@@ -2216,6 +2695,22 @@
     }
 
     /**
+     * 全局 Toast 提示函数
+     * @param {string} message 提示信息
+     * @param {number} duration 显示时长 (ms)
+     */
+    function showToast(message, duration = 2000) {
+        const existing = document.querySelector('.gemini-toast');
+        if (existing) existing.remove();
+        const toast = createElement('div', { className: 'gemini-toast' }, message);
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.animation = 'toastSlideIn 0.3s reverse';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    /**
      * 页面宽度样式管理器
      * 负责动态注入和移除页面宽度样式
      */
@@ -2260,17 +2755,19 @@
         generateCSS() {
             const globalWidth = `${this.widthConfig.value}${this.widthConfig.unit}`;
             const selectors = this.siteAdapter.getWidthSelectors();
-            return selectors.map((config) => {
-                const {selector, globalSelector, property, value, extraCss, noCenter} = config;
-                const params = {
-                    finalWidth: value || globalWidth,
-                    targetSelector: globalSelector || selector, // 优先使用全局特定选择器
-                    property,
-                    extra: extraCss || '',
-                    centerCss: noCenter ? '' : 'margin-left: auto !important; margin-right: auto !important;'
-                };
-                return `${params.targetSelector} { ${params.property}: ${params.finalWidth} !important; ${params.centerCss} ${params.extra} }`;
-            }).join('\n');
+            return selectors
+                .map((config) => {
+                    const { selector, globalSelector, property, value, extraCss, noCenter } = config;
+                    const params = {
+                        finalWidth: value || globalWidth,
+                        targetSelector: globalSelector || selector, // 优先使用全局特定选择器
+                        property,
+                        extra: extraCss || '',
+                        centerCss: noCenter ? '' : 'margin-left: auto !important; margin-right: auto !important;',
+                    };
+                    return `${params.targetSelector} { ${params.property}: ${params.finalWidth} !important; ${params.centerCss} ${params.extra} }`;
+                })
+                .join('\n');
         }
 
         updateConfig(widthConfig) {
@@ -2298,14 +2795,16 @@
         generateShadowCSS() {
             const globalWidth = `${this.widthConfig.value}${this.widthConfig.unit}`;
             const selectors = this.siteAdapter.getWidthSelectors();
-            return selectors.map((config) => {
-                const {selector, property, value, extraCss, noCenter} = config;
-                // Shadow DOM 中只使用原始 selector (不带父级限定)，靠 JS 过滤来保证安全
-                const finalWidth = value || globalWidth;
-                const extra = extraCss || '';
-                const centerCss = noCenter ? '' : 'margin-left: auto !important; margin-right: auto !important;';
-                return `${selector} { ${property}: ${finalWidth} !important; ${centerCss} ${extra} }`;
-            }).join('\n');
+            return selectors
+                .map((config) => {
+                    const { selector, property, value, extraCss, noCenter } = config;
+                    // Shadow DOM 中只使用原始 selector (不带父级限定)，靠 JS 过滤来保证安全
+                    const finalWidth = value || globalWidth;
+                    const extra = extraCss || '';
+                    const centerCss = noCenter ? '' : 'margin-left: auto !important; margin-right: auto !important;';
+                    return `${selector} { ${property}: ${finalWidth} !important; ${centerCss} ${extra} }`;
+                })
+                .join('\n');
         }
 
         stopShadowInjection() {
@@ -2361,7 +2860,6 @@
             this.observer = null;
             this.cleanupInterval = null;
             this.lastScrollY = window.scrollY;
-
         }
 
         setEnabled(enabled) {
@@ -2397,8 +2895,7 @@
                 scrollIntoView: Element.prototype.scrollIntoView,
                 scrollTo: window.scrollTo,
                 // 保存属性描述符以便恢复
-                scrollTopDescriptor: Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop') ||
-                    Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop')
+                scrollTopDescriptor: Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop') || Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop'),
             };
 
             const self = this;
@@ -2441,8 +2938,7 @@
             if (this.originalApis.scrollTopDescriptor) {
                 Object.defineProperty(Element.prototype, 'scrollTop', {
                     get: function () {
-                        return self.originalApis.scrollTopDescriptor.get ?
-                            self.originalApis.scrollTopDescriptor.get.call(this) : this.files; // fallback (impossible normally)
+                        return self.originalApis.scrollTopDescriptor.get ? self.originalApis.scrollTopDescriptor.get.call(this) : this.files; // fallback (impossible normally)
                     },
                     set: function (value) {
                         if (self.enabled && self.shouldBlockScroll() && value > this.scrollTop + 50) {
@@ -2453,7 +2949,7 @@
                             self.originalApis.scrollTopDescriptor.set.call(this, value);
                         }
                     },
-                    configurable: true
+                    configurable: true,
                 });
             }
         }
@@ -2493,7 +2989,7 @@
                     this.lastScrollY = window.scrollY;
                 }
             };
-            window.addEventListener('scroll', onScroll, {passive: true});
+            window.addEventListener('scroll', onScroll, { passive: true });
             this.onScrollHandler = onScroll;
         }
 
@@ -2513,14 +3009,15 @@
                 const contentSelectors = this.siteAdapter.getChatContentSelectors();
                 if (contentSelectors.length === 0) return;
 
-                mutations.forEach(mutation => {
+                mutations.forEach((mutation) => {
                     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                         // 检查是否有新消息节点
                         for (const node of mutation.addedNodes) {
-                            if (node.nodeType === 1) { // Element
+                            if (node.nodeType === 1) {
+                                // Element
                                 // 使用适配器提供的选择器判断
                                 for (const sel of contentSelectors) {
-                                    if (node.matches && node.matches(sel) || (node.querySelector && node.querySelector(sel))) {
+                                    if ((node.matches && node.matches(sel)) || (node.querySelector && node.querySelector(sel))) {
                                         hasNewContent = true;
                                         break;
                                     }
@@ -2550,7 +3047,7 @@
 
             this.observer.observe(document.body, {
                 childList: true,
-                subtree: true
+                subtree: true,
             });
 
             // 定时器保底
@@ -2579,7 +3076,6 @@
             }
         }
     }
-
 
     // ==================== 核心管理类 ====================
 
@@ -2656,11 +3152,11 @@
             // 监听真正的滚动容器（各站点通过 SiteAdapter 适配）
             const container = this.scrollManager.container;
             if (container) {
-                container.addEventListener('scroll', this.scrollHandler, {passive: true});
+                container.addEventListener('scroll', this.scrollHandler, { passive: true });
                 this.listeningContainer = container; // 保存引用以便移除
             }
             // 同时保留 window 监听作为兜底（某些站点可能用 window 滚动）
-            window.addEventListener('scroll', this.scrollHandler, {capture: true, passive: true});
+            window.addEventListener('scroll', this.scrollHandler, { capture: true, passive: true });
         }
 
         stopRecording() {
@@ -2673,7 +3169,7 @@
                     this.listeningContainer = null;
                 }
                 // 移除 window 监听
-                window.removeEventListener('scroll', this.scrollHandler, {capture: true});
+                window.removeEventListener('scroll', this.scrollHandler, { capture: true });
                 this.scrollHandler = null;
             }
         }
@@ -2718,7 +3214,7 @@
             const data = {
                 top: scrollTop,
                 ts: Date.now(),
-                ...((anchorInfo) ? anchorInfo : {})
+                ...(anchorInfo ? anchorInfo : {}),
             };
 
             const allData = GM_getValue('gemini_reading_progress', {});
@@ -2754,7 +3250,7 @@
                     if (attempts > 30) {
                         // 超过最大尝试次数，使用像素位置作为最终降级
                         if (data.top !== undefined && scrollContainer.scrollHeight >= data.top) {
-                            this.scrollManager.scrollTo({top: data.top, behavior: 'instant'});
+                            this.scrollManager.scrollTo({ top: data.top, behavior: 'instant' });
                             this.restoredTop = data.top;
                             resolve(true);
                         } else {
@@ -2795,14 +3291,14 @@
                         if (showToastFunc) showToastFunc(`正在加载历史会话 (${historyLoadAttempts + 1}/${maxHistoryLoadAttempts})...`);
 
                         // 滚动到顶部触发懒加载
-                        this.scrollManager.scrollTo({top: 0, behavior: 'instant'});
+                        this.scrollManager.scrollTo({ top: 0, behavior: 'instant' });
 
                         historyLoadAttempts++;
                         // 等待页面加载新内容
                         setTimeout(() => tryScroll(attempts + 1), 2000);
                     } else if (data.top !== undefined && currentScrollHeight >= data.top) {
                         // 没有内容锚点或已用尽回溯机会，但像素位置可用
-                        this.scrollManager.scrollTo({top: data.top, behavior: 'instant'});
+                        this.scrollManager.scrollTo({ top: data.top, behavior: 'instant' });
                         this.restoredTop = data.top;
                         resolve(true);
                     } else if (!canLoadMore && hasContentAnchor) {
@@ -2831,7 +3327,7 @@
             const allData = GM_getValue('gemini_reading_progress', {});
             let changed = false;
 
-            Object.keys(allData).forEach(k => {
+            Object.keys(allData).forEach((k) => {
                 if (now - allData[k].ts > expireTime) {
                     delete allData[k];
                     changed = true;
@@ -2857,7 +3353,7 @@
             this.t = i18nFunc;
             // 双位置交换：类似 git switch -
             this.previousAnchor = null; // 上一个位置（跳转前）
-            this.currentAnchor = null;  // 当前锚点（跳转目标）
+            this.currentAnchor = null; // 当前锚点（跳转目标）
             this.onAnchorChange = null; // UI 更新回调
         }
 
@@ -2873,13 +3369,12 @@
                 if (this.scrollManager.siteAdapter.getVisibleAnchorElement) {
                     anchorInfo = this.scrollManager.siteAdapter.getVisibleAnchorElement();
                 }
-            } catch (err) {
-            }
+            } catch (err) {}
 
             return {
                 top: this.scrollManager.scrollTop,
                 ts: Date.now(),
-                ...anchorInfo
+                ...anchorInfo,
             };
         }
 
@@ -2890,14 +3385,13 @@
                 if (this.scrollManager.siteAdapter.getVisibleAnchorElement) {
                     anchorInfo = this.scrollManager.siteAdapter.getVisibleAnchorElement();
                 }
-            } catch (err) {
-            }
+            } catch (err) {}
 
             // 保存当前位置为"上一个锚点"
             this.previousAnchor = {
                 top: top,
                 ts: Date.now(),
-                ...anchorInfo
+                ...anchorInfo,
             };
 
             if (this.onAnchorChange) this.onAnchorChange(true);
@@ -2927,7 +3421,7 @@
 
             // 2.2 降级：像素位置
             if (!jumped && this.previousAnchor.top !== undefined) {
-                this.scrollManager.scrollTo({top: this.previousAnchor.top, behavior: 'smooth'});
+                this.scrollManager.scrollTo({ top: this.previousAnchor.top, behavior: 'smooth' });
                 jumped = true;
             }
 
@@ -2952,6 +3446,2826 @@
             this.previousAnchor = null;
             this.currentAnchor = null;
             if (this.onAnchorChange) this.onAnchorChange(false);
+        }
+    }
+
+    /**
+     * 通用会话管理器
+     * 负责会话列表的 UI 渲染、文件夹管理和交互
+     * Phase 1: 骨架版本，仅显示占位内容
+     */
+    class ConversationManager {
+        constructor(config) {
+            this.container = config.container;
+            this.settings = config.settings;
+            this.siteAdapter = config.siteAdapter;
+            this.t = config.i18n || ((k) => k);
+            this.isActive = false;
+            this.data = null; // 会话数据
+            this.expandedFolderId = null; // 记忆当前展开的文件夹（手风琴模式，只展开一个）
+            this.selectedIds = new Set(); // 批量选中的会话 ID
+            this.batchMode = false; // 批量模式开关
+            this.searchQuery = ''; // 搜索关键词
+            this.searchResult = null; // 搜索结果 { folderMatches, conversationMatches, totalCount }
+
+            this.init();
+        }
+
+        init() {
+            this.loadData();
+            this.createUI();
+            this.startSidebarObserver();
+        }
+
+        /**
+         * 启动侧边栏实时监听
+         * 使用 DOMToolkit.each 监听新会话添加
+         */
+        startSidebarObserver() {
+            if (this.sidebarObserverStop) return; // 已经在监听
+
+            // 获取适配器提供的配置
+            const config = this.siteAdapter.getConversationObserverConfig();
+            if (!config) return; // 站点不支持侧边栏监听
+
+            // 保存配置供其他方法使用
+            this.observerConfig = config;
+
+            // 延迟启动函数（等待侧边栏 DOM 加载完成）
+            const startObserver = (retryCount = 0) => {
+                const maxRetries = 5; // 最多重试5次
+                const retryDelay = 1000; // 每次重试间隔1秒
+
+                // 确定监听起点：始终使用最精确的容器，让 Observer 能监听 Shadow DOM 内部的变化
+                const sidebarContainer = this.siteAdapter.getSidebarScrollContainer() || document;
+
+                // 对于需要 Shadow DOM 穿透的站点，检查侧边栏容器是否已加载
+                // 如果返回的是 document，说明没找到特定容器，可能还要等待 (除非原本就是 document)
+                if (config.shadow && retryCount < maxRetries) {
+                    const foundContainer = this.siteAdapter.getSidebarScrollContainer();
+                    if (!foundContainer) {
+                        // 侧边栏还未加载，延迟重试
+                        setTimeout(() => startObserver(retryCount + 1), retryDelay);
+                        return;
+                    }
+                }
+
+                // 保存当前从属的容器，用于后续存活检测 (Zombie Check)
+                this.observerContainer = sidebarContainer;
+
+                // 侧边栏已加载或达到最大重试次数，开始监听
+                this.sidebarObserverStop = DOMToolkit.each(
+                    config.selector,
+                    (el, isNew) => {
+                        // 尝试提取 ID，如果失败则重试（因为新会话可能属性延迟生成）
+                        const tryAdd = (retries = 5) => {
+                            const info = config.extractInfo(el);
+
+                            if (info?.id) {
+                                // 仅对新发现的元素尝试添加到数据（如果是全新的会话）
+                                if (isNew && !this.data.conversations[info.id]) {
+                                    // 自动添加新会话到当前选中文件夹
+                                    const folderId = this.data.lastUsedFolderId || 'inbox';
+                                    this.data.conversations[info.id] = {
+                                        id: info.id,
+                                        siteId: this.siteAdapter.getSiteId(),
+                                        cid: info.cid || null,
+                                        title: info.title || 'New Conversation',
+                                        url: info.url,
+                                        folderId: folderId,
+                                        createdAt: Date.now(),
+                                        updatedAt: Date.now(),
+                                    };
+                                    this.saveData();
+                                    // 轻量级更新计数（避免重建整个 UI 丢失展开状态）
+                                    this.updateFolderCount(folderId);
+                                }
+
+                                // 对所有会话（无论新旧）启动标题变更监听
+                                this.monitorConversationTitle(el, info.id);
+                            } else if (retries > 0) {
+                                setTimeout(() => tryAdd(retries - 1), 500);
+                            }
+                        };
+
+                        tryAdd();
+                    },
+                    { parent: sidebarContainer, shadow: config.shadow },
+                );
+            };
+
+            // 启动观察器
+            startObserver();
+
+            // 补充：仅对 Shadow DOM 站点启用轮询（Observer 可能因 DOM 复用/替换而失效）
+            // 普通站点的 Observer 工作正常，无需轮询
+            if (config.shadow) {
+                this.pollNewConversations();
+            }
+        }
+
+        /**
+         * 检查侧边栏监听器是否仍然有效 (Zombie Check)
+         * 如果容器被销毁（Detached），则重启监听器
+         */
+        checkObserverStatus() {
+            // 如果监听器已停止，不需要检查
+            if (!this.sidebarObserverStop) return;
+
+            // 如果容器存在但已失去连接 (isConnected === false)，说明变成了僵尸监听器
+            if (this.observerContainer && !this.observerContainer.isConnected) {
+                console.log('Gemini Helper: Sidebar container detached. Restarting observer...');
+                this.stopSidebarObserver();
+                // 给予一点延迟等待新容器就绪
+                setTimeout(() => this.startSidebarObserver(), 500);
+            }
+        }
+
+        /**
+         * 轮询检测新会话
+         * 作为 MutationObserver 的补充机制
+         */
+        pollNewConversations() {
+            if (this.pollInterval) return; // 已在轮询
+
+            this.pollInterval = setInterval(() => {
+                if (!this.observerConfig) return;
+
+                const config = this.observerConfig;
+                const elements = DOMToolkit.query(config.selector, { all: true, shadow: config.shadow });
+
+                elements.forEach((el) => {
+                    const info = config.extractInfo(el);
+                    if (info?.id && !this.data.conversations[info.id]) {
+                        // 发现未记录的会话
+                        const folderId = this.data.lastUsedFolderId || 'inbox';
+                        this.data.conversations[info.id] = {
+                            id: info.id,
+                            siteId: this.siteAdapter.getSiteId(),
+                            cid: info.cid || null,
+                            title: info.title || 'New Conversation',
+                            url: info.url,
+                            folderId: folderId,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now(),
+                        };
+                        this.saveData();
+                        this.updateFolderCount(folderId);
+                        // 启动标题监听
+                        this.monitorConversationTitle(el, info.id);
+                    }
+                });
+            }, 3000);
+        }
+
+        /**
+         * 停止轮询
+         */
+        stopPolling() {
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+            }
+        }
+
+        /**
+         * 监听会话标题变化
+         * 使用共享的 watchMultiple 减少 Observer 数量
+         * @param {HTMLElement} el 会话元素
+         * @param {string} id 会话ID
+         */
+        monitorConversationTitle(el, id) {
+            // 防止重复监听
+            if (el.dataset.ghTitleObserver) return;
+            el.dataset.ghTitleObserver = 'true';
+
+            // 使用配置获取正确的标题元素
+            const titleEl = this.observerConfig?.getTitleElement?.(el) || el;
+
+            // 确保共享 watcher 已初始化
+            if (!this.titleWatcher) {
+                const container = this.siteAdapter.getSidebarScrollContainer() || document.body;
+                this.titleWatcher = DOMToolkit.watchMultiple(container, { debounce: 500 });
+            }
+
+            // 添加到共享监听器
+            this.titleWatcher.add(titleEl, () => {
+                // 每次回调时重新从元素提取 ID，确保 ID 匹配
+                const currentInfo = this.observerConfig?.extractInfo?.(el);
+                const currentId = currentInfo?.id;
+
+                if (!currentId || currentId !== id) {
+                    // ID 不匹配则跳过（防止元素被复用时错误更新）
+                    return;
+                }
+
+                const currentTitle = titleEl.textContent?.trim();
+                const stored = this.data.conversations[currentId];
+
+                if (currentTitle && stored && stored.title !== currentTitle) {
+                    console.log(`[Gemini Helper] Title changed for ${currentId}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
+
+                    // 更新本地数据的标题
+                    stored.title = currentTitle;
+                    stored.updatedAt = Date.now();
+                    this.saveData();
+
+                    // 刷新 UI (更新显示)
+                    this.createUI();
+                }
+            });
+        }
+
+        /**
+         * 停止侧边栏监听
+         */
+        stopSidebarObserver() {
+            if (this.sidebarObserverStop) {
+                this.sidebarObserverStop();
+                this.sidebarObserverStop = null;
+            }
+            // 清理容器引用
+            this.observerContainer = null;
+
+            // 清理共享的标题监听器
+            if (this.titleWatcher) {
+                this.titleWatcher.stop();
+                this.titleWatcher = null;
+            }
+            // 清理轮询
+            this.stopPolling();
+        }
+
+        /**
+         * 轻量级更新文件夹计数（不重建 UI）
+         * 同时刷新已展开文件夹的会话列表
+         */
+        updateFolderCount(folderId) {
+            const folderItem = this.container?.querySelector(`.conversations-folder-item[data-folder-id="${folderId}"]`);
+            if (folderItem) {
+                // 获取当前 CID（仅 Gemini Business 有效）
+                const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+                const count = Object.values(this.data.conversations).filter((c) => c.folderId === folderId && this.matchesCid(c, currentCid)).length;
+                const countSpan = folderItem.querySelector('.conversations-folder-count');
+                if (countSpan) countSpan.textContent = `(${count})`;
+
+                // 如果该文件夹已展开，同时刷新会话列表
+                if (folderItem.classList.contains('expanded')) {
+                    const conversationList = this.container?.querySelector(`.conversations-list[data-folder-id="${folderId}"]`);
+                    if (conversationList) {
+                        this.renderConversationList(folderId, conversationList);
+                    }
+                }
+            }
+        }
+
+        /**
+         * 激活会话 Tab 时调用
+         */
+        activate() {
+            this.isActive = true;
+            this.syncConversations(null, true); // 切换进来时静默同步一次
+            this.createUI();
+        }
+
+        /**
+         * 停用会话 Tab 时调用
+         */
+        deactivate() {
+            this.isActive = false;
+        }
+
+        /**
+         * 获取全局存储键
+         * 注意：文件夹和标签全局共用，会话通过 cid 字段区分不同团队
+         */
+        getStorageKey() {
+            return SETTING_KEYS.CONVERSATIONS;
+        }
+
+        /**
+         * 加载会话数据
+         */
+        loadData() {
+            const key = this.getStorageKey();
+            const saved = GM_getValue(key, null);
+            if (saved) {
+                this.data = { ...DEFAULT_CONVERSATION_DATA, ...saved };
+            } else {
+                this.data = JSON.parse(JSON.stringify(DEFAULT_CONVERSATION_DATA));
+            }
+        }
+
+        /**
+         * 保存会话数据
+         */
+        saveData() {
+            const key = this.getStorageKey();
+            GM_setValue(key, this.data);
+        }
+
+        /**
+         * 上移文件夹
+         * @param {string} folderId 文件夹 ID
+         */
+        moveFolderUp(folderId) {
+            const index = this.data.folders.findIndex((f) => f.id === folderId);
+            // index 0 是收件箱（固定），index 1 是第一个可移动的
+            if (index <= 1) return;
+            // 与上一个交换位置
+            [this.data.folders[index - 1], this.data.folders[index]] = [this.data.folders[index], this.data.folders[index - 1]];
+            this.saveData();
+            this.createUI();
+        }
+
+        /**
+         * 下移文件夹
+         * @param {string} folderId 文件夹 ID
+         */
+        moveFolderDown(folderId) {
+            const index = this.data.folders.findIndex((f) => f.id === folderId);
+            if (index <= 0 || index >= this.data.folders.length - 1) return;
+            // 与下一个交换位置
+            [this.data.folders[index], this.data.folders[index + 1]] = [this.data.folders[index + 1], this.data.folders[index]];
+            this.saveData();
+            this.createUI();
+        }
+
+        /**
+         * 创建文件夹
+         * @param {string} name 文件夹名称
+         * @param {string} icon 图标 emoji
+         * @returns {object} 新创建的文件夹
+         */
+        createFolder(name, icon = '📁') {
+            const folder = {
+                id: 'folder_' + Date.now(),
+                name: `${icon} ${name}`,
+                icon: icon,
+                isDefault: false,
+            };
+            this.data.folders.push(folder);
+            this.saveData();
+            return folder;
+        }
+
+        /**
+         * 重命名文件夹
+         * @param {string} folderId 文件夹 ID
+         * @param {string} newName 新名称
+         * @param {string} newIcon 新图标
+         */
+        renameFolder(folderId, newName, newIcon = null) {
+            const folder = this.data.folders.find((f) => f.id === folderId);
+            if (folder && !folder.isDefault) {
+                folder.name = newIcon ? `${newIcon} ${newName}` : newName;
+                if (newIcon) folder.icon = newIcon;
+                this.saveData();
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * 删除文件夹
+         * @param {string} folderId 文件夹 ID
+         * @returns {boolean} 是否删除成功
+         */
+        deleteFolder(folderId) {
+            const folder = this.data.folders.find((f) => f.id === folderId);
+            if (!folder || folder.isDefault) {
+                showToast(this.t('conversationsCannotDeleteDefault') || '无法删除默认文件夹');
+                return false;
+            }
+            // 将文件夹内的会话移到收件箱
+            Object.values(this.data.conversations).forEach((conv) => {
+                if (conv.folderId === folderId) {
+                    conv.folderId = 'inbox';
+                }
+            });
+            this.data.folders = this.data.folders.filter((f) => f.id !== folderId);
+            this.saveData();
+            return true;
+        }
+
+        /**
+         * 从侧边栏同步会话（增量）
+         * @param {string} targetFolderId 可选，指定目标文件夹
+         * @param {boolean} silent 是否静默同步（不显示 Toast）
+         * @param {boolean} checkForDeletions 是否检查并删除失效会话（仅全量同步时启用）
+         */
+        syncConversations(targetFolderId = null, silent = false, checkForDeletions = false) {
+            const sidebarItems = this.siteAdapter.getConversationList();
+
+            if (!sidebarItems || sidebarItems.length === 0) {
+                if (!silent) showToast(this.t('conversationsSyncEmpty') || '未找到会话');
+                return;
+            }
+
+            // 获取当前 CID（仅 Gemini Business 有效）
+            const currentCid = sidebarItems[0]?.cid || null;
+
+            // 检查是否有已保存的会话（初次同步判断）
+            // 注意：需要按当前 CID 过滤，避免其他团队的数据干扰判断
+            const existingConvCount = Object.values(this.data.conversations).filter((c) => this.matchesCid(c, currentCid)).length;
+            const isFirstSync = existingConvCount === 0;
+
+            // 初次同步且未指定目标文件夹：弹窗让用户选择
+            if (isFirstSync && !targetFolderId) {
+                if (!silent) {
+                    this.showFolderSelectDialog((selectedFolderId) => {
+                        this.syncConversations(selectedFolderId, false);
+                    });
+                }
+                return;
+            }
+
+            let newCount = 0;
+            let updatedCount = 0;
+            const now = Date.now();
+            const folderId = targetFolderId || this.data.lastUsedFolderId || 'inbox';
+
+            sidebarItems.forEach((item) => {
+                // Key 始终用 sessionId（cid 和 siteId 存储在对象属性中）
+                const storageKey = item.id;
+
+                const existing = this.data.conversations[storageKey];
+                if (existing) {
+                    // 更新已有会话的标题（可能被用户修改）
+                    if (existing.title !== item.title) {
+                        existing.title = item.title;
+                        existing.updatedAt = now;
+                        updatedCount++;
+                    }
+                    // 确保 siteId 和 cid 是最新的
+                    if (!existing.siteId) existing.siteId = this.siteAdapter.getSiteId();
+                    if (item.cid && !existing.cid) existing.cid = item.cid;
+                } else {
+                    // 新会话：添加到指定文件夹
+                    this.data.conversations[storageKey] = {
+                        id: item.id,
+                        siteId: this.siteAdapter.getSiteId(), // 记录所属站点
+                        cid: item.cid || null, // 记录所属团队（Gemini Business）
+                        title: item.title,
+                        url: item.url,
+                        folderId: folderId,
+                        createdAt: now,
+                        updatedAt: now,
+                    };
+                    newCount++;
+                }
+            });
+
+            // 记住用户选择
+            if (targetFolderId) {
+                this.data.lastUsedFolderId = targetFolderId;
+            }
+
+            // 有变更才保存和刷新
+            if (newCount > 0 || updatedCount > 0) {
+                this.saveData();
+                this.createUI();
+            }
+
+            // 检查已删除的会话（仅检查当前站点+CID 下的会话）
+            if (checkForDeletions) {
+                // 远程会话的 ID 集合
+                const remoteIds = new Set(sidebarItems.map((item) => item.id));
+
+                // 本地当前站点+CID 的会话 ID（通过对象属性过滤）
+                const localIdsForCurrentContext = Object.entries(this.data.conversations)
+                    .filter(([, conv]) => this.matchesCid(conv, currentCid))
+                    .map(([key]) => key);
+
+                // 找出本地有但远程没有的（当前站点+CID 范围内）
+                const missingIds = localIdsForCurrentContext.filter((id) => !remoteIds.has(id));
+
+                if (missingIds.length > 0) {
+                    const msg = (this.t('conversationsSyncDeleteMsg') || '检测到 {count} 个会话已在云端删除，是否同步删除本地记录？').replace('{count}', missingIds.length);
+                    this.showConfirmDialog(this.t('conversationsSyncDeleteTitle') || '同步删除', msg, () => {
+                        missingIds.forEach((id) => delete this.data.conversations[id]);
+                        this.saveData();
+                        this.createUI();
+                        showToast(`${this.t('conversationsDeleted') || '已移除'} ${missingIds.length}`);
+                    });
+                }
+            }
+
+            if (!silent) {
+                if (newCount > 0 || updatedCount > 0) {
+                    showToast(`${this.t('conversationsSynced') || '同步完成'}：+${newCount} ↻${updatedCount}`);
+                } else {
+                    showToast(this.t('conversationsSyncNoChange') || '无新会话');
+                }
+            }
+        }
+
+        /**
+         * 检查会话是否属于当前站点和团队
+         * @param {Object} conv 会话对象
+         * @param {string|null} currentCid 当前团队 ID (Gemini Business)
+         * @returns {boolean}
+         */
+        matchesCid(conv, currentCid) {
+            // 1. 首先检查站点匹配
+            const currentSiteId = this.siteAdapter.getSiteId();
+            // 如果会话有 siteId 且不匹配当前站点，排除
+            if (conv.siteId && conv.siteId !== currentSiteId) {
+                return false;
+            }
+
+            // 2. 检查 CID 匹配
+            // 如果当前无 CID（非 Gemini Business 或无团队），显示无 CID 的会话和旧数据
+            if (!currentCid) return !conv.cid;
+            // 如果会话没有 cid（旧数据），显示它
+            if (!conv.cid) return true;
+            // 否则严格匹配 CID
+            return conv.cid === currentCid;
+        }
+
+        /**
+         * 显示文件夹选择对话框
+         */
+        showFolderSelectDialog(onSelect) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, this.t('conversationsSelectFolder') || '选择同步目标文件夹'));
+
+            // 文件夹列表
+            const list = createElement('div', { className: 'conversations-folder-select-list' });
+            this.data.folders.forEach((folder) => {
+                const item = createElement(
+                    'div',
+                    {
+                        className: 'conversations-folder-select-item',
+                        'data-folder-id': folder.id,
+                    },
+                    `${folder.icon} ${folder.name}`,
+                );
+                item.addEventListener('click', () => {
+                    overlay.remove();
+                    onSelect(folder.id);
+                });
+                list.appendChild(item);
+            });
+            dialog.appendChild(list);
+
+            // 取消按钮
+            const btns = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            btns.appendChild(cancelBtn);
+            dialog.appendChild(btns);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+        }
+
+        /**
+         * 显示确认对话框
+         */
+        showConfirmDialog(title, message, onConfirm) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, title));
+
+            const msgDiv = createElement('div', { className: 'conversations-dialog-message' }, message);
+            dialog.appendChild(msgDiv);
+
+            // 按钮
+            const btns = createElement('div', { className: 'conversations-dialog-buttons' });
+
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            btns.appendChild(cancelBtn);
+
+            const confirmBtn = createElement('button', { className: 'conversations-dialog-btn confirm' }, this.t('confirm') || '确定');
+            confirmBtn.addEventListener('click', () => {
+                overlay.remove();
+                onConfirm();
+            });
+            btns.appendChild(confirmBtn);
+
+            dialog.appendChild(btns);
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+        }
+
+        /**
+         * 创建会话面板 UI
+         */
+        createUI() {
+            const container = this.container;
+            clearElement(container);
+
+            const content = createElement('div', { className: 'conversations-content' });
+
+            // 工具栏
+            const toolbar = createElement('div', { className: 'conversations-toolbar' });
+
+            // 1. 同步目标选择 (左侧)
+            const folderSelect = createElement('select', {
+                className: 'conversations-folder-select',
+                id: 'conversations-folder-select',
+                title: this.t('conversationsSelectFolder') || 'Select folder',
+            });
+            this.data.folders.forEach((folder) => {
+                // 截断过长的文件夹名称，避免下拉菜单溢出
+                const truncatedName = folder.name.length > 20 ? folder.name.slice(0, 20) + '...' : folder.name;
+                const option = createElement('option', { value: folder.id, title: folder.name }, truncatedName);
+                if (folder.id === (this.data.lastUsedFolderId || 'inbox')) {
+                    option.selected = true;
+                }
+                folderSelect.appendChild(option);
+            });
+            folderSelect.addEventListener('change', () => {
+                this.data.lastUsedFolderId = folderSelect.value;
+                this.saveData();
+            });
+            toolbar.appendChild(folderSelect);
+
+            // 定义局部 helper 创建 SVG
+            const createSVG = (pathData) => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('fill', 'currentColor');
+                svg.setAttribute('width', '18');
+                svg.setAttribute('height', '18');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', pathData);
+                svg.appendChild(path);
+                return svg;
+            };
+
+            const SYNC_PATH =
+                'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+            const HOURGLASS_PATH = 'M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z';
+            const CHECK_BOX_PATH = 'M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
+
+            // 2. 同步按钮 (紧跟下拉框)
+            const syncBtn = createElement('button', {
+                className: 'conversations-toolbar-btn sync',
+                id: 'conversations-sync-btn',
+                title: this.t('conversationsSync'),
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            syncBtn.appendChild(createSVG(SYNC_PATH));
+            syncBtn.addEventListener('click', async () => {
+                syncBtn.disabled = true;
+                clearElement(syncBtn);
+                syncBtn.appendChild(createSVG(HOURGLASS_PATH));
+
+                await this.siteAdapter.loadAllConversations();
+                this.syncConversations(folderSelect.value, false, true);
+
+                syncBtn.disabled = false;
+                clearElement(syncBtn);
+                syncBtn.appendChild(createSVG(SYNC_PATH));
+            });
+            toolbar.appendChild(syncBtn);
+
+            // 3. 新建文件夹按钮 (右侧，仅图标)
+            const addFolderBtn = createElement('button', {
+                className: 'conversations-toolbar-btn add-folder',
+                title: this.t('conversationsAddFolder') || 'New Folder',
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            addFolderBtn.appendChild(createSVG('M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z'));
+            addFolderBtn.addEventListener('click', () => this.showCreateFolderDialog());
+            toolbar.appendChild(addFolderBtn);
+
+            // 4. 批量模式按钮
+            const batchModeBtn = createElement('button', {
+                className: 'conversations-toolbar-btn batch-mode' + (this.batchMode ? ' active' : ''),
+                title: this.t('conversationsBatchMode') || '批量操作',
+                id: 'conversations-batch-mode-btn',
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            batchModeBtn.appendChild(createSVG(CHECK_BOX_PATH));
+            batchModeBtn.addEventListener('click', () => this.toggleBatchMode());
+            toolbar.appendChild(batchModeBtn);
+
+            content.appendChild(toolbar);
+
+            // 搜索栏
+            const searchBar = createElement('div', { className: 'conversations-search-bar' });
+            const searchWrapper = createElement('div', { className: 'conversations-search-wrapper' });
+
+            const searchInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-search-input',
+                id: 'conversations-search-input',
+                placeholder: this.t('conversationsSearchPlaceholder') || '搜索会话...',
+                value: this.searchQuery || '',
+            });
+
+            // 注入 placeholder 防选中样式
+            const placeholderStyle = document.createElement('style');
+            placeholderStyle.textContent = `
+                .conversations-search-input::-webkit-input-placeholder { user-select: none; }
+                .conversations-search-input::placeholder { user-select: none; }
+            `;
+            searchWrapper.appendChild(placeholderStyle);
+
+            // 搜索输入防抖处理
+            let searchTimeout = null;
+            searchInput.addEventListener('input', () => {
+                updateClearBtn();
+                if (searchTimeout) clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.handleSearch(searchInput.value.trim());
+                }, 150);
+            });
+
+            // Input Group (Input Only)
+            const inputGroup = createElement('div', { className: 'conversations-search-input-group' });
+            inputGroup.appendChild(searchInput);
+            searchWrapper.appendChild(inputGroup);
+
+            // 置顶筛选按钮
+            const pinFilterBtn = createElement(
+                'div',
+                {
+                    className: 'conversations-pin-filter-btn' + (this.filterPinned ? ' active' : ''),
+                    title: this.t('conversationsFilterPinned') || '筛选置顶',
+                    style: 'user-select: none;',
+                },
+                '📌',
+            );
+            pinFilterBtn.addEventListener('click', () => {
+                this.filterPinned = !this.filterPinned;
+                pinFilterBtn.classList.toggle('active', this.filterPinned);
+                this.handleSearch(this.searchQuery || '');
+                updateClearBtn();
+            });
+            searchWrapper.appendChild(pinFilterBtn);
+
+            // 标签筛选按钮
+            const isTagFiltering = this.filterTagIds && this.filterTagIds.size > 0;
+            const tagFilterBtn = createElement(
+                'div',
+                {
+                    className: 'conversations-tag-search-btn' + (this.data.tags && this.data.tags.length > 0 ? '' : ' empty') + (isTagFiltering ? ' active' : ''),
+                    title: this.t('conversationsFilterByTags') || '按标签筛选',
+                    style: 'user-select: none;',
+                },
+                '🏷️',
+            );
+
+            // ... tag filter event listener ...
+
+            tagFilterBtn.addEventListener('click', (e) => {
+                // ... existing implementation ...
+                e.stopPropagation();
+
+                const existingMenu = document.querySelector('.conversations-tag-filter-menu');
+                if (existingMenu) {
+                    existingMenu.remove();
+                    return;
+                }
+
+                const menu = createElement('div', { className: 'conversations-tag-filter-menu', 'data-trigger': 'search-filter' });
+                const list = createElement('div', { className: 'conversations-tag-filter-list' }); // Scrollable area
+
+                // 清除选项
+                if (this.filterTagIds && this.filterTagIds.size > 0) {
+                    const clearItem = createElement('div', { className: 'conversations-tag-filter-item' });
+                    clearItem.textContent = this.t('conversationsClearTags') || '清除筛选';
+                    clearItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.filterTagIds.clear();
+                        tagFilterBtn.classList.remove('active');
+                        menu.remove();
+                        this.handleSearch(this.searchQuery);
+                        updateClearBtn();
+                    });
+                    list.appendChild(clearItem);
+                }
+
+                if (this.data.tags) {
+                    this.data.tags.forEach((tag) => {
+                        const item = createElement('div', { className: 'conversations-tag-filter-item' });
+                        if (this.filterTagIds && this.filterTagIds.has(tag.id)) {
+                            item.classList.add('selected');
+                        }
+
+                        const dot = createElement('span', { className: 'conversations-tag-dot', style: `background-color: ${tag.color}` });
+                        item.appendChild(dot);
+
+                        // Tag Name Span
+                        const nameSpan = createElement('span');
+                        nameSpan.textContent = tag.name;
+                        item.appendChild(nameSpan);
+
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (!this.filterTagIds) this.filterTagIds = new Set();
+
+                            if (this.filterTagIds.has(tag.id)) {
+                                this.filterTagIds.delete(tag.id);
+                                item.classList.remove('selected');
+                            } else {
+                                this.filterTagIds.add(tag.id);
+                                item.classList.add('selected');
+                            }
+
+                            if (this.filterTagIds.size > 0) tagFilterBtn.classList.add('active');
+                            else tagFilterBtn.classList.remove('active');
+
+                            this.handleSearch(this.searchQuery);
+                            updateClearBtn();
+                        });
+                        list.appendChild(item);
+                    });
+                } else {
+                    const emptyItem = createElement('div', { className: 'conversations-tag-filter-item', style: 'color:#9ca3af; cursor:default;' });
+                    emptyItem.textContent = this.t('conversationsNoTags') || '暂无标签';
+                    list.appendChild(emptyItem);
+                }
+
+                menu.appendChild(list);
+
+                // Footer Area
+                const footer = createElement('div', { className: 'conversations-tag-filter-footer' });
+
+                const manageItem = createElement('div', { className: 'conversations-tag-filter-item conversations-tag-filter-action' });
+                manageItem.textContent = this.t('conversationsManageTags') || '管理标签';
+                manageItem.addEventListener('click', () => {
+                    menu.remove();
+                    this.showTagManagerDialog();
+                });
+                footer.appendChild(manageItem);
+                menu.appendChild(footer);
+
+                // IMPORTANT: Append to wrapper for relative positioning
+                searchWrapper.appendChild(menu);
+
+                // Click outside to close
+                const closeMenu = (e) => {
+                    if (!menu.contains(e.target) && e.target !== tagFilterBtn) {
+                        menu.remove();
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
+            });
+            searchWrapper.appendChild(tagFilterBtn);
+
+            // 清空按钮 (Global Clear) - Moved to far right
+            // Re-use clearBtn but change its element type/class logic
+            const clearBtn = createElement(
+                'div',
+                {
+                    className: 'conversations-search-clear', // Style updated in CSS
+                    id: 'conversations-search-clear',
+                    title: this.t('conversationsClearAll') || '清除所有筛选',
+                },
+                '×',
+            );
+
+            clearBtn.addEventListener('click', () => {
+                if (clearBtn.classList.contains('disabled')) return;
+                searchInput.value = '';
+                if (this.filterTagIds) this.filterTagIds.clear();
+                this.filterPinned = false;
+                tagFilterBtn.classList.remove('active');
+                pinFilterBtn.classList.remove('active');
+                this.handleSearch('');
+                updateClearBtn();
+            });
+            searchWrapper.appendChild(clearBtn);
+
+            // Update clear button visibility helper
+            const updateClearBtn = () => {
+                const hasText = searchInput.value.length > 0;
+                const hasTags = this.filterTagIds && this.filterTagIds.size > 0;
+                const hasPinFilter = this.filterPinned;
+                const hasFilter = hasText || hasTags || hasPinFilter;
+
+                // Always visible but disabled if no filter
+                clearBtn.classList.toggle('disabled', !hasFilter);
+            };
+            // Check initial state
+            updateClearBtn();
+
+            searchBar.appendChild(searchWrapper);
+
+            // 搜索结果计数条
+            const resultBar = createElement('div', {
+                className: 'conversations-result-bar',
+                id: 'conversations-result-bar',
+            });
+            if (this.searchQuery && this.searchResult) {
+                resultBar.textContent = `${this.searchResult.totalCount} ${this.t('conversationsSearchResult') || '个结果'}`;
+                resultBar.classList.add('visible');
+            }
+            searchBar.appendChild(resultBar);
+
+            content.appendChild(searchBar);
+
+            // 文件夹列表
+            const folderList = this.createFolderListUI();
+            content.appendChild(folderList);
+
+            // 底部批量操作栏（仅批量模式下显示）
+            if (this.batchMode) {
+                const batchBar = createElement('div', { className: 'conversations-batch-bar', id: 'conversations-batch-bar' });
+                // 根据选中数量决定是否显示
+                batchBar.style.display = this.selectedIds.size > 0 ? 'flex' : 'none';
+
+                const batchInfo = createElement(
+                    'span',
+                    { className: 'conversations-batch-info', id: 'conversations-batch-info' },
+                    (this.t('batchSelected') || '已选 {n} 个').replace('{n}', this.selectedIds.size),
+                );
+                batchBar.appendChild(batchInfo);
+
+                const batchBtns = createElement('div', { className: 'conversations-batch-btns' });
+
+                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📂 ' + (this.t('batchMove') || '移动'));
+                batchMoveBtn.addEventListener('click', () => this.batchMove());
+                batchBtns.appendChild(batchMoveBtn);
+
+                const batchDeleteBtn = createElement('button', { className: 'conversations-batch-btn danger' }, '🗑️ ' + (this.t('batchDelete') || '删除'));
+                batchDeleteBtn.addEventListener('click', () => this.batchDelete());
+                batchBtns.appendChild(batchDeleteBtn);
+
+                const batchCancelBtn = createElement('button', { className: 'conversations-batch-btn cancel' }, this.t('batchExit') || '退出');
+                batchCancelBtn.addEventListener('click', () => this.clearSelection());
+                batchBtns.appendChild(batchCancelBtn);
+
+                batchBar.appendChild(batchBtns);
+                content.appendChild(batchBar);
+            }
+
+            container.appendChild(content);
+        }
+
+        /**
+         * 创建文件夹列表 UI
+         */
+        createFolderListUI() {
+            const container = createElement('div', { className: 'conversations-folder-list' });
+
+            if (!this.data || !this.data.folders || this.data.folders.length === 0) {
+                const empty = createElement('div', { className: 'conversations-empty' }, this.t('conversationsEmpty'));
+                container.appendChild(empty);
+                return container;
+            }
+
+            // 搜索模式下的过滤逻辑
+            const isSearching = !!this.searchResult;
+            const { folderMatches, conversationMatches, conversationFolderMap } = this.searchResult || {};
+
+            // 计算搜索时哪些文件夹有匹配的会话（需要展开父级）
+            const foldersWithMatchedConversations = new Set();
+            if (isSearching && conversationFolderMap) {
+                conversationFolderMap.forEach((folderId) => {
+                    foldersWithMatchedConversations.add(folderId);
+                });
+            }
+
+            let hasVisibleItems = false;
+
+            this.data.folders.forEach((folder, index) => {
+                // 搜索过滤：判断文件夹是否应该显示
+                if (isSearching) {
+                    const folderDirectMatch = folderMatches?.has(folder.id);
+                    const hasMatchedChildren = foldersWithMatchedConversations.has(folder.id);
+                    if (!folderDirectMatch && !hasMatchedChildren) {
+                        return; // 跳过不匹配的文件夹
+                    }
+                }
+
+                hasVisibleItems = true;
+
+                // 文件夹项
+                const folderItem = this.createFolderItem(folder, index);
+                container.appendChild(folderItem);
+
+                // 搜索时：如果有匹配的会话则自动展开，否则只显示文件夹
+                const hasMatchedConvs = isSearching && foldersWithMatchedConversations.has(folder.id);
+                const shouldExpand = isSearching ? hasMatchedConvs : this.expandedFolderId === folder.id;
+
+                // 会话列表容器
+                const conversationList = createElement('div', {
+                    className: 'conversations-list',
+                    'data-folder-id': folder.id,
+                    style: shouldExpand ? 'display: block;' : 'display: none;',
+                });
+                container.appendChild(conversationList);
+
+                // 如果需要展开，渲染会话列表
+                if (shouldExpand) {
+                    folderItem.classList.add('expanded');
+                    this.renderConversationList(folder.id, conversationList);
+                }
+
+                // 绑定展开逻辑（非搜索模式下或搜索结果中点击可切换）
+                folderItem.addEventListener('click', (e) => {
+                    if (e.target.closest('button')) return; // 避免点击按钮触发
+
+                    // 折叠其他文件夹，并更新记忆
+                    container.querySelectorAll('.conversations-folder-item.expanded').forEach((el) => {
+                        if (el !== folderItem) {
+                            el.classList.remove('expanded');
+                            const otherList = container.querySelector(`.conversations-list[data-folder-id="${el.dataset.folderId}"]`);
+                            if (otherList) otherList.style.display = 'none';
+                        }
+                    });
+
+                    const isExpanded = folderItem.classList.toggle('expanded');
+                    // 记忆展开状态
+                    this.expandedFolderId = isExpanded ? folder.id : null;
+
+                    if (isExpanded) {
+                        // 刷新计数（确保与实际会话数一致，按站点+CID 过滤）
+                        const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+                        const count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, currentCid)).length;
+                        const countSpan = folderItem.querySelector('.conversations-folder-count');
+                        if (countSpan) countSpan.textContent = `(${count})`;
+
+                        this.renderConversationList(folder.id, conversationList);
+                        conversationList.style.display = 'block';
+                    } else {
+                        conversationList.style.display = 'none';
+                    }
+                });
+            });
+
+            // 搜索无结果显示
+            if (isSearching && !hasVisibleItems) {
+                const noResult = createElement('div', { className: 'conversations-empty' }, this.t('conversationsNoSearchResult') || '未找到匹配结果');
+                container.appendChild(noResult);
+            }
+
+            return container;
+        }
+
+        /**
+         * 创建单个文件夹项
+         * @param {number} index 文件夹在数组中的索引
+         */
+        createFolderItem(folder, index) {
+            // 为非默认文件夹生成柔和的背景色（较淡）
+            const bgColors = ['#fef9e7', '#fdf2f8', '#eff6ff', '#ecfdf5', '#faf5ff', '#fefce8', '#ecfeff', '#fdf4ff'];
+            const bgColor = folder.isDefault ? '#f0f9ff' : bgColors[index % bgColors.length];
+
+            const item = createElement('div', {
+                className: 'conversations-folder-item' + (folder.isDefault ? ' default' : ''),
+                'data-folder-id': folder.id,
+                style: `background: ${bgColor};`,
+            });
+
+            // 文件夹信息（图标 + 名称）
+            const folderName = folder.name.replace(folder.icon, '').trim();
+            const info = createElement('div', { className: 'conversations-folder-info' });
+
+            // 全选复选框（仅批量模式下显示）
+            if (this.batchMode) {
+                // 获取当前 CID（仅 Gemini Business 有效）
+                const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+                // 搜索模式下只处理匹配的会话（同时按 CID 过滤）
+                let conversationsInFolder = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, currentCid));
+                if (this.searchResult) {
+                    conversationsInFolder = conversationsInFolder.filter((c) => this.searchResult.conversationMatches?.has(c.id));
+                }
+
+                const allSelected = conversationsInFolder.length > 0 && conversationsInFolder.every((c) => this.selectedIds.has(c.id));
+                const someSelected = !allSelected && conversationsInFolder.some((c) => this.selectedIds.has(c.id));
+
+                const checkbox = createElement('input', {
+                    type: 'checkbox',
+                    className: 'conversations-folder-checkbox',
+                });
+                checkbox.checked = allSelected;
+                if (someSelected) checkbox.indeterminate = true;
+
+                checkbox.addEventListener('click', (e) => e.stopPropagation());
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        // 全选（仅匹配项）
+                        conversationsInFolder.forEach((c) => this.selectedIds.add(c.id));
+                    } else {
+                        // 全不选（仅匹配项）
+                        conversationsInFolder.forEach((c) => this.selectedIds.delete(c.id));
+                    }
+                    this.createUI(); // 使用 createUI 重绘以更新状态
+                });
+                info.appendChild(checkbox);
+            }
+
+            info.appendChild(createElement('span', { className: 'conversations-folder-icon', style: 'user-select: none;' }, folder.icon));
+
+            // 文件夹名称（支持搜索高亮）
+            const nameSpan = createElement('span', {
+                className: 'conversations-folder-name',
+                title: folderName,
+            });
+            if (this.searchQuery && this.searchResult?.folderMatches?.has(folder.id)) {
+                nameSpan.appendChild(this.highlightText(folderName, this.searchQuery));
+            } else {
+                nameSpan.textContent = folderName;
+            }
+            info.appendChild(nameSpan);
+
+            // 上下排序按钮（悬浮时在名称区域右侧显示，不占空间）
+            if (!folder.isDefault) {
+                const orderBtns = createElement('div', { className: 'conversations-folder-order-btns', style: 'user-select: none;' });
+
+                const upBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-folder-order-btn',
+                        title: this.t('moveUp') || '上移',
+                    },
+                    '↑',
+                );
+                if (index <= 1) upBtn.disabled = true;
+                upBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!upBtn.disabled) this.moveFolderUp(folder.id);
+                });
+
+                const downBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-folder-order-btn',
+                        title: this.t('moveDown') || '下移',
+                    },
+                    '↓',
+                );
+                if (index >= this.data.folders.length - 1) downBtn.disabled = true;
+                downBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!downBtn.disabled) this.moveFolderDown(folder.id);
+                });
+
+                orderBtns.appendChild(upBtn);
+                orderBtns.appendChild(downBtn);
+                info.appendChild(orderBtns);
+            }
+
+            item.appendChild(info);
+
+            // 右侧控制区域（计数 + 菜单按钮）
+            const controls = createElement('div', { className: 'conversations-folder-controls' });
+
+            // 获取当前 CID（仅 Gemini Business 有效）- 复用上面的变量或重新获取
+            const cidForCount = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+            // 会话计数（搜索模式下显示匹配数量，同时按 CID 过滤）
+            let count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, cidForCount)).length;
+            if (this.searchResult) {
+                count = Object.values(this.data.conversations).filter((c) => c.folderId === folder.id && this.matchesCid(c, cidForCount) && this.searchResult.conversationMatches?.has(c.id)).length;
+            }
+            controls.appendChild(createElement('span', { className: 'conversations-folder-count' }, `(${count})`));
+
+            // 操作菜单按钮（始终渲染以保持对齐，默认文件夹隐藏）
+            const menuBtn = createElement('button', { className: 'conversations-folder-menu-btn', style: 'user-select: none;' }, '⋯');
+            if (folder.isDefault) {
+                menuBtn.style.visibility = 'hidden';
+                menuBtn.style.pointerEvents = 'none'; // 避免阻挡点击
+            } else {
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showFolderMenu(folder, menuBtn);
+                });
+            }
+            controls.appendChild(menuBtn);
+
+            item.appendChild(controls);
+
+            return item;
+        }
+
+        /**
+         * 获取侧边栏会话顺序
+         * @returns {Array<string>} 会话 ID 数组，按侧边栏 DOM 顺序排列
+         */
+        getSidebarConversationOrder() {
+            const config = this.siteAdapter.getConversationObserverConfig?.();
+            if (!config) return [];
+
+            const elements = DOMToolkit.query(config.selector, { all: true, shadow: config.shadow });
+            return Array.from(elements)
+                .map((el) => config.extractInfo?.(el)?.id)
+                .filter(Boolean);
+        }
+
+        /**
+         * 渲染文件夹下的会话列表
+         */
+        renderConversationList(folderId, container) {
+            clearElement(container);
+
+            // 获取当前 CID（仅 Gemini Business 有效）
+            const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+
+            // 获取该文件夹下的会话（按 CID 过滤）
+            let conversations = Object.values(this.data.conversations).filter((c) => c.folderId === folderId && this.matchesCid(c, currentCid));
+
+            // 搜索模式下过滤不匹配的会话
+            const isSearching = !!this.searchResult;
+            if (isSearching) {
+                const { conversationMatches } = this.searchResult;
+                conversations = conversations.filter((c) => conversationMatches?.has(c.id));
+            }
+
+            if (conversations.length === 0) {
+                const empty = createElement('div', { className: 'conversations-list-empty' }, this.t('conversationsEmpty') || '暂无会话');
+                container.appendChild(empty);
+                return;
+            }
+
+            // 获取侧边栏顺序
+            const sidebarOrder = this.getSidebarConversationOrder();
+
+            // 排序：置顶优先，其余按侧边栏顺序
+            conversations.sort((a, b) => {
+                // 置顶优先
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+
+                // 按侧边栏顺序
+                const indexA = sidebarOrder.indexOf(a.id);
+                const indexB = sidebarOrder.indexOf(b.id);
+                // 不在侧边栏的放到最后
+                if (indexA === -1 && indexB === -1) return (b.updatedAt || 0) - (a.updatedAt || 0);
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            });
+
+            conversations.forEach((conv) => {
+                const item = this.createConversationItem(conv);
+                container.appendChild(item);
+            });
+        }
+
+        /**
+         * 创建单个会话项
+         */
+        createConversationItem(conv) {
+            const item = createElement('div', { className: 'conversations-item', 'data-id': conv.id });
+            // New Layout: Flex Column
+            // Row 1: Content (Title + Checkbox) ----- Actions (Time + Menu)
+            // Row 2: Tags
+
+            // Container for Row 1
+
+            // Checkbox
+            if (this.batchMode) {
+                const checkbox = createElement('input', {
+                    type: 'checkbox',
+                    className: 'conversations-item-checkbox',
+                });
+                checkbox.checked = this.selectedIds.has(conv.id);
+                checkbox.addEventListener('click', (e) => e.stopPropagation());
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) this.selectedIds.add(conv.id);
+                    else this.selectedIds.delete(conv.id);
+                    this.updateBatchActionBar();
+                });
+                item.appendChild(checkbox);
+            }
+
+            // Title
+            const title = createElement('span', {
+                className: 'conversations-item-title',
+                title: conv.title,
+                style: 'user-select: none;',
+            });
+            // 置顶标识
+            const displayTitle = conv.pinned ? `📌 ${conv.title || '无标题'}` : conv.title || '无标题';
+            if (this.searchQuery && this.searchResult?.conversationMatches?.has(conv.id)) {
+                if (conv.pinned) title.appendChild(document.createTextNode('📌 '));
+                title.appendChild(this.highlightText(conv.title || '无标题', this.searchQuery));
+            } else {
+                title.textContent = displayTitle;
+            }
+            title.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this.batchMode) {
+                    const checkbox = item.querySelector('.conversations-item-checkbox');
+                    if (checkbox) {
+                        checkbox.click();
+                    }
+                    return;
+                }
+                // 尝试在侧边栏中查找并点击（支持 Shadow DOM 穿透）
+                // 方法1: 通过 jslog 属性查找（Gemini 标准版）
+                let sidebarItem = DOMToolkit.query(`.conversation[jslog*="${conv.id}"]`, { shadow: true });
+                // 方法2: 遍历所有会话元素，通过菜单按钮 ID 匹配（Gemini Business）
+                // 注意：closest() 在 Shadow DOM 中可能失效，所以需要遍历
+                if (!sidebarItem) {
+                    const conversations = DOMToolkit.query('.conversation', { all: true, shadow: true });
+                    for (const convEl of conversations) {
+                        const menuBtn = convEl.querySelector(`#menu-${conv.id}`) || convEl.querySelector(`.conversation-action-menu-button[id="menu-${conv.id}"]`);
+                        if (menuBtn) {
+                            sidebarItem = convEl;
+                            break;
+                        }
+                    }
+                }
+                if (sidebarItem) {
+                    const btn = sidebarItem.querySelector('button.list-item') || sidebarItem.querySelector('button');
+                    if (btn) btn.click();
+                    else sidebarItem.click();
+                } else if (conv.url) {
+                    window.location.href = conv.url;
+                }
+            });
+            item.appendChild(title);
+
+            // Tags (Insert after title)
+            if (conv.tagIds && conv.tagIds.length > 0 && this.data.tags) {
+                const tagList = createElement('div', { className: 'conversations-tag-list', style: 'user-select: none;' });
+                conv.tagIds.forEach((tagId) => {
+                    const tagDef = this.data.tags.find((t) => t.id === tagId);
+                    if (tagDef) {
+                        const tagEl = createElement(
+                            'span',
+                            {
+                                className: 'conversations-tag',
+                                style: `background-color: ${tagDef.color || '#9ca3af'}`,
+                            },
+                            tagDef.name,
+                        );
+                        tagList.appendChild(tagEl);
+                    }
+                });
+                if (tagList.children.length > 0) {
+                    item.appendChild(tagList);
+                }
+            }
+
+            // Right side of Top Row: Time + Menu
+            const metaContainer = createElement('div', { className: 'conversations-item-meta' });
+
+            const time = createElement('span', { className: 'conversations-item-time' }, this.formatTime(conv.updatedAt));
+            metaContainer.appendChild(time);
+
+            const menuBtn = createElement('button', { className: 'conversations-item-menu-btn', style: 'user-select: none;' }, '⋯');
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showConversationMenu(conv, menuBtn);
+            });
+            metaContainer.appendChild(menuBtn);
+            item.appendChild(metaContainer);
+
+            return item;
+        }
+
+        /**
+         * 显示会话操作菜单
+         */
+        showConversationMenu(conv, anchorEl) {
+            // 移除已有菜单
+            document.querySelectorAll('.conversations-item-menu').forEach((m) => m.remove());
+
+            const menu = createElement('div', { className: 'conversations-item-menu' });
+
+            // 重命名
+            const renameBtn = createElement('button', {}, this.t('conversationsRename') || '重命名');
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.showRenameConversationDialog(conv);
+            });
+            menu.appendChild(renameBtn);
+
+            // 置顶/取消置顶
+            const pinText = conv.pinned ? this.t('conversationsUnpin') || '取消置顶' : this.t('conversationsPin') || '📌 置顶';
+            const pinBtn = createElement('button', {}, pinText);
+            pinBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.toggleConversationPin(conv);
+            });
+            menu.appendChild(pinBtn);
+
+            // 设置标签
+            const tagBtn = createElement('button', {}, this.t('conversationsSetTags') || '设置标签');
+            tagBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.showTagManagerDialog(conv);
+            });
+            menu.appendChild(tagBtn);
+
+            // 移动到...
+            const moveBtn = createElement('button', {}, this.t('conversationsMoveTo') || '移动到...');
+            moveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.showMoveToFolderDialog(conv);
+            });
+            menu.appendChild(moveBtn);
+
+            // 删除
+            const deleteBtn = createElement('button', { className: 'danger' }, this.t('conversationsDelete') || '删除');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.confirmDeleteConversation(conv);
+            });
+            menu.appendChild(deleteBtn);
+
+            // 定位菜单
+            const rect = anchorEl.getBoundingClientRect();
+            menu.style.position = 'fixed';
+            menu.style.top = `${rect.bottom + 4}px`;
+            menu.style.right = `${window.innerWidth - rect.right}px`;
+
+            document.body.appendChild(menu);
+
+            // 点击外部关闭
+            const closeHandler = (e) => {
+                if (!menu.contains(e.target) && e.target !== anchorEl) {
+                    menu.remove();
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+
+        /**
+         * 切换会话置顶状态
+         */
+        toggleConversationPin(conv) {
+            const stored = this.data.conversations[conv.id];
+            if (!stored) return;
+
+            stored.pinned = !stored.pinned;
+            stored.updatedAt = Date.now();
+            this.saveData();
+
+            // 刷新 UI
+            this.createUI();
+
+            // 显示提示
+            const message = stored.pinned ? this.t('conversationsPinned') || '已置顶' : this.t('conversationsUnpinned') || '已取消置顶';
+            showToast(message);
+        }
+
+        /**
+         * 显示重命名会话对话框
+         */
+        showRenameConversationDialog(conv) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+
+            // 标题
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, this.t('conversationsRename') || '重命名'));
+
+            // 输入框区域
+            const inputSection = createElement('div', { className: 'conversations-dialog-section' });
+            inputSection.appendChild(createElement('label', {}, this.t('conversationsFolderName') || '名称'));
+            const nameInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                value: conv.title || '',
+                placeholder: this.t('conversationsFolderNamePlaceholder') || '输入会话标题',
+            });
+            inputSection.appendChild(nameInput);
+            dialog.appendChild(inputSection);
+
+            // 按钮
+            const buttons = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+
+            const confirmBtn = createElement('button', { className: 'conversations-dialog-btn confirm' }, this.t('confirm') || '确定');
+            confirmBtn.addEventListener('click', () => {
+                const newTitle = nameInput.value.trim();
+                if (newTitle && newTitle !== conv.title) {
+                    this.renameConversation(conv.id, newTitle);
+                }
+                overlay.remove();
+            });
+
+            buttons.appendChild(cancelBtn);
+            buttons.appendChild(confirmBtn);
+            dialog.appendChild(buttons);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            // 聚焦并全选
+            nameInput.focus();
+            nameInput.select();
+
+            // ESC 关闭
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') overlay.remove();
+                if (e.key === 'Enter') confirmBtn.click();
+            });
+        }
+
+        /**
+         * 重命名会话
+         */
+        renameConversation(convId, newTitle) {
+            const conv = this.data.conversations[convId];
+            if (!conv) return;
+
+            const oldTitle = conv.title;
+            conv.title = newTitle;
+            conv.updatedAt = Date.now();
+            this.saveData();
+            this.createUI();
+            showToast(this.t('conversationsFolderRenamed') || '已重命名');
+
+            // 根据设置决定是否同步云端
+            if (this.settings?.conversations?.syncRenameToCloud) {
+                this.syncRenameToCloud(convId, newTitle, oldTitle);
+            }
+        }
+
+        /**
+         * 同步重命名到云端（侧边栏）
+         */
+        syncRenameToCloud(convId, newTitle, oldTitle) {
+            // 尝试在侧边栏找到对应会话并触发重命名
+            const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${convId}"]`);
+            if (sidebarItem) {
+                // 尝试模拟右键菜单或编辑操作
+                // 由于侧边栏结构复杂，这里暂时只打印提示
+                console.log(`[ConversationManager] 云端同步重命名：${oldTitle} -> ${newTitle}`);
+                // TODO: 实现实际的侧边栏重命名操作
+            }
+        }
+
+        /**
+         * 确认删除会话
+         */
+        confirmDeleteConversation(conv) {
+            this.showConfirmDialog(this.t('conversationsDelete') || '删除', `确定删除会话 "${conv.title}" 吗？`, () => this.deleteConversation(conv.id));
+        }
+
+        /**
+         * 删除会话
+         */
+        deleteConversation(convId) {
+            const conv = this.data.conversations[convId];
+            if (!conv) return;
+
+            delete this.data.conversations[convId];
+            this.saveData();
+            this.createUI();
+            showToast(this.t('conversationsDeleted') || '已删除');
+
+            // 根据设置决定是否同步云端删除
+            if (this.settings?.conversations?.syncDeleteToCloud) {
+                this.syncDeleteToCloud(convId);
+            }
+        }
+
+        /**
+         * 同步删除到云端（侧边栏）
+         */
+        syncDeleteToCloud(convId) {
+            // 尝试在侧边栏找到对应会话并触发删除
+            const sidebarItem = DOMToolkit.query(`.conversation[jslog*="${convId}"]`);
+            if (sidebarItem) {
+                console.log(`[ConversationManager] 云端同步删除会话：${convId}`);
+                // TODO: 实现实际的侧边栏删除操作
+            }
+        }
+
+        /**
+         * 更新底部批量操作栏状态
+         */
+        updateBatchActionBar() {
+            const batchBar = document.getElementById('conversations-batch-bar');
+            const batchInfo = document.getElementById('conversations-batch-info');
+            if (!batchBar || !batchInfo) return;
+
+            const count = this.selectedIds.size;
+            if (count > 0) {
+                batchBar.style.display = 'flex';
+                batchInfo.textContent = (this.t('batchSelected') || '已选 {n} 个').replace('{n}', count);
+            } else {
+                batchBar.style.display = 'none';
+            }
+        }
+
+        /**
+         * 切换批量模式
+         */
+        toggleBatchMode() {
+            this.batchMode = !this.batchMode;
+            if (!this.batchMode) {
+                this.selectedIds.clear();
+            }
+            this.createUI();
+            // 恢复之前展开的文件夹
+            if (this.expandedFolderId) {
+                const folderHeader = this.container.querySelector(`.conversations-folder-header[data-folder-id="${this.expandedFolderId}"]`);
+                if (folderHeader) folderHeader.click();
+            }
+        }
+
+        /**
+         * 清除选中状态并退出批量模式
+         */
+        clearSelection() {
+            this.selectedIds.clear();
+            this.batchMode = false;
+            this.createUI();
+            // 恢复之前展开的文件夹
+            if (this.expandedFolderId) {
+                const folderHeader = this.container.querySelector(`.conversations-folder-header[data-folder-id="${this.expandedFolderId}"]`);
+                if (folderHeader) folderHeader.click();
+            }
+        }
+
+        /**
+         * 批量移动会话
+         */
+        batchMove() {
+            if (this.selectedIds.size === 0) return;
+
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, `移动 ${this.selectedIds.size} 个会话到...`));
+
+            // 搜索框 + 新建文件夹按钮
+            const searchRow = createElement('div', {
+                style: 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;',
+            });
+            const searchInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-search',
+                placeholder: '搜索文件夹...',
+                style: 'flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; font-size: 13px;',
+            });
+            const addFolderBtn = createElement('button', {
+                className: 'conversations-dialog-add-folder-btn',
+                title: this.t('conversationsAddFolder') || '新建文件夹',
+                style: 'width: 36px; height: 36px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;',
+            });
+            const addSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            addSvg.setAttribute('viewBox', '0 0 24 24');
+            addSvg.setAttribute('fill', '#6b7280');
+            addSvg.setAttribute('width', '18');
+            addSvg.setAttribute('height', '18');
+            const addPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            addPath.setAttribute('d', 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z');
+            addSvg.appendChild(addPath);
+            addFolderBtn.appendChild(addSvg);
+            addFolderBtn.addEventListener('click', () => {
+                overlay.remove();
+                this.showCreateFolderDialog();
+            });
+            searchRow.appendChild(searchInput);
+            searchRow.appendChild(addFolderBtn);
+            dialog.appendChild(searchRow);
+
+            // 文件夹列表容器
+            const list = createElement('div', { className: 'conversations-folder-select-list' });
+
+            // 渲染列表函数
+            const renderList = (filter = '') => {
+                clearElement(list);
+                this.data.folders.forEach((folder) => {
+                    const folderName = folder.name.replace(folder.icon, '').trim();
+                    if (filter && !folderName.toLowerCase().includes(filter.toLowerCase())) return;
+
+                    const item = createElement('div', { className: 'conversations-folder-select-item' }, `${folder.icon} ${folderName}`);
+                    item.addEventListener('click', () => {
+                        // 批量移动
+                        this.selectedIds.forEach((convId) => {
+                            if (this.data.conversations[convId]) {
+                                this.data.conversations[convId].folderId = folder.id;
+                                this.data.conversations[convId].updatedAt = Date.now();
+                            }
+                        });
+                        this.saveData();
+                        overlay.remove();
+                        showToast(`已移动 ${this.selectedIds.size} 个会话到 ${folder.name}`);
+                        this.clearSelection();
+                        this.createUI();
+                    });
+                    list.appendChild(item);
+                });
+            };
+
+            // 初始渲染
+            renderList();
+
+            // 搜索事件
+            searchInput.addEventListener('input', (e) => {
+                renderList(e.target.value);
+            });
+
+            dialog.appendChild(list);
+
+            // 取消按钮
+            const btns = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            btns.appendChild(cancelBtn);
+            dialog.appendChild(btns);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            searchInput.focus();
+        }
+
+        /**
+         * 批量删除会话
+         */
+        batchDelete() {
+            if (this.selectedIds.size === 0) return;
+
+            this.showConfirmDialog('批量删除', `确定删除选中的 ${this.selectedIds.size} 个会话吗？`, () => {
+                const count = this.selectedIds.size;
+                this.selectedIds.forEach((convId) => {
+                    delete this.data.conversations[convId];
+                });
+                this.saveData();
+                showToast(`已删除 ${count} 个会话`);
+                this.clearSelection();
+                this.createUI();
+            });
+        }
+
+        /**
+         * 创建标签
+         * @param {string} name 标签名称
+         * @param {string} color 标签颜色
+         */
+        createTag(name, color) {
+            if (!this.data.tags) this.data.tags = [];
+
+            // Check duplicate
+            const exists = this.data.tags.some((t) => t.name.toLowerCase() === name.toLowerCase());
+            if (exists) {
+                showToast(this.t('conversationsTagExists') || '标签名称已存在');
+                return null;
+            }
+
+            const tag = {
+                id: 'tag_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                name,
+                color,
+            };
+            this.data.tags.push(tag);
+            this.saveData();
+            return tag;
+        }
+
+        /**
+         * 更新标签
+         * @param {string} tagId 标签ID
+         * @param {string} name 标签名称
+         * @param {string} color 标签颜色
+         */
+        updateTag(tagId, name, color) {
+            if (!this.data.tags) return null;
+
+            // Check duplicate (exclude self)
+            const exists = this.data.tags.some((t) => t.id !== tagId && t.name.toLowerCase() === name.toLowerCase());
+            if (exists) {
+                showToast(this.t('conversationsTagExists') || '标签名称已存在');
+                return null;
+            }
+
+            const tag = this.data.tags.find((t) => t.id === tagId);
+            if (tag) {
+                tag.name = name;
+                tag.color = color;
+                this.saveData();
+            }
+            return tag;
+        }
+
+        /**
+         * 删除标签
+         * @param {string} tagId 标签ID
+         */
+        deleteTag(tagId) {
+            if (!this.data.tags) return;
+            // 1. 删除标签定义
+            this.data.tags = this.data.tags.filter((t) => t.id !== tagId);
+
+            // 2. 从所有会话中移除该标签引用
+            Object.values(this.data.conversations).forEach((conv) => {
+                if (conv.tagIds) {
+                    conv.tagIds = conv.tagIds.filter((id) => id !== tagId);
+                    if (conv.tagIds.length === 0) delete conv.tagIds;
+                }
+            });
+
+            this.saveData();
+        }
+
+        /**
+         * 设置会话标签
+         * @param {string} convId 会话ID
+         * @param {Array<string>} tagIds 标签ID数组
+         */
+        setConversationTags(convId, tagIds) {
+            if (this.data.conversations[convId]) {
+                if (tagIds && tagIds.length > 0) {
+                    this.data.conversations[convId].tagIds = tagIds;
+                } else {
+                    delete this.data.conversations[convId].tagIds;
+                }
+                this.saveData();
+            }
+        }
+
+        /**
+         * 显示移动到文件夹对话框
+         */
+        showMoveToFolderDialog(conv) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, this.t('conversationsMoveTo') || '移动到...'));
+
+            // 搜索框 + 新建文件夹按钮
+            const searchRow = createElement('div', {
+                style: 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;',
+            });
+            const searchInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-search',
+                placeholder: '搜索文件夹...',
+                style: 'flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; font-size: 13px;',
+            });
+            const addFolderBtn = createElement('button', {
+                className: 'conversations-dialog-add-folder-btn',
+                title: this.t('conversationsAddFolder') || '新建文件夹',
+                style: 'width: 36px; height: 36px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;',
+            });
+            const addSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            addSvg.setAttribute('viewBox', '0 0 24 24');
+            addSvg.setAttribute('fill', '#6b7280');
+            addSvg.setAttribute('width', '18');
+            addSvg.setAttribute('height', '18');
+            const addPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            addPath.setAttribute('d', 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z');
+            addSvg.appendChild(addPath);
+            addFolderBtn.appendChild(addSvg);
+            addFolderBtn.addEventListener('click', () => {
+                overlay.remove();
+                this.showCreateFolderDialog();
+            });
+            searchRow.appendChild(searchInput);
+            searchRow.appendChild(addFolderBtn);
+            dialog.appendChild(searchRow);
+
+            // 文件夹列表
+            const list = createElement('div', { className: 'conversations-folder-select-list' });
+
+            // 渲染列表函数
+            const renderList = (filter = '') => {
+                clearElement(list);
+                this.data.folders.forEach((folder) => {
+                    // 排除当前所在文件夹
+                    if (folder.id === conv.folderId) return;
+
+                    const folderName = folder.name.replace(folder.icon, '').trim();
+                    if (filter && !folderName.toLowerCase().includes(filter.toLowerCase())) return;
+
+                    const item = createElement(
+                        'div',
+                        {
+                            className: 'conversations-folder-select-item',
+                            'data-folder-id': folder.id,
+                        },
+                        `${folder.icon} ${folderName}`,
+                    );
+                    item.addEventListener('click', () => {
+                        // 移动会话
+                        this.data.conversations[conv.id].folderId = folder.id;
+                        this.data.conversations[conv.id].updatedAt = Date.now();
+                        this.saveData();
+                        this.createUI();
+                        overlay.remove();
+                        showToast((this.t('conversationsMoved') || '已移动到') + ` ${folder.name}`);
+                    });
+                    list.appendChild(item);
+                });
+            };
+
+            // 初始渲染
+            renderList();
+
+            // 搜索事件
+            searchInput.addEventListener('input', (e) => {
+                renderList(e.target.value);
+            });
+
+            dialog.appendChild(list);
+
+            // 取消按钮
+            const btns = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            btns.appendChild(cancelBtn);
+            dialog.appendChild(btns);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            searchInput.focus();
+        }
+
+        /**
+         * 格式化时间显示
+         */
+        formatTime(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            if (diff < 60000) return this.t('justNow') || '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + (this.t('minutesAgo') || '分钟前');
+            if (diff < 86400000) return Math.floor(diff / 3600000) + (this.t('hoursAgo') || '小时前');
+            if (diff < 604800000) return Math.floor(diff / 86400000) + (this.t('daysAgo') || '天前');
+
+            return date.toLocaleDateString();
+        }
+
+        /**
+         * 显示文件夹操作菜单
+         */
+        showFolderMenu(folder, anchorEl) {
+            // 移除已有菜单
+            document.querySelectorAll('.conversations-folder-menu').forEach((m) => m.remove());
+
+            const menu = createElement('div', { className: 'conversations-folder-menu' });
+
+            const renameBtn = createElement('button', {}, this.t('conversationsRename') || '重命名');
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.showRenameFolderDialog(folder);
+            });
+
+            const deleteBtn = createElement('button', { style: 'color: #ef4444;' }, this.t('conversationsDelete') || '删除');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                this.confirmDeleteFolder(folder);
+            });
+
+            menu.appendChild(renameBtn);
+            menu.appendChild(deleteBtn);
+
+            // 定位菜单
+            const rect = anchorEl.getBoundingClientRect();
+            menu.style.position = 'fixed';
+            menu.style.top = `${rect.bottom + 4}px`;
+            menu.style.left = `${rect.left}px`;
+
+            document.body.appendChild(menu);
+
+            // 点击外部关闭
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        }
+
+        /**
+         * 显示新建文件夹对话框
+         */
+        showCreateFolderDialog() {
+            this.showFolderDialog({
+                title: this.t('conversationsAddFolder') || '新建文件夹',
+                icon: '📁',
+                name: '',
+                onConfirm: (name, icon) => {
+                    if (name.trim()) {
+                        this.createFolder(name.trim(), icon);
+                        this.createUI(); // 刷新 UI
+                        showToast(this.t('conversationsFolderCreated') || '文件夹已创建');
+                    }
+                },
+            });
+        }
+
+        /**
+         * 显示重命名文件夹对话框
+         */
+        showRenameFolderDialog(folder) {
+            const currentName = folder.name.replace(folder.icon, '').trim();
+            this.showFolderDialog({
+                title: this.t('conversationsRename') || '重命名文件夹',
+                icon: folder.icon,
+                name: currentName,
+                onConfirm: (name, icon) => {
+                    if (name.trim()) {
+                        this.renameFolder(folder.id, name.trim(), icon);
+                        this.createUI(); // 刷新 UI
+                        showToast(this.t('conversationsFolderRenamed') || '文件夹已重命名');
+                    }
+                },
+            });
+        }
+
+        /**
+         * 确认删除文件夹
+         */
+        confirmDeleteFolder(folder) {
+            this.showConfirmDialog(this.t('conversationsDelete') || '删除', this.t('conversationsDeleteConfirm') || `确定删除文件夹 "${folder.name}" 吗？其中的会话将移到收件箱。`, () => {
+                if (this.deleteFolder(folder.id)) {
+                    this.createUI(); // 刷新 UI
+                    showToast(this.t('conversationsFolderDeleted') || '文件夹已删除');
+                }
+            });
+        }
+
+        /**
+         * 通用文件夹对话框（新建/重命名复用）
+         */
+        showFolderDialog({ title, icon, name, onConfirm }) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog' });
+
+            // 标题
+            dialog.appendChild(createElement('div', { className: 'conversations-dialog-title' }, title));
+
+            // Emoji 选择器
+            const emojiSection = createElement('div', { className: 'conversations-dialog-section' });
+            emojiSection.appendChild(createElement('label', {}, this.t('conversationsIcon') || '图标'));
+            const emojiPicker = this.createEmojiPicker(icon);
+            emojiSection.appendChild(emojiPicker);
+            dialog.appendChild(emojiSection);
+
+            // 名称输入
+            const nameSection = createElement('div', { className: 'conversations-dialog-section' });
+            nameSection.appendChild(createElement('label', {}, this.t('conversationsFolderName') || '名称'));
+            const nameInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                value: name,
+                placeholder: this.t('conversationsFolderNamePlaceholder') || '输入文件夹名称',
+            });
+            nameSection.appendChild(nameInput);
+            dialog.appendChild(nameSection);
+
+            // 按钮
+            const buttons = createElement('div', { className: 'conversations-dialog-buttons' });
+            const cancelBtn = createElement('button', { className: 'conversations-dialog-btn cancel' }, this.t('cancel') || '取消');
+            const confirmBtn = createElement('button', { className: 'conversations-dialog-btn confirm' }, this.t('confirm') || '确定');
+
+            cancelBtn.addEventListener('click', () => overlay.remove());
+            confirmBtn.addEventListener('click', () => {
+                const customInput = emojiPicker.querySelector('input');
+                const selectedIcon = customInput ? customInput.value : emojiPicker.querySelector('.selected')?.textContent || icon;
+                onConfirm(nameInput.value, selectedIcon);
+                overlay.remove();
+            });
+
+            buttons.appendChild(cancelBtn);
+            buttons.appendChild(confirmBtn);
+            dialog.appendChild(buttons);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            // 聚焦输入框
+            nameInput.focus();
+
+            // 点击遮罩关闭 (智能行为：有输入则保存，无输入则关闭)
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    const name = nameInput.value.trim();
+                    // 这里我们复用 confirmBtn 的逻辑，因为 confirmBtn 里也只是调用 onConfirm
+                    // 但我们需要判断是否有效。
+                    // 用户的要求：输入了->新建/编辑；没有输入->关闭
+                    if (name) {
+                        confirmBtn.click();
+                    } else {
+                        overlay.remove();
+                    }
+                }
+            });
+
+            // ESC 关闭，Enter 确定
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') overlay.remove();
+                if (e.key === 'Enter') confirmBtn.click();
+            });
+        }
+
+        /**
+         * 创建 Emoji 选择器 (增强版)
+         */
+        createEmojiPicker(selectedEmoji = '📁') {
+            const container = createElement('div', {
+                className: 'conversations-emoji-picker',
+                style: 'display: flex; flex-direction: column; gap: 8px;',
+            });
+
+            // 1. 自定义输入区域
+            const customRow = createElement('div', {
+                className: 'conversations-emoji-custom-row',
+                style: 'display: flex; align-items: center; gap: 8px; padding: 4px; background: #f9fafb; border-radius: 4px; border: 1px solid #e5e7eb;',
+            });
+
+            const customLabel = createElement('span', { style: 'font-size: 12px; color: #6b7280; flex-shrink: 0;' }, this.t('conversationsCustomIcon') || '自定义:');
+
+            const customInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-emoji-custom-input',
+                value: selectedEmoji,
+                maxLength: 4, // 稍微放宽长度
+                placeholder: '☺',
+                style: 'width: 60px; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px; font-size: 16px;',
+            });
+
+            customRow.appendChild(customLabel);
+            customRow.appendChild(customInput);
+            container.appendChild(customRow);
+
+            // 2. 预设列表区域
+            const listContainer = createElement('div', {
+                className: 'conversations-emoji-list',
+                style: 'display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; max-height: 120px; overflow-y: auto; padding: 2px; scrollbar-width: none; -ms-overflow-style: none;',
+            });
+            // Hide scrollbar style
+            const hideScrollStyle = document.createElement('style');
+            hideScrollStyle.textContent = `.conversations-emoji-list::-webkit-scrollbar { display: none; }`;
+            listContainer.appendChild(hideScrollStyle);
+
+            // 扩充的预设 Emoji 库 (64个)
+            const presetEmojis = [
+                // 📂 基础文件夹
+                '📁',
+                '📂',
+                '📥',
+                '🗂️',
+                '📊',
+                '📈',
+                '📉',
+                '📋',
+                // 💼 办公/工作
+                '💼',
+                '📅',
+                '📌',
+                '📎',
+                '📝',
+                '✒️',
+                '🔍',
+                '💡',
+                // 💻 编程/技术
+                '💻',
+                '⌨️',
+                '🖥️',
+                '🖱️',
+                '🐛',
+                '🔧',
+                '🔨',
+                '⚙️',
+                // 🤖 AI/机器人
+                '🤖',
+                '👾',
+                '🧠',
+                '⚡',
+                '🔥',
+                '✨',
+                '🎓',
+                '📚',
+                // 🎨 创意/艺术
+                '🎨',
+                '🎭',
+                '🎬',
+                '🎹',
+                '🎵',
+                '📷',
+                '🖌️',
+                '🖍️',
+                // 🏠 生活/日常
+                '🏠',
+                '🛒',
+                '✈️',
+                '🎮',
+                '⚽',
+                '🍔',
+                '☕',
+                '❤️',
+                // 🌈 颜色/标记
+                '🔴',
+                '🟠',
+                '🟡',
+                '🟢',
+                '🔵',
+                '🟣',
+                '⚫',
+                '⚪',
+                // ⭐ 其他
+                '⭐',
+                '🌟',
+                '🎉',
+                '🔒',
+                '🔑',
+                '🚫',
+                '✅',
+                '❓',
+            ];
+
+            // 选中状态管理
+            let currentSelectedBtn = null;
+
+            presetEmojis.forEach((emoji) => {
+                const btn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-emoji-btn' + (emoji === selectedEmoji ? ' selected' : ''),
+                        style: 'width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 4px; font-size: 16px;',
+                    },
+                    emoji,
+                );
+
+                if (emoji === selectedEmoji) currentSelectedBtn = btn;
+
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault(); // 防止触发表单提交等意外行为
+
+                    // 更新按钮选中状态
+                    if (currentSelectedBtn) {
+                        currentSelectedBtn.classList.remove('selected');
+                        currentSelectedBtn.style.backgroundColor = 'transparent';
+                    }
+                    btn.classList.add('selected');
+                    btn.style.backgroundColor = '#dbeafe'; // 浅蓝背景表示选中
+                    currentSelectedBtn = btn;
+
+                    // 同步到自定义输入框
+                    customInput.value = emoji;
+                    // 标记为用户手动选择的 (通过 class，供外部获取值时优先使用输入框的值)
+                    customInput.classList.add('selected');
+                });
+
+                // Hover 效果
+                btn.onmouseenter = () => {
+                    if (!btn.classList.contains('selected')) btn.style.backgroundColor = '#f3f4f6';
+                };
+                btn.onmouseleave = () => {
+                    if (!btn.classList.contains('selected')) btn.style.backgroundColor = 'transparent';
+                };
+
+                listContainer.appendChild(btn);
+            });
+
+            container.appendChild(listContainer);
+
+            // 自定义输入监听
+            customInput.addEventListener('input', (e) => {
+                let val = e.target.value;
+
+                // 简单的 Emoji 校验：利用 Unicode 属性 \p{Extended_Pictographic}
+                const emojiRegex = /[^\p{Extended_Pictographic}\u200d\ufe0f]/gu;
+                if (val && emojiRegex.test(val)) {
+                    val = val.replace(emojiRegex, '');
+                    e.target.value = val;
+                }
+
+                // 清除按钮选中状态，因为现在是自定义的
+                if (currentSelectedBtn) {
+                    currentSelectedBtn.classList.remove('selected');
+                    currentSelectedBtn.style.backgroundColor = 'transparent';
+                    currentSelectedBtn = null;
+                }
+
+                // 尝试反向匹配：如果输入的内容刚好在预设里，把那个按钮高亮
+                const matchBtn = Array.from(listContainer.children).find((b) => b.textContent === val);
+                if (matchBtn) {
+                    matchBtn.classList.add('selected');
+                    matchBtn.style.backgroundColor = '#dbeafe';
+                    currentSelectedBtn = matchBtn;
+                }
+
+                // 给 input 加个标记类
+                customInput.classList.add('selected');
+            });
+
+            // 初始高亮颜色
+            if (currentSelectedBtn) {
+                currentSelectedBtn.style.backgroundColor = '#dbeafe';
+            }
+
+            return container;
+        }
+
+        /**
+         * 设置激活状态
+         * 激活时刷新所有文件夹计数和展开的文件夹
+         */
+        setActive(active) {
+            const wasActive = this.isActive;
+            this.isActive = active;
+
+            // 从非激活变为激活时，刷新所有文件夹计数和展开的文件夹
+            if (!wasActive && active) {
+                this.refreshAllFolderCounts();
+            }
+        }
+
+        /**
+         * 刷新所有文件夹的计数和展开的文件夹会话列表
+         */
+        refreshAllFolderCounts() {
+            if (!this.data || !this.data.folders) return;
+
+            this.data.folders.forEach((folder) => {
+                this.updateFolderCount(folder.id);
+            });
+        }
+
+        /**
+         * 刷新会话列表
+         */
+        refresh() {
+            this.loadData();
+            this.createUI();
+        }
+
+        /**
+         * 处理搜索输入
+         * @param {string} query 搜索关键词
+         */
+        handleSearch(query) {
+            this.searchQuery = query;
+            if (!query && (!this.filterTagIds || this.filterTagIds.size === 0) && !this.filterPinned) {
+                // 清空搜索时重置（无关键词、无标签筛选、无置顶筛选）
+                this.searchResult = null;
+                this.refreshAfterSearch();
+                return;
+            }
+
+            // 执行搜索
+            this.searchResult = this.performSearch(query);
+            this.refreshAfterSearch();
+        }
+
+        /**
+         * 执行搜索
+         * @param {string} query 搜索关键词
+         * @returns {{ folderMatches: Set, conversationMatches: Set, conversationFolderMap: Map, totalCount: number }}
+         */
+        performSearch(query) {
+            const lowerQuery = query.toLowerCase();
+            const folderMatches = new Set(); // 直接匹配的文件夹 ID
+            const conversationMatches = new Set(); // 匹配的会话 ID
+            const conversationFolderMap = new Map(); // 会话 ID -> 所属文件夹 ID（用于展开父级）
+
+            // 获取当前 CID（仅 Gemini Business 有效）
+            const currentCid = this.siteAdapter.getCurrentCid ? this.siteAdapter.getCurrentCid() : null;
+
+            // 1. 遍历文件夹，匹配名称
+            if (this.data && this.data.folders && lowerQuery) {
+                this.data.folders.forEach((folder) => {
+                    if (folder.name.toLowerCase().includes(lowerQuery)) {
+                        folderMatches.add(folder.id);
+                    }
+                });
+            }
+
+            // 2. 遍历会话，匹配标题（按 CID 过滤）
+            if (this.data && this.data.conversations) {
+                Object.values(this.data.conversations).forEach((conv) => {
+                    // 先按 CID 过滤
+                    if (!this.matchesCid(conv, currentCid)) return;
+
+                    // 逻辑整合：关键词 AND 标签 AND 置顶
+                    const matchQuery = !lowerQuery || (conv.title && conv.title.toLowerCase().includes(lowerQuery));
+                    const matchTags = !this.filterTagIds || this.filterTagIds.size === 0 || (conv.tagIds && conv.tagIds.some((id) => this.filterTagIds.has(id)));
+                    const matchPinned = !this.filterPinned || conv.pinned;
+
+                    if (matchQuery && matchTags && matchPinned) {
+                        conversationMatches.add(conv.id);
+                        conversationFolderMap.set(conv.id, conv.folderId);
+                    }
+                });
+            }
+
+            return {
+                folderMatches,
+                conversationMatches,
+                conversationFolderMap,
+                totalCount: folderMatches.size + conversationMatches.size,
+            };
+        }
+
+        /**
+         * 搜索后刷新 UI（不重建整个面板，只更新列表和结果条）
+         */
+        refreshAfterSearch() {
+            // 更新结果条
+            const resultBar = document.getElementById('conversations-result-bar');
+            if (resultBar) {
+                if (this.searchResult) {
+                    resultBar.textContent = `${this.searchResult.totalCount} ${this.t('conversationsSearchResult') || '个结果'}`;
+                    resultBar.classList.add('visible');
+                } else {
+                    resultBar.textContent = '';
+                    resultBar.classList.remove('visible');
+                }
+            }
+
+            // 重建文件夹列表（带搜索过滤）
+            const container = this.container?.querySelector('.conversations-content');
+            const oldFolderList = container?.querySelector('.conversations-folder-list');
+            if (container && oldFolderList) {
+                const newFolderList = this.createFolderListUI();
+                container.replaceChild(newFolderList, oldFolderList);
+            }
+        }
+
+        /**
+         * 高亮文本中的关键词
+         * @param {string} text 原始文本
+         * @param {string} query 搜索关键词
+         * @returns {DocumentFragment} 带高亮的文档片段
+         */
+        highlightText(text, query) {
+            const fragment = document.createDocumentFragment();
+            if (!query) {
+                fragment.appendChild(document.createTextNode(text));
+                return fragment;
+            }
+
+            try {
+                const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`(${escapedQuery})`, 'gi');
+                const parts = text.split(regex);
+
+                parts.forEach((part) => {
+                    if (part.toLowerCase() === query.toLowerCase()) {
+                        const mark = document.createElement('mark');
+                        mark.textContent = part;
+                        mark.style.backgroundColor = 'rgba(255, 235, 59, 0.5)';
+                        mark.style.color = 'inherit';
+                        mark.style.padding = '0 2px';
+                        mark.style.borderRadius = '2px';
+                        fragment.appendChild(mark);
+                    } else {
+                        fragment.appendChild(document.createTextNode(part));
+                    }
+                });
+            } catch (e) {
+                fragment.appendChild(document.createTextNode(text));
+            }
+            return fragment;
+        }
+        /**
+         * 显示标签管理对话框
+         */
+        showTagManagerDialog(conv = null) {
+            const overlay = createElement('div', { className: 'conversations-dialog-overlay' });
+            const dialog = createElement('div', { className: 'conversations-dialog conversations-dialog-tag-manager' });
+
+            // 标题
+            // 标题栏 (含关闭按钮)
+            const titleRow = createElement('div', { className: 'conversations-dialog-title', style: 'display:flex; justify-content:space-between; align-items:center;' });
+            titleRow.textContent = this.t('conversationsManageTags') || '管理标签';
+
+            const closeIcon = createElement(
+                'span',
+                {
+                    className: 'conversations-close-icon',
+                    style: 'cursor:pointer; padding:4px; font-size:20px; color:#9ca3af; line-height:1; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:4px;',
+                    title: this.t('close') || '关闭',
+                },
+                '×',
+            );
+            closeIcon.addEventListener('click', () => overlay.remove());
+            closeIcon.addEventListener('mouseenter', () => (closeIcon.style.backgroundColor = '#f3f4f6'));
+            closeIcon.addEventListener('mouseleave', () => (closeIcon.style.backgroundColor = 'transparent'));
+
+            titleRow.appendChild(closeIcon);
+            dialog.appendChild(titleRow);
+
+            const content = createElement('div', { className: 'conversations-dialog-content' });
+
+            // 标签列表容器 (隐藏滚动条)
+            const listContainer = createElement('div', {
+                className: 'conversations-tag-manager-list',
+                style: 'scrollbar-width: none; -ms-overflow-style: none;', // Firefox, IE
+            });
+            // 注入隐藏 scrollbar 的样式 (Chrome/Safari)
+            const hideScrollStyle = document.createElement('style');
+            hideScrollStyle.textContent = `.conversations-tag-manager-list::-webkit-scrollbar { display: none; }`;
+            listContainer.appendChild(hideScrollStyle);
+
+            const renderList = () => {
+                clearElement(listContainer);
+                if (!this.data.tags || this.data.tags.length === 0) {
+                    listContainer.appendChild(createElement('div', { className: 'conversations-empty' }, this.t('conversationsNoTags') || '暂无标签'));
+                    return;
+                }
+
+                this.data.tags.forEach((tag) => {
+                    const item = createElement('div', { className: 'conversations-tag-manager-item' });
+
+                    // 左侧：勾选框（如果有会话上下文）+ 预览
+                    const left = createElement('div', { style: 'display:flex; align-items:center; gap:8px;' });
+
+                    let checkbox = null;
+                    if (conv) {
+                        checkbox = createElement('input', { type: 'checkbox' });
+                        checkbox.checked = conv.tagIds && conv.tagIds.includes(tag.id);
+                        checkbox.addEventListener('change', () => {
+                            let newTags = conv.tagIds || [];
+                            if (checkbox.checked) {
+                                if (!newTags.includes(tag.id)) newTags.push(tag.id);
+                            } else {
+                                newTags = newTags.filter((id) => id !== tag.id);
+                            }
+                            this.setConversationTags(conv.id, newTags);
+                            this.saveData();
+                            const list = this.container.querySelector(`.conversations-list[data-folder-id="${conv.folderId}"]`);
+                            if (list) this.renderConversationList(conv.folderId, list);
+                        });
+                        checkbox.addEventListener('click', (e) => e.stopPropagation()); // 防止点击 checkbox 触发行点击
+                        left.appendChild(checkbox);
+                    }
+
+                    const preview = createElement(
+                        'span',
+                        {
+                            className: 'conversations-tag-preview',
+                            style: `background-color: ${tag.color}`,
+                        },
+                        tag.name,
+                    );
+                    left.appendChild(preview);
+                    item.appendChild(left);
+
+                    // 右侧：编辑/删除按钮
+                    const actions = createElement('div', { className: 'conversations-tag-actions' });
+
+                    // 编辑逻辑简化：点击填充到底部输入框，暂不实现行内编辑
+                    const editBtn = createElement(
+                        'button',
+                        {
+                            className: 'conversations-tag-btn edit',
+                            title: this.t('edit'),
+                        },
+                        '✎',
+                    );
+                    editBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 防止触发行点击
+                        nameInput.value = tag.name;
+                        updateColorSelection(tag.color);
+                        editingId = tag.id;
+                        addBtn.textContent = this.t('conversationsUpdateTag') || '更新标签';
+                    });
+                    actions.appendChild(editBtn);
+
+                    const delBtn = createElement(
+                        'button',
+                        {
+                            className: 'conversations-tag-btn delete',
+                            title: this.t('delete'),
+                        },
+                        '×',
+                    );
+                    delBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 防止触发行点击
+                        if (confirm(this.t('confirmDelete') || '确定删除?')) {
+                            this.deleteTag(tag.id);
+                            renderList();
+                            // 刷新所有可见的会话列表
+                            this.container.querySelectorAll('.conversations-list').forEach((list) => {
+                                const fid = list.dataset.folderId;
+                                if (fid) this.renderConversationList(fid, list);
+                            });
+                        }
+                    });
+                    actions.appendChild(delBtn);
+
+                    item.appendChild(actions);
+
+                    // 整行点击切换 checkbox（仅在有会话上下文时）
+                    if (conv && checkbox) {
+                        item.style.cursor = 'pointer';
+                        item.addEventListener('click', () => {
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change')); // 触发 change 事件更新数据
+                        });
+                    }
+
+                    listContainer.appendChild(item);
+                });
+            };
+
+            content.appendChild(listContainer);
+
+            // 新建/编辑区域
+            const formSection = createElement('div', { className: 'conversations-dialog-section', style: 'border-top:1px solid #eee; padding-top:10px;' });
+
+            let editingId = null;
+
+            const nameInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                placeholder: this.t('conversationsTagName') || '标签名称',
+                style: 'flex:1; margin-bottom: 8px;',
+            });
+            // Enter 提交
+            nameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') addBtn.click();
+            });
+            formSection.appendChild(nameInput);
+
+            const colorPicker = createElement('div', { className: 'conversations-color-picker' });
+            let selectedColor = TAG_COLORS[0];
+
+            // 1. 渲染 30 色预设网格
+            const updateColorSelection = (color, source = 'click') => {
+                if (!color.startsWith('#')) color = '#' + color;
+                selectedColor = color;
+
+                // 更新 Hex 输入框
+                if (source !== 'input') {
+                    hexInput.value = color;
+                    hexInput.style.borderColor = '#ddd'; // Reset error state
+                }
+
+                // 更新选中状态
+                // 检查是否在预设中
+                const presetMatch = Array.from(colorPicker.children).find((c) => c.dataset.color && c.dataset.color.toLowerCase() === color.toLowerCase());
+
+                Array.from(colorPicker.children).forEach((c) => c.classList.remove('selected'));
+
+                if (presetMatch) {
+                    presetMatch.classList.add('selected');
+                    // 重置自定义按钮
+                    customBtnInner.style.background = 'conic-gradient(from 180deg, red, yellow, lime, aqua, blue, magenta, red)';
+                    customBtn.classList.remove('active-custom');
+                } else {
+                    // 自定义颜色选中
+                    customBtnInner.style.background = color;
+                    customBtn.classList.add('active-custom');
+                }
+            };
+
+            TAG_COLORS.forEach((color) => {
+                const colorItem = createElement('div', {
+                    className: 'conversations-color-item',
+                    style: `background-color: ${color}`,
+                    'data-color': color,
+                });
+                if (color === selectedColor) colorItem.classList.add('selected');
+                colorItem.addEventListener('click', () => updateColorSelection(color));
+                colorPicker.appendChild(colorItem);
+            });
+            formSection.appendChild(colorPicker);
+
+            // 2. 自定义颜色行 (彩虹按钮 + Hex 输入框)
+            const customRow = createElement('div', {
+                style: 'display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 0 4px;',
+            });
+
+            // 彩虹按钮容器
+            const customBtn = createElement('div', {
+                className: 'conversations-color-item custom-btn-wrapper',
+                title: '自定义颜色',
+                style: 'position: relative; cursor: pointer; border: 2px solid transparent; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);',
+            });
+            // 选中样式 CSS (通过 class 控制 border)
+            const customBtnStyle = document.createElement('style');
+            customBtnStyle.textContent = `
+                .active-custom { border-color: #666 !important; transform: scale(1.1); }
+            `;
+            customRow.appendChild(customBtnStyle);
+
+            const customBtnInner = createElement('div', {
+                style: 'width: 100%; height: 100%; background: conic-gradient(from 180deg, red, yellow, lime, aqua, blue, magenta, red);',
+            });
+
+            const nativePicker = createElement('input', {
+                type: 'color',
+                style: 'position: absolute; left: -50%; top: -50%; width: 200%; height: 200%; opacity: 0; cursor: pointer;',
+            });
+            nativePicker.addEventListener('input', (e) => updateColorSelection(e.target.value, 'picker'));
+
+            customBtn.appendChild(customBtnInner);
+            customBtn.appendChild(nativePicker);
+            customRow.appendChild(customBtn);
+
+            // Hex 输入区域
+            const hexWrapper = createElement('div', {
+                style: 'display: flex; align-items: center; gap: 8px; flex: 1;',
+            });
+            hexWrapper.appendChild(createElement('span', { style: 'font-size: 13px; color: #666;' }, 'HEX:'));
+
+            const hexInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                value: selectedColor,
+                placeholder: '#RRGGBB',
+                style: 'flex: 1; font-family: monospace; text-transform: uppercase;',
+            });
+
+            hexInput.addEventListener('input', (e) => {
+                const val = e.target.value;
+                // 正则校验: #后面跟3或6位16进制字符
+                const hexRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+                if (hexRegex.test(val)) {
+                    hexInput.style.borderColor = '#ddd'; // Valid
+                    // 补全3位到6位
+                    let expandVal = val;
+                    if (val.length === 4) {
+                        expandVal = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
+                    }
+                    updateColorSelection(expandVal, 'input');
+                } else {
+                    hexInput.style.borderColor = '#ef4444'; // Invalid
+                }
+            });
+
+            // 失去焦点时如果无效则恢复
+            hexInput.addEventListener('blur', () => {
+                if (hexInput.style.borderColor === 'rgb(239, 68, 68)' || hexInput.style.borderColor === '#ef4444') {
+                    hexInput.value = selectedColor;
+                    hexInput.style.borderColor = '#ddd';
+                }
+            });
+
+            hexWrapper.appendChild(hexInput);
+            customRow.appendChild(hexWrapper);
+
+            formSection.appendChild(customRow);
+
+            // 初始化颜色选择状态
+            updateColorSelection(selectedColor, 'init');
+
+            const addBtn = createElement(
+                'button',
+                {
+                    className: 'conversations-dialog-btn confirm',
+                    style: 'width:100%; margin-top:8px;',
+                },
+                this.t('conversationsNewTag') || '新建标签',
+            );
+
+            addBtn.addEventListener('click', () => {
+                const name = nameInput.value.trim();
+                if (!name) return;
+
+                let result;
+                if (editingId) {
+                    result = this.updateTag(editingId, name, selectedColor);
+                } else {
+                    result = this.createTag(name, selectedColor);
+                }
+
+                if (result) {
+                    // Success
+                    if (editingId) {
+                        editingId = null;
+                        addBtn.textContent = this.t('conversationsNewTag') || '新建标签';
+                    }
+                    nameInput.value = '';
+                    // Reset color selection? Maybe keep it.
+                    renderList();
+
+                    // 刷新所有可见的会话列表 (因为标签修改会影响所有使用了该标签的会话)
+                    this.container.querySelectorAll('.conversations-list').forEach((list) => {
+                        const fid = list.dataset.folderId;
+                        if (fid) this.renderConversationList(fid, list);
+                    });
+                }
+                // If result is null, validation failed (toast already shown), keep input for user to fix
+            });
+
+            formSection.appendChild(addBtn);
+            content.appendChild(formSection);
+            dialog.appendChild(content);
+
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            // 渲染列表
+            renderList();
+
+            // 点击遮罩关闭
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+
+            // ESC 关闭
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') overlay.remove();
+            });
+
+            // Focus input
+            nameInput.focus();
         }
     }
 
@@ -3003,9 +6317,7 @@
 
         updateAutoUpdateState() {
             // 只有当：大纲功能开启 AND 自动更新开启 AND Tab处于激活状态 时才启用 Observer
-            const shouldEnable = this.settings.outline?.enabled &&
-                this.settings.outline?.autoUpdate &&
-                this.isActive;
+            const shouldEnable = this.settings.outline?.enabled && this.settings.outline?.autoUpdate && this.isActive;
 
             if (shouldEnable) {
                 this.startObserver();
@@ -3032,7 +6344,7 @@
             this.observer.observe(document.body, {
                 childList: true,
                 subtree: true,
-                characterData: true // 标题文字变化也要检测
+                characterData: true, // 标题文字变化也要检测
             });
             console.log('Gemini Helper: Outline Auto-Update Started');
         }
@@ -3082,46 +6394,58 @@
             const container = this.container;
             clearElement(container);
 
-            const content = createElement('div', {className: 'outline-content'});
+            const content = createElement('div', { className: 'outline-content' });
 
             // 固定工具栏
-            const toolbar = createElement('div', {className: 'outline-fixed-toolbar'});
+            const toolbar = createElement('div', { className: 'outline-fixed-toolbar' });
 
             // 第一行：按钮和搜索占位
-            const row1 = createElement('div', {className: 'outline-toolbar-row'});
+            const row1 = createElement('div', { className: 'outline-toolbar-row' });
 
             // 滚动按钮
-            const scrollBtn = createElement('button', {
-                className: 'outline-toolbar-btn',
-                id: 'outline-scroll-btn',
-                title: this.t('outlineScrollBottom')
-            }, '⬇');
+            const scrollBtn = createElement(
+                'button',
+                {
+                    className: 'outline-toolbar-btn',
+                    id: 'outline-scroll-btn',
+                    title: this.t('outlineScrollBottom'),
+                },
+                '⬇',
+            );
             scrollBtn.addEventListener('click', () => this.scrollList());
             row1.appendChild(scrollBtn);
 
             // 展开/折叠按钮
-            const expandBtn = createElement('button', {
-                className: 'outline-toolbar-btn',
-                id: 'outline-expand-btn',
-                title: this.t('outlineExpandAll')
-            }, '⊕');
+            const expandBtn = createElement(
+                'button',
+                {
+                    className: 'outline-toolbar-btn',
+                    id: 'outline-expand-btn',
+                    title: this.t('outlineExpandAll'),
+                },
+                '⊕',
+            );
             expandBtn.addEventListener('click', () => this.toggleExpandAll());
             row1.appendChild(expandBtn);
 
             // 搜索框区域
-            const searchWrapper = createElement('div', {className: 'outline-search-wrapper'});
+            const searchWrapper = createElement('div', { className: 'outline-search-wrapper' });
 
             const searchInput = createElement('input', {
                 type: 'text',
                 className: 'outline-search-input',
                 placeholder: this.t('outlineSearch'),
-                value: this.state.searchQuery
+                value: this.state.searchQuery,
             });
 
-            const clearBtn = createElement('button', {
-                className: 'outline-search-clear hidden',
-                title: this.t('clear')
-            }, '×');
+            const clearBtn = createElement(
+                'button',
+                {
+                    className: 'outline-search-clear hidden',
+                    title: this.t('clear'),
+                },
+                '×',
+            );
 
             // 搜索事件处理
             let debounceTimer;
@@ -3158,15 +6482,15 @@
             toolbar.appendChild(row1);
 
             // 第二行：层级滑块
-            const row2 = createElement('div', {className: 'outline-toolbar-row'});
-            const sliderContainer = createElement('div', {className: 'outline-level-slider-container'});
+            const row2 = createElement('div', { className: 'outline-toolbar-row' });
+            const sliderContainer = createElement('div', { className: 'outline-level-slider-container' });
 
             // 层级节点
-            const dotsContainer = createElement('div', {className: 'outline-level-dots', id: 'outline-level-dots'});
-            const levelLine = createElement('div', {className: 'outline-level-line'});
+            const dotsContainer = createElement('div', { className: 'outline-level-dots', id: 'outline-level-dots' });
+            const levelLine = createElement('div', { className: 'outline-level-line' });
             const levelProgress = createElement('div', {
                 className: 'outline-level-progress',
-                id: 'outline-level-progress'
+                id: 'outline-level-progress',
             });
             levelLine.appendChild(levelProgress);
             dotsContainer.appendChild(levelLine);
@@ -3174,10 +6498,10 @@
             // 创建 6 个层级节点（0 表示不展开，1-6 表示层级）
             for (let i = 0; i <= 6; i++) {
                 const dot = createElement('div', {
-                    className: `outline-level-dot ${i <= (this.state.expandLevel) ? 'active' : ''}`,
-                    'data-level': i
+                    className: `outline-level-dot ${i <= this.state.expandLevel ? 'active' : ''}`,
+                    'data-level': i,
                 });
-                const tooltip = createElement('div', {className: 'outline-level-dot-tooltip'});
+                const tooltip = createElement('div', { className: 'outline-level-dot-tooltip' });
                 if (i === 0) {
                     tooltip.textContent = '⊖'; // 不展开
                 } else {
@@ -3196,13 +6520,13 @@
             // 搜索结果统计条 (插入在工具栏和列表之间)
             const resultBar = createElement('div', {
                 className: 'outline-result-bar hidden',
-                id: 'outline-result-bar'
+                id: 'outline-result-bar',
             });
             content.appendChild(resultBar);
 
             // 大纲列表包装器（可滚动）
-            const listWrapper = createElement('div', {className: 'outline-list-wrapper', id: 'outline-list-wrapper'});
-            const list = createElement('div', {className: 'outline-list', id: 'outline-list'});
+            const listWrapper = createElement('div', { className: 'outline-list-wrapper', id: 'outline-list-wrapper' });
+            const list = createElement('div', { className: 'outline-list', id: 'outline-list' });
             listWrapper.appendChild(list);
             content.appendChild(listWrapper);
 
@@ -3217,7 +6541,7 @@
             clearElement(listContainer);
 
             if (!outlineData || outlineData.length === 0) {
-                listContainer.appendChild(createElement('div', {className: 'outline-empty'}, this.t('outlineEmpty')));
+                listContainer.appendChild(createElement('div', { className: 'outline-empty' }, this.t('outlineEmpty')));
                 return;
             }
 
@@ -3226,13 +6550,13 @@
 
             // 统计各层级数量
             this.state.levelCounts = {};
-            outlineData.forEach(item => {
+            outlineData.forEach((item) => {
                 this.state.levelCounts[item.level] = (this.state.levelCounts[item.level] || 0) + 1;
             });
             this.updateTooltips();
 
             // 智能缩进：检测最高层级
-            const minLevel = Math.min(...outlineData.map(item => item.level));
+            const minLevel = Math.min(...outlineData.map((item) => item.level));
             this.state.minLevel = minLevel;
 
             // 在重构树之前，捕获当前的折叠状态
@@ -3242,7 +6566,7 @@
             }
 
             // 构建树形结构
-            const outlineKey = outlineData.map(i => i.text).join('|');
+            const outlineKey = outlineData.map((i) => i.text).join('|');
             let isNewTree = false;
             // 只要 key 变了，或者是首次构建，都重新构建树
             // 注意：实时更新时 key 会不断变化，所以必须每次都重建树以包含新节点
@@ -3347,7 +6671,7 @@
             // 返回值: { isMatch: boolean, hasMatchedDescendant: boolean }
             const traverse = (nodes) => {
                 let hasAnyMatch = false;
-                nodes.forEach(node => {
+                nodes.forEach((node) => {
                     const isMatch = normalize(node.text).includes(normalizedQuery);
                     if (isMatch) matchCount++;
 
@@ -3421,7 +6745,7 @@
                     relativeLevel,
                     index,
                     children: [],
-                    collapsed: false
+                    collapsed: false,
                 };
 
                 // 找到父节点
@@ -3443,7 +6767,7 @@
 
         // 渲染大纲项
         renderItems(container, items, minLevel, displayLevel, parentCollapsed = false, parentForceExpanded = false) {
-            items.forEach(item => {
+            items.forEach((item) => {
                 const hasChildren = item.children && item.children.length > 0;
                 const isTopLevel = item.level === minLevel;
 
@@ -3464,7 +6788,7 @@
                     }
                 } else {
                     // 非顶层节点
-                    const isRelevant = !this.state.searchQuery || (item.isMatch || item.hasMatchedDescendant || parentForceExpanded);
+                    const isRelevant = !this.state.searchQuery || item.isMatch || item.hasMatchedDescendant || parentForceExpanded;
                     // 注意：parentForceExpanded 意味着父级被手动点开了，此时应该显示子级（即使不匹配）
 
                     // 综合判断
@@ -3488,13 +6812,17 @@
                 const itemEl = createElement('div', {
                     className: `outline-item outline-level-${item.relativeLevel}`,
                     'data-index': item.index,
-                    'data-level': item.relativeLevel
+                    'data-level': item.relativeLevel,
                 });
 
                 const isExpanded = hasChildren && !item.collapsed;
-                const toggle = createElement('span', {
-                    className: `outline-item-toggle ${hasChildren ? (isExpanded ? 'expanded' : '') : 'invisible'}`
-                }, '▸');
+                const toggle = createElement(
+                    'span',
+                    {
+                        className: `outline-item-toggle ${hasChildren ? (isExpanded ? 'expanded' : '') : 'invisible'}`,
+                    },
+                    '▸',
+                );
 
                 if (hasChildren) {
                     toggle.addEventListener('click', (e) => {
@@ -3509,7 +6837,7 @@
                 }
                 itemEl.appendChild(toggle);
 
-                const textEl = createElement('span', {className: 'outline-item-text'});
+                const textEl = createElement('span', { className: 'outline-item-text' });
 
                 // 高亮处理
                 if (this.state.searchQuery && item.isMatch) {
@@ -3520,7 +6848,7 @@
                         const parts = item.text.split(regex);
 
                         clearElement(textEl);
-                        parts.forEach(part => {
+                        parts.forEach((part) => {
                             if (part.toLowerCase() === query.toLowerCase()) {
                                 const mark = document.createElement('mark');
                                 mark.textContent = part;
@@ -3565,7 +6893,7 @@
                         }
                         // 传入 __bypassLock: true 以绕过 ScrollLockManager 的拦截
                         // 恢复 behavior: 'smooth'，因为我们已经处理了元素重新查找，应该可以兼容
-                        targetElement.scrollIntoView({behavior: 'smooth', block: 'center', __bypassLock: true});
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', __bypassLock: true });
                         targetElement.classList.add('outline-highlight');
                         setTimeout(() => targetElement.classList.remove('outline-highlight'), 2000);
                     } else {
@@ -3581,23 +6909,16 @@
 
                 if (hasChildren) {
                     const childParentCollapsed = item.collapsed || parentCollapsed;
-                    this.renderItems(
-                        container,
-                        item.children,
-                        minLevel,
-                        displayLevel,
-                        childParentCollapsed,
-                        item.forceExpanded || parentForceExpanded
-                    );
+                    this.renderItems(container, item.children, minLevel, displayLevel, childParentCollapsed, item.forceExpanded || parentForceExpanded);
                 }
             });
         }
 
         // 初始化树的折叠状态
         initializeCollapsedState(items, displayLevel) {
-            items.forEach(item => {
+            items.forEach((item) => {
                 if (item.children && item.children.length > 0) {
-                    const allChildrenHidden = item.children.every(child => child.level > displayLevel);
+                    const allChildrenHidden = item.children.every((child) => child.level > displayLevel);
                     item.collapsed = allChildrenHidden;
                     this.initializeCollapsedState(item.children, displayLevel);
                 } else {
@@ -3614,11 +6935,11 @@
 
             const isAtBottom = wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 10;
             if (isAtBottom) {
-                wrapper.scrollTo({top: 0, behavior: 'smooth'});
+                wrapper.scrollTo({ top: 0, behavior: 'smooth' });
                 btn.textContent = '⬇';
                 btn.title = this.t('outlineScrollBottom');
             } else {
-                wrapper.scrollTo({top: wrapper.scrollHeight, behavior: 'smooth'});
+                wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
                 btn.textContent = '⬆';
                 btn.title = this.t('outlineScrollTop');
             }
@@ -3654,7 +6975,7 @@
 
             // 更新 UI
             const dots = document.querySelectorAll('.outline-level-dot');
-            dots.forEach(dot => {
+            dots.forEach((dot) => {
                 const dotLevel = parseInt(dot.dataset.level, 10);
                 dot.classList.toggle('active', dotLevel <= level);
             });
@@ -3694,10 +7015,10 @@
 
         // 清除强制展开状态
         clearForceExpandedState(items, displayLevel) {
-            items.forEach(item => {
+            items.forEach((item) => {
                 item.forceExpanded = false;
                 if (item.children && item.children.length > 0) {
-                    const allChildrenHidden = item.children.every(child => child.level > displayLevel);
+                    const allChildrenHidden = item.children.every((child) => child.level > displayLevel);
                     item.collapsed = allChildrenHidden;
                     this.clearForceExpandedState(item.children, displayLevel);
                 } else {
@@ -3709,7 +7030,7 @@
         // 更新提示
         updateTooltips() {
             const dots = document.querySelectorAll('.outline-level-dot');
-            dots.forEach(dot => {
+            dots.forEach((dot) => {
                 const level = parseInt(dot.dataset.level, 10);
                 const tooltip = dot.querySelector('.outline-level-dot-tooltip');
                 if (tooltip && level > 0) {
@@ -3721,13 +7042,13 @@
 
         // 捕获树的状态（expanded/collapsed）
         captureTreeState(nodes, stateMap) {
-            nodes.forEach(node => {
+            nodes.forEach((node) => {
                 // 使用 level + text 作为 key
                 // 注意：如果有完全相同的标题在同一级，可能会冲突，但在当前场景下可以接受
                 const key = `${node.level}_${node.text}`;
                 stateMap[key] = {
                     collapsed: node.collapsed,
-                    forceExpanded: node.forceExpanded
+                    forceExpanded: node.forceExpanded,
                 };
 
                 if (node.children && node.children.length > 0) {
@@ -3738,7 +7059,7 @@
 
         // 恢复树的状态
         restoreTreeState(nodes, stateMap) {
-            nodes.forEach(node => {
+            nodes.forEach((node) => {
                 const key = `${node.level}_${node.text}`;
                 const state = stateMap[key];
                 if (state) {
@@ -3756,7 +7077,6 @@
         }
     }
 
-
     /**
      * 设置管理器
      * 负责所有设置的加载、保存和默认值合并
@@ -3772,7 +7092,23 @@
             const widthSettings = GM_getValue(SETTING_KEYS.PAGE_WIDTH, DEFAULT_WIDTH_SETTINGS);
             const outlineSettings = GM_getValue(SETTING_KEYS.OUTLINE, DEFAULT_OUTLINE_SETTINGS);
             const promptsSettings = GM_getValue(SETTING_KEYS.PROMPTS_SETTINGS, DEFAULT_PROMPTS_SETTINGS);
-            const tabOrder = GM_getValue(SETTING_KEYS.TAB_ORDER, DEFAULT_TAB_ORDER);
+            let tabOrder = GM_getValue(SETTING_KEYS.TAB_ORDER, DEFAULT_TAB_ORDER);
+
+            // 兼容老用户：确保所有默认 Tab 都在 tabOrder 中
+            // 如果有新增的 Tab（如 conversations），自动添加到 settings 之前
+            const missingTabs = DEFAULT_TAB_ORDER.filter((tab) => !tabOrder.includes(tab));
+            if (missingTabs.length > 0) {
+                const settingsIndex = tabOrder.indexOf('settings');
+                if (settingsIndex !== -1) {
+                    // 在 settings 之前插入缺失的 Tab
+                    tabOrder = [...tabOrder.slice(0, settingsIndex), ...missingTabs, ...tabOrder.slice(settingsIndex)];
+                } else {
+                    // 如果没有 settings，直接追加
+                    tabOrder = [...tabOrder, ...missingTabs];
+                }
+                // 保存更新后的 tabOrder
+                GM_setValue(SETTING_KEYS.TAB_ORDER, tabOrder);
+            }
 
             // 加载模型锁定设置（按站点隔离，但一次性加载所有站点的配置）
             const savedModelLockSettings = GM_getValue(SETTING_KEYS.MODEL_LOCK, {});
@@ -3783,18 +7119,18 @@
 
             // 遍历所有注册的适配器，合并默认配置和保存的配置
             if (registry && registry.adapters) {
-                registry.adapters.forEach(adapter => {
+                registry.adapters.forEach((adapter) => {
                     const siteId = adapter.getSiteId();
                     const defaults = adapter.getDefaultLockSettings();
-                    mergedModelLockConfig[siteId] = {...defaults, ...(savedModelLockSettings[siteId] || {})};
+                    mergedModelLockConfig[siteId] = { ...defaults, ...(savedModelLockSettings[siteId] || {}) };
                 });
             } else if (currentAdapter) {
                 const defaults = currentAdapter.getDefaultLockSettings();
-                mergedModelLockConfig[currentSiteId] = {...defaults, ...(savedModelLockSettings[currentSiteId] || {})};
+                mergedModelLockConfig[currentSiteId] = { ...defaults, ...(savedModelLockSettings[currentSiteId] || {}) };
             }
 
             // 确保大纲设置有默认值 (合并默认配置与保存的配置)
-            const mergedOutlineSettings = {...DEFAULT_OUTLINE_SETTINGS, ...outlineSettings};
+            const mergedOutlineSettings = { ...DEFAULT_OUTLINE_SETTINGS, ...outlineSettings };
 
             return {
                 clearTextareaOnSend: GM_getValue(SETTING_KEYS.CLEAR_TEXTAREA_ON_SEND, false), // 默认关闭
@@ -3805,8 +7141,9 @@
                 tabOrder: tabOrder,
                 preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
                 showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
-                tabSettings: {...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {})},
-                readingHistory: {...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {})}
+                tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
+                readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) },
+                conversations: { enabled: true },
             };
         }
 
@@ -3840,6 +7177,10 @@
             GM_setValue('gemini_prevent_auto_scroll', settings.preventAutoScroll);
             // 保存阅读历史设置
             GM_setValue(SETTING_KEYS.READING_HISTORY, settings.readingHistory);
+            // 保存会话设置
+            if (settings.conversations) {
+                GM_setValue('gemini_conversations_settings', settings.conversations);
+            }
         }
     }
 
@@ -3863,9 +7204,7 @@
             this.settings = this.loadSettings(); // 加载设置
 
             // 初始化当前 Tab：优先使用设置的第一个 Tab
-            this.currentTab = this.settings.tabOrder && this.settings.tabOrder.length > 0
-                ? this.settings.tabOrder[0]
-                : 'prompts';
+            this.currentTab = this.settings.tabOrder && this.settings.tabOrder.length > 0 ? this.settings.tabOrder[0] : 'prompts';
 
             // 兜底：如果首个 Tab 被禁用，则回退到 safe tab
             const isOutlineDisabled = this.currentTab === 'outline' && !this.settings.outline?.enabled;
@@ -3873,7 +7212,7 @@
 
             if (isOutlineDisabled || isPromptsDisabled) {
                 // 尝试找一个可用的 tab
-                const availableTab = this.settings.tabOrder.find(t => {
+                const availableTab = this.settings.tabOrder.find((t) => {
                     if (t === 'outline') return this.settings.outline?.enabled;
                     if (t === 'prompts') return this.settings.prompts?.enabled;
                     return true; // settings always enabled
@@ -3937,9 +7276,9 @@
         }
 
         updatePrompt(id, updatedPrompt) {
-            const index = this.prompts.findIndex(p => p.id === id);
+            const index = this.prompts.findIndex((p) => p.id === id);
             if (index !== -1) {
-                this.prompts[index] = {...this.prompts[index], ...updatedPrompt};
+                this.prompts[index] = { ...this.prompts[index], ...updatedPrompt };
                 this.savePrompts();
                 this.refreshPromptList();
                 this.refreshCategories();
@@ -3947,7 +7286,7 @@
         }
 
         deletePrompt(id) {
-            this.prompts = this.prompts.filter(p => p.id !== id);
+            this.prompts = this.prompts.filter((p) => p.id !== id);
             this.savePrompts();
             this.refreshPromptList();
             this.refreshCategories();
@@ -3955,7 +7294,7 @@
 
         getCategories() {
             const categories = new Set();
-            this.prompts.forEach(p => {
+            this.prompts.forEach((p) => {
                 if (p.category) categories.add(p.category);
             });
             return Array.from(categories);
@@ -3972,17 +7311,16 @@
             const currentSiteId = this.siteAdapter.getSiteId();
             const adapterOptions = {
                 clearOnInit: this.siteAdapter instanceof GeminiBusinessAdapter ? this.settings.clearTextareaOnSend : false,
-                modelLockConfig: this.settings.modelLockConfig[currentSiteId] // 传递当前站点的配置
+                modelLockConfig: this.settings.modelLockConfig[currentSiteId], // 传递当前站点的配置
             };
             // 绑定新对话监听 (点击按钮或快捷键)
             this.siteAdapter.bindNewChatListeners(() => {
                 console.log('Gemini Helper: New chat detected, re-initializing...');
-                // 重新加载配置并执行初始化逻辑
-                this.settings = this.loadSettings();
+                // 使用当前内存中的设置重新应用配置（无需重新加载）
                 const currentSiteId = this.siteAdapter.getSiteId();
                 const adapterOptions = {
                     clearOnInit: this.siteAdapter instanceof GeminiBusinessAdapter ? this.settings.clearTextareaOnSend : false,
-                    modelLockConfig: this.settings.modelLockConfig[currentSiteId]
+                    modelLockConfig: this.settings.modelLockConfig[currentSiteId],
                 };
                 this.siteAdapter.afterPropertiesSet(adapterOptions);
                 // 重新应用滚动锁定状态
@@ -4183,12 +7521,21 @@
                 .quick-btn-group.hidden { display: none; }
                 .hidden { display: none !important; }
                 .outline-hidden { display: none !important; }
-                .prompt-toast {
-                    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981;
-                    color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000001; animation: toastSlideIn 0.3s;
+                .gemini-toast {
+                    position: fixed !important; top: 32px !important; left: 50% !important; transform: translateX(-50%) !important;
+                    background: ${gradient}; /* 品牌渐变色 */
+                    color: white; /* 渐变色背景通常较深，配白字 */
+                    padding: 10px 24px; border-radius: 9999px; font-size: 14px; font-weight: 500;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+                    z-index: 1000001 !important; animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                    border: 1px solid rgba(255, 255, 255, 0.15); /* 增加一点白色内描边提升精致感 */
+                    display: flex; align-items: center; justify-content: center; gap: 8px;
+                    pointer-events: none;
                 }
-                @keyframes toastSlideIn { from { transform: translate(-50%, -20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+                @keyframes toastSlideIn {
+                    from { transform: translate(-50%, -20px) scale(0.95); opacity: 0; }
+                    to { transform: translate(-50%, 0) scale(1); opacity: 1; }
+                }
                 /* 快捷跳转按钮组（面板内） */
                 .scroll-nav-container {
                     display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid #e5e7eb;
@@ -4211,6 +7558,506 @@
                 .scroll-nav-btn.icon-only:hover span {
                     transform: rotate(360deg) scale(1.2);
                 }
+
+                /* ========== 会话面板样式 ========== */
+                .conversations-content {
+                    display: flex; flex-direction: column; flex: 1; min-height: 200px;
+                    overflow-x: hidden; /* 隐藏横向滚动条 */
+                }
+                .conversations-toolbar {
+                    display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0;
+                }
+                .conversations-toolbar-btn {
+                    padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb;
+                    font-size: 13px; color: #374151; cursor: pointer; transition: all 0.2s;
+                    display: flex; align-items: center; gap: 4px;
+                }
+                .conversations-toolbar-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+                .conversations-toolbar-btn.sync { padding: 6px 10px; }
+                .conversations-toolbar-btn.batch-mode.active { background: #6366f1; color: white; border-color: #6366f1; }
+                .conversations-toolbar-btn:disabled { opacity: 0.6; cursor: wait; }
+                .conversations-folder-select {
+                    padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px;
+                    background: #f9fafb; font-size: 13px; color: #374151; cursor: pointer;
+                    flex: 1; min-width: 0; max-width: 150px;
+                }
+                .conversations-folder-select:focus { outline: none; border-color: #6366f1; }
+                .conversations-folder-list {
+                    flex: 1; overflow-y: auto; padding: 8px;
+                    scrollbar-width: none; /* Firefox */
+                    -ms-overflow-style: none; /* IE/Edge */
+                }
+                .conversations-folder-list::-webkit-scrollbar { display: none; } /* Chrome */
+                .conversations-folder-item {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 10px 12px; margin-bottom: 4px; border-radius: 8px;
+                    background: #f9fafb; cursor: pointer; transition: all 0.2s;
+                    flex-wrap: wrap; /* 允许换行，会话列表在下方 */
+                }
+                .conversations-folder-item:hover { background: #f3f4f6; }
+                .conversations-folder-item.default { background: #e0f2fe; }
+                .conversations-folder-item.expanded {
+                    background: #c7d2fe !important; /* 更深的紫蓝色 */
+                    border: 2px solid #6366f1; /* 明显的边框 */
+                    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+                    border-radius: 8px 8px 0 0; /* 展开时上方圆角 */
+                }
+                .conversations-folder-info {
+                    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+                    position: relative; /* 为绝对定位的箭头提供参考 */
+                }
+                .conversations-folder-icon {
+                    font-size: 18px; width: 24px; height: 24px;
+                    display: flex; align-items: center; justify-content: center;
+                    line-height: 1; flex-shrink: 0;
+                }
+                .conversations-folder-name {
+                    font-size: 14px; font-weight: 500; color: #1f2937;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                    user-select: none; /* 禁止选中 */
+                }
+                .conversations-folder-count { font-size: 12px; color: #6b7280; flex-shrink: 0; user-select: none; }
+                .conversations-folder-menu-btn {
+                    width: 24px; height: 24px; border: none; background: transparent;
+                    color: #6b7280; cursor: pointer; border-radius: 4px; font-size: 14px;
+                }
+                .conversations-folder-menu-btn:hover { background: #e5e7eb; }
+                .conversations-folder-controls {
+                    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+                }
+                .conversations-folder-order-btns {
+                    position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+                    display: flex; align-items: center; gap: 2px;
+                    opacity: 0; transition: opacity 0.2s;
+                    background: linear-gradient(to right, transparent, currentColor 8px); /* 渐变遮罩 */
+                    background: inherit; padding-left: 8px;
+                }
+                .conversations-folder-item:hover .conversations-folder-order-btns {
+                    opacity: 1;
+                }
+                .conversations-folder-order-btn {
+                    width: 20px; height: 20px; border: 1px solid #d1d5db; border-radius: 4px;
+                    background: white; color: #6b7280; cursor: pointer; font-size: 11px;
+                    display: flex; align-items: center; justify-content: center;
+                    transition: all 0.15s;
+                }
+                .conversations-folder-order-btn:hover:not(:disabled) {
+                    background: #f3f4f6; border-color: #9ca3af; color: #374151;
+                }
+                .conversations-folder-order-btn:disabled {
+                    opacity: 0.3; cursor: default;
+                }
+                .conversations-folder-menu {
+                    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000002; padding: 4px;
+                    min-width: 100px;
+                }
+                .conversations-folder-menu button {
+                    display: block; width: 100%; padding: 8px 12px; border: none; background: none;
+                    text-align: left; font-size: 13px; color: #374151; cursor: pointer; border-radius: 4px;
+                }
+                .conversations-folder-menu button:hover { background: #f3f4f6; }
+                .conversations-empty {
+                    text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 14px;
+                }
+
+                /* 搜索栏样式 */
+                .conversations-search-bar {
+                    padding: 8px 12px;
+                    border-bottom: 1px solid #e5e7eb;
+                    background: #f9fafb;
+                }
+                .conversations-search-wrapper {
+                    display: flex;
+                    align-items: center;
+                    gap: 0;
+                    position: relative; /* For dropdown menu */
+                }
+                /* Has Filter State: Remove Tag Btn Radius */
+                .conversations-search-wrapper.has-filter .conversations-tag-search-btn {
+                    border-radius: 0;
+                    border-right: none;
+                }
+                
+                .conversations-search-input-group {
+                    flex: 1;
+                    position: relative;
+                    height: 36px;
+                    min-width: 0;
+                }
+                .conversations-search-input {
+                    width: 100%;
+                    height: 100%;
+                    padding: 0 12px; /* Symmetric padding */
+                    border: 1px solid #d1d5db;
+                    border-radius: 8px 0 0 8px;
+                    font-size: 14px;
+                    box-sizing: border-box;
+                    transition: all 0.2s;
+                }
+                .conversations-search-input:focus {
+                    outline: none;
+                    border-color: #6366f1;
+                    z-index: 1;
+                    position: relative;
+                }
+                
+                /* Pin Button */
+                .conversations-pin-filter-btn {
+                    cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 14px;
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid #d1d5db; border-left: none;
+                    background: white; box-sizing: border-box; transition: all 0.2s;
+                }
+                .conversations-pin-filter-btn:hover { background: #f3f4f6; color: #374151; }
+                .conversations-pin-filter-btn.active { 
+                    color: #6366f1; background: #eef2ff; 
+                    box-shadow: inset 0 0 0 1px #818cf8;
+                }
+
+                .conversations-result-bar {
+                    text-align: center;
+                    padding: 6px;
+                    color: #3b82f6;
+                    font-size: 13px;
+                    background: #eff6ff;
+                    display: none;
+                }
+                .conversations-result-bar.visible { display: block; }
+
+                /* 标签样式 */
+                .conversations-tag {
+                    display: inline-block; padding: 2px 6px; border-radius: 4px;
+                    font-size: 11px; margin-right: 4px; margin-top: 4px;
+                    color: white; background-color: #9ca3af; line-height: 1.2;
+                    /* Fix 1: Max width and overflow */
+                    max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+                }
+                .conversations-tag-list {
+                    margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px; border-top: 1px dashed #eee; padding-top: 2px;
+                }
+                .conversations-tag-list:empty { display: none; }
+
+                /* 标签筛选按钮 */
+                .conversations-tag-search-btn {
+                    cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 14px;
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid #d1d5db; border-left: none; border-radius: 0; /* Always 0 radius/square */
+                    background: white; box-sizing: border-box; transition: all 0.2s;
+                }
+                .conversations-tag-search-btn:hover { background: #f3f4f6; color: #374151; }
+                .conversations-tag-search-btn.active { 
+                    color: #6366f1; background: #eef2ff; 
+                    box-shadow: inset 0 0 0 1px #818cf8; /* Fix 7: Distinct active border/shadow */
+                }
+                .conversations-tag-search-btn.empty { opacity: 0.5; }
+                
+                /* Clear Button - Restyled at far right */
+                .conversations-search-clear {
+                    cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 18px;
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid #d1d5db; border-left: none; border-radius: 0 8px 8px 0;
+                    background: white; box-sizing: border-box; transition: all 0.2s;
+                    user-select: none;
+                }
+                .conversations-search-clear:hover { background: #fef2f2; color: #ef4444; }
+                .conversations-search-clear.disabled { 
+                    opacity: 0.3; cursor: default; background: #f9fafb; pointer-events: none;
+                }
+
+                /* Removed old inner clear button styles */
+
+                /* 标签筛选菜单 */
+                .conversations-tag-filter-menu {
+                    position: absolute;
+                    top: calc(100% + 4px);
+                    right: 0;
+                    width: 200px;
+                    background: white;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    z-index: 1000;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    animation: fadeIn 0.2s;
+                }
+                .conversations-tag-filter-list {
+                    overflow-y: auto; flex: 1; padding: 4px; display: flex; flex-direction: column; gap: 2px;
+                }
+                .conversations-tag-filter-footer {
+                    padding: 4px; border-top: 1px solid #eee; background: #f9fafb; flex-shrink: 0;
+                }
+                .conversations-tag-filter-item {
+                    display: flex; align-items: center; gap: 8px; padding: 8px;
+                    cursor: pointer; border-radius: 6px; font-size: 13px; color: #374151;
+                    /* Fix overflow */
+                    width: 100%; box-sizing: border-box; overflow: hidden;
+                }
+                .conversations-tag-filter-item span:not(.conversations-tag-dot) {
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+                }
+                .conversations-tag-filter-item:hover { background: #f3f4f6; }
+                .conversations-tag-filter-item.selected { background: #eff6ff; color: #2563eb; font-weight: 500; }
+                
+                /* Checkmark for selected */
+                .conversations-tag-filter-item.selected::after {
+                    content: '✓'; margin-left: auto; font-size: 14px; font-weight: bold;
+                }
+                
+                /* Ensure dot doesn't stretch */
+                .conversations-tag-dot {
+                    width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+                    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
+                }
+                
+                .conversations-tag-filter-divider { height: 1px; background: #eee; margin: 4px 0; flex-shrink: 0; }
+                .conversations-tag-filter-action { color: #6366f1; font-weight: 500; justify-content: center; }
+
+                /* 标签管理弹窗 */
+                .conversations-tag-manager-list {
+                    max-height: 250px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 12px; padding: 4px;
+                }
+                .conversations-tag-manager-item {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 8px; border-bottom: 1px solid #f3f4f6;
+                }
+                .conversations-tag-manager-item:last-child { border-bottom: none; }
+                .conversations-tag-manager-item:hover { background: #f9fafb; }
+                .conversations-tag-preview {
+                    padding: 2px 8px; border-radius: 4px; font-size: 12px; color: white;
+                    /* Fix overflow */
+                    max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; display: inline-block;
+                }
+                .conversations-tag-actions { display: flex; gap: 4px; flex-shrink: 0; }
+                .conversations-tag-btn {
+                    width: 24px; height: 24px; border: none; background: transparent; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center; color: #9ca3af; border-radius: 4px; transition: all 0.2s;
+                }
+                .conversations-tag-btn:hover { background: #e5e7eb; color: #374151; }
+                .conversations-tag-btn:hover { background: #fee2e2; color: #ef4444; }
+                .conversations-tag-btn.edit:hover { background: #e0f2fe; color: #3b82f6; }
+
+                /* 颜色选择器 */
+                .conversations-color-picker {
+                    display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin: 12px 0;
+                }
+                .conversations-color-item {
+                    width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+                    border: 2px solid transparent; transition: transform 0.1s;
+                }
+                .conversations-color-item:hover { transform: scale(1.1); }
+                .conversations-color-item.selected { border-color: #374151; transform: scale(1.1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                .conversations-result-bar {
+                    text-align: center;
+                    padding: 6px;
+                    color: #6366f1;
+                    font-size: 13px;
+                    background: #eef2ff;
+                    border-radius: 4px;
+                    margin-top: 8px;
+                    display: none;
+                }
+                .conversations-result-bar.visible { display: block; }
+
+                /* 会话列表样式 */
+                .conversations-list {
+                    width: 100%; /* 占满父容器宽度 */
+                    padding: 8px 12px;
+                    background: #f8fafc;
+                    border: 2px solid #6366f1;
+                    border-top: none;
+                    border-radius: 0 0 8px 8px;
+                    margin-top: -4px; /* 与文件夹项视觉连接 */
+                    margin-bottom: 4px;
+                    max-height: 300px;
+                    overflow-y: auto;
+                    scrollbar-width: none; /* Firefox */
+                    -ms-overflow-style: none; /* IE/Edge */
+                }
+                .conversations-list::-webkit-scrollbar { display: none; } /* Chrome */
+                .conversations-list-empty {
+                    padding: 12px; color: #9ca3af; font-size: 13px; text-align: center;
+                }
+                .conversations-item {
+                    display: flex; align-items: center;
+                    padding: 8px 12px;
+                    margin-bottom: 4px; /* Card Layout: Spacing */
+                    border-radius: 6px; /* Card Layout: Radius */
+                    background: white;  /* Card Layout: White Background */
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    gap: 8px;
+                    position: relative;
+                    /* border-bottom removed for card style */
+                }
+                .conversations-item:hover {
+                    background: #f3f4f6; /* Slightly darker on hover */
+                }
+                /* Rounded Blue Bar on Hover */
+                .conversations-item::before {
+                    content: '';
+                    position: absolute;
+                    left: 0;
+                    top: 50%;
+                    transform: translateY(-50%) scaleY(0);
+                    width: 4px;
+                    height: 80%;
+                    background-color: #428cf1;
+                    border-radius: 0 4px 4px 0; /* 右侧圆角，左侧贴边 */
+                    transition: transform 0.2s;
+                }
+                .conversations-item:hover::before {
+                    transform: translateY(-50%) scaleY(1);
+                }
+
+                .conversations-item-title {
+                    flex: 1;
+                    min-width: 0;
+                    font-size: 14px; color: #374151;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                }
+                /* Tags Container */
+                .conversations-tag-list {
+                    display: flex; gap: 4px; border: none; padding: 0; margin: 0;
+                    flex-shrink: 0;
+                    max-width: 35%;
+                    overflow: hidden;
+                }
+                .conversations-item-meta {
+                    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+                    margin-left: auto;
+                }
+                .conversations-item-time {
+                    font-size: 11px; color: #9ca3af; flex-shrink: 0;
+                }
+                .conversations-item-menu-btn {
+                    width: 20px; height: 20px; border: none; background: transparent;
+                    color: #9ca3af; cursor: pointer; border-radius: 4px; font-size: 12px;
+                    opacity: 0; transition: opacity 0.2s; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+                }
+                .conversations-item:hover .conversations-item-menu-btn { opacity: 1; }
+                .conversations-item-menu-btn:hover { background: #e5e7eb; color: #374151; }
+                .conversations-item-menu {
+                    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000002; padding: 4px;
+                    min-width: 120px;
+                }
+                .conversations-item-menu button {
+                    display: block; width: 100%; padding: 8px 12px; border: none; background: none;
+                    text-align: left; font-size: 13px; color: #374151; cursor: pointer; border-radius: 4px;
+                }
+                .conversations-item-menu button:hover { background: #f3f4f6; }
+                .conversations-item-menu button.danger { color: #dc2626; }
+                .conversations-item-menu button.danger:hover { background: #fef2f2; }
+
+                /* 复选框样式 */
+                .conversations-folder-checkbox {
+                    margin-right: 8px; width: 16px; height: 16px; cursor: pointer;
+                    accent-color: #4b5563; flex-shrink: 0;
+                }
+                .conversations-item-checkbox {
+                    width: 16px; height: 16px; margin-right: 8px; cursor: pointer;
+                    accent-color: #4b5563; flex-shrink: 0;
+                }
+
+                /* 底部批量操作栏 */
+                .conversations-batch-bar {
+                    position: sticky; bottom: 0; left: 0; right: 0;
+                    background: white;
+                    padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
+                    border-radius: 8px; margin-top: 8px;
+                    border: 1px solid #e5e7eb;
+                    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+                }
+                .conversations-batch-info {
+                    color: #374151; font-size: 13px; font-weight: 500;
+                }
+                .conversations-batch-btns {
+                    display: flex; gap: 8px;
+                }
+                .conversations-batch-btn {
+                    padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+                    font-size: 12px; cursor: pointer; transition: all 0.2s;
+                    background: #f3f4f6; color: #374151;
+                }
+                .conversations-batch-btn:hover { background: #e5e7eb; border-color: #9ca3af; }
+                .conversations-batch-btn.danger { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
+                .conversations-batch-btn.danger:hover { background: #fecaca; border-color: #f87171; }
+                .conversations-batch-btn.cancel { background: transparent; border: none; color: #6b7280; }
+                .conversations-batch-btn.cancel:hover { background: #f3f4f6; color: #374151; border: none; }
+
+                /* 会话对话框样式 */
+                .conversations-dialog-overlay {
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0,0,0,0.5); z-index: 1000003;
+                    display: flex; align-items: center; justify-content: center;
+                }
+                .conversations-dialog {
+                    background: white; border-radius: 12px; padding: 20px; min-width: 320px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                }
+                .conversations-dialog-title {
+                    font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 16px;
+                }
+                .conversations-dialog-message {
+                    font-size: 14px; color: #4b5563; margin-bottom: 20px; line-height: 1.5;
+                    white-space: pre-line;
+                }
+                .conversations-dialog-section {
+                    margin-bottom: 16px;
+                }
+                .conversations-dialog-section label {
+                    display: block; font-size: 13px; color: #6b7280; margin-bottom: 8px;
+                }
+                .conversations-dialog-input {
+                    width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+                    font-size: 14px; box-sizing: border-box;
+                }
+                .conversations-dialog-input:focus {
+                    outline: none; border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.1);
+                }
+                .conversations-dialog-buttons {
+                    display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;
+                }
+                .conversations-dialog-btn {
+                    padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s;
+                }
+                .conversations-dialog-btn.cancel {
+                    border: 1px solid #d1d5db; background: white; color: #374151;
+                }
+                .conversations-dialog-btn.cancel:hover { background: #f3f4f6; }
+                .conversations-dialog-btn.confirm {
+                    border: none; background: ${gradient}; color: white;
+                }
+                .conversations-dialog-btn.confirm:hover { opacity: 0.9; }
+
+                /* 文件夹选择列表 */
+                .conversations-folder-select-list {
+                    max-height: 250px; overflow-y: auto; margin: 12px 0;
+                }
+                .conversations-folder-select-item {
+                    padding: 12px 16px; border-radius: 8px; cursor: pointer;
+                    transition: all 0.2s; font-size: 14px;
+                }
+                .conversations-folder-select-item:hover {
+                    background: #f3f4f6;
+                }
+
+                /* Emoji 选择器 */
+                .conversations-emoji-picker {
+                    display: flex; flex-wrap: wrap; gap: 4px;
+                }
+                .conversations-emoji-btn {
+                    width: 36px; height: 36px; border: 1px solid #e5e7eb; border-radius: 8px;
+                    background: #f9fafb; font-size: 18px; cursor: pointer; transition: all 0.2s;
+                }
+                .conversations-emoji-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+                .conversations-emoji-btn.selected {
+                    background: #e0e7ff; border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.2);
+                }
+
                 /* 分类管理按钮 */
                 .category-manage-btn {
                     padding: 4px 8px; background: transparent; border: 1px dashed #9ca3af; border-radius: 12px;
@@ -4419,50 +8266,65 @@
             if (existingBar) existingBar.remove();
             if (existingBtnGroup) existingBtnGroup.remove();
 
-            const panel = createElement('div', {id: 'gemini-helper-panel'});
+            const panel = createElement('div', { id: 'gemini-helper-panel' });
 
             // Header
-            const header = createElement('div', {className: 'prompt-panel-header'});
-            const title = createElement('div', {className: 'prompt-panel-title'});
+            const header = createElement('div', { className: 'prompt-panel-header' });
+            const title = createElement('div', { className: 'prompt-panel-title' });
             title.appendChild(createElement('span', {}, '✨'));
             title.appendChild(createElement('span', {}, this.t('panelTitle')));
-            title.appendChild(createElement('span', {className: 'site-indicator'}, this.siteAdapter.getName()));
 
-            const controls = createElement('div', {className: 'prompt-panel-controls'});
-            const refreshBtn = createElement('button', {
-                className: 'prompt-panel-btn',
-                id: 'refresh-prompts',
-                title: this.t('refreshPrompts')
-            }, '⟳');
+            const controls = createElement('div', { className: 'prompt-panel-controls' });
+            const refreshBtn = createElement(
+                'button',
+                {
+                    className: 'prompt-panel-btn',
+                    id: 'refresh-prompts',
+                    title: this.t('refreshPrompts'),
+                },
+                '⟳',
+            );
             refreshBtn.addEventListener('click', () => {
                 refreshBtn.classList.add('loading');
                 // 根据当前 Tab 智能刷新
                 if (this.currentTab === 'outline') {
                     this.refreshOutline();
-                    this.showToast(this.t('refreshed'));
+                    showToast(this.t('refreshed'));
                 } else if (this.currentTab === 'prompts') {
                     this.refreshPromptList();
-                    this.showToast(this.t('refreshed'));
+                    showToast(this.t('refreshed'));
+                } else if (this.currentTab === 'conversations') {
+                    // 只刷新 UI 显示，不执行侧边栏同步
+                    this.conversationManager?.createUI();
+                    showToast(this.t('refreshed'));
                 } else {
-                    this.showToast(this.t('refreshed'));
+                    showToast(this.t('refreshed'));
                 }
                 setTimeout(() => refreshBtn.classList.remove('loading'), 500);
             });
-            const toggleBtn = createElement('button', {
-                className: 'prompt-panel-btn',
-                id: 'toggle-panel',
-                title: this.t('collapse')
-            }, '−');
+            const toggleBtn = createElement(
+                'button',
+                {
+                    className: 'prompt-panel-btn',
+                    id: 'toggle-panel',
+                    title: this.t('collapse'),
+                },
+                '−',
+            );
             // 注意：toggleBtn 的事件监听在 bindEvents 中统一绑定，避免重复绑定
             // 新建标签页按钮
             // 新标签页按钮 (只有在设置开启且站点支持时显示)
             if (this.settings.tabSettings?.openInNewTab && this.siteAdapter.supportsNewTab()) {
-                const newTabBtn = createElement('button', {
-                    className: 'prompt-panel-btn',
-                    id: 'new-tab-btn',
-                    title: this.t('newTabTooltip'),
-                    style: 'margin-right: 2px;'
-                }, '+');
+                const newTabBtn = createElement(
+                    'button',
+                    {
+                        className: 'prompt-panel-btn',
+                        id: 'new-tab-btn',
+                        title: this.t('newTabTooltip'),
+                        style: 'margin-right: 2px;',
+                    },
+                    '+',
+                );
                 newTabBtn.addEventListener('click', () => {
                     const url = this.siteAdapter.getNewTabUrl();
                     if (url) {
@@ -4472,6 +8334,28 @@
                 controls.appendChild(newTabBtn);
             }
 
+            // 设置按钮（固定在header，不占用Tab位置）
+            const settingsBtn = createElement(
+                'button',
+                {
+                    className: 'prompt-panel-btn',
+                    id: 'settings-btn',
+                    title: this.t('tabSettings'),
+                },
+                '⚙',
+            );
+            settingsBtn.addEventListener('click', () => {
+                if (this.currentTab === 'settings') {
+                    // 已在设置页，返回上一个 Tab（默认提示词）
+                    this.switchTab(this.previousTab || 'prompts');
+                } else {
+                    // 记住当前 Tab，进入设置
+                    this.previousTab = this.currentTab;
+                    this.switchTab('settings');
+                }
+            });
+
+            controls.appendChild(settingsBtn);
             controls.appendChild(refreshBtn);
             controls.appendChild(toggleBtn);
 
@@ -4499,12 +8383,12 @@
                             privacyTitleItem.style.pointerEvents = isPrivate ? 'auto' : 'none';
                         }
                     }
-                    this.showToast(isPrivate ? '🔒 隐私模式已开启' : '🔓 隐私模式已关闭');
+                    showToast(isPrivate ? '🔒 隐私模式已开启' : '🔓 隐私模式已关闭');
                 }
             });
 
             // Tab 栏
-            const tabs = createElement('div', {className: 'prompt-panel-tabs'});
+            const tabs = createElement('div', { className: 'prompt-panel-tabs' });
 
             // 根据设置的顺序渲染 Tab
             const tabOrder = this.settings.tabOrder || DEFAULT_TAB_ORDER;
@@ -4512,9 +8396,9 @@
             // 确保所有 Tab 都存在（防止新版本新增 Tab 或配置丢失）
             const allTabs = new Set([...tabOrder, ...DEFAULT_TAB_ORDER]);
             // 过滤掉未定义的 Tab ID
-            const validTabs = Array.from(allTabs).filter(id => TAB_DEFINITIONS[id]);
+            const validTabs = Array.from(allTabs).filter((id) => TAB_DEFINITIONS[id]);
 
-            validTabs.forEach(tabId => {
+            validTabs.forEach((tabId) => {
                 const def = TAB_DEFINITIONS[tabId];
 
                 // 特殊处理：如果大纲被禁用，添加 hidden 类，但仍然渲染（为了保持 DOM 结构一致性，或者稍后在 switchTab 处理可见性）
@@ -4530,16 +8414,24 @@
                 if (tabId === 'prompts' && !this.settings.prompts?.enabled) {
                     className += ' hidden';
                 }
+                // 会话特殊显隐逻辑
+                if (tabId === 'conversations' && this.settings.conversations?.enabled === false) {
+                    className += ' hidden';
+                }
+
+                // 设置 Tab 不在这里渲染（已移动到 header 按钮）
+                if (tabId === 'settings') return;
 
                 const btn = createElement('button', {
                     className: className,
                     'data-tab': tabId,
-                    id: `${tabId}-tab`
+                    id: `${tabId}-tab`,
                 });
 
-                // 添加图标和文本
-                btn.appendChild(createElement('span', {style: 'margin-right: 6px;'}, def.icon));
+                // 图标 + 文字
+                btn.appendChild(createElement('span', { style: 'margin-right: 4px;' }, def.icon));
                 btn.appendChild(document.createTextNode(this.t(def.labelKey)));
+                // btn.appendChild(document.createTextNode(this.t(def.labelKey)));
 
                 btn.addEventListener('click', () => this.switchTab(tabId));
                 tabs.appendChild(btn);
@@ -4552,22 +8444,22 @@
             // 1. 提示词面板内容区
             const promptsContent = createElement('div', {
                 className: `prompt-panel-content${this.currentTab === 'prompts' ? '' : ' hidden'}`,
-                id: 'prompts-content'
+                id: 'prompts-content',
             });
 
-            const searchBar = createElement('div', {className: 'prompt-search-bar'});
+            const searchBar = createElement('div', { className: 'prompt-search-bar' });
             const searchInput = createElement('input', {
                 className: 'prompt-search-input',
                 id: 'prompt-search',
                 type: 'text',
-                placeholder: this.t('searchPlaceholder')
+                placeholder: this.t('searchPlaceholder'),
             });
             searchBar.appendChild(searchInput);
 
-            const categories = createElement('div', {className: 'prompt-categories', id: 'prompt-categories'});
-            const list = createElement('div', {className: 'prompt-list', id: 'prompt-list'});
+            const categories = createElement('div', { className: 'prompt-categories', id: 'prompt-categories' });
+            const list = createElement('div', { className: 'prompt-list', id: 'prompt-list' });
 
-            const addBtn = createElement('button', {className: 'add-prompt-btn', id: 'add-prompt'});
+            const addBtn = createElement('button', { className: 'add-prompt-btn', id: 'add-prompt' });
             addBtn.appendChild(createElement('span', {}, '+'));
             addBtn.appendChild(createElement('span', {}, this.t('addPrompt')));
 
@@ -4576,11 +8468,10 @@
             promptsContent.appendChild(list);
             promptsContent.appendChild(addBtn);
 
-
             // 2. 大纲面板内容区
             const outlineContent = createElement('div', {
                 className: `prompt-panel-content${this.currentTab === 'outline' ? '' : ' hidden'}`,
-                id: 'outline-content'
+                id: 'outline-content',
             });
             // 初始化大纲管理器
             this.outlineManager = new OutlineManager({
@@ -4588,52 +8479,78 @@
                 settings: this.settings,
                 onSettingsChange: () => this.saveSettings(),
                 onJumpBefore: () => this.anchorManager.setAnchor(this.scrollManager.scrollTop),
-                i18n: (k) => this.t(k)
+                i18n: (k) => this.t(k),
             });
 
+            // 3. 会话面板内容区
+            const conversationsContent = createElement('div', {
+                className: `prompt-panel-content${this.currentTab === 'conversations' ? '' : ' hidden'}`,
+                id: 'conversations-content',
+            });
+            // 初始化会话管理器
+            this.conversationManager = new ConversationManager({
+                container: conversationsContent,
+                settings: this.settings,
+                siteAdapter: this.siteAdapter,
+                i18n: (k) => this.t(k),
+            });
 
-            // 3. 设置面板内容区
+            // 4. 设置面板内容区
             const settingsContent = createElement('div', {
                 className: `prompt-panel-content${this.currentTab === 'settings' ? '' : ' hidden'}`,
-                id: 'settings-content'
+                id: 'settings-content',
             });
             this.createSettingsContent(settingsContent);
 
-
             panel.appendChild(promptsContent);
             panel.appendChild(outlineContent);
+            panel.appendChild(conversationsContent);
             panel.appendChild(settingsContent);
 
             document.body.appendChild(panel);
 
             // 选中提示词悬浮条
-            const selectedBar = createElement('div', {className: 'selected-prompt-bar', style: 'user-select: none;'});
-            selectedBar.appendChild(createElement('span', {style: 'user-select: none;'}, this.t('currentPrompt')));
-            selectedBar.appendChild(createElement('span', {
-                className: 'selected-prompt-text',
-                id: 'selected-prompt-text',
-                style: 'user-select: none;'
-            }));
-            const clearBtn = createElement('button', {className: 'clear-prompt-btn', id: 'clear-prompt'}, '×');
+            const selectedBar = createElement('div', { className: 'selected-prompt-bar', style: 'user-select: none;' });
+            selectedBar.appendChild(createElement('span', { style: 'user-select: none;' }, this.t('currentPrompt')));
+            selectedBar.appendChild(
+                createElement('span', {
+                    className: 'selected-prompt-text',
+                    id: 'selected-prompt-text',
+                    style: 'user-select: none;',
+                }),
+            );
+            const clearBtn = createElement('button', { className: 'clear-prompt-btn', id: 'clear-prompt' }, '×');
             selectedBar.appendChild(clearBtn);
             document.body.appendChild(selectedBar);
 
-            const quickBtnGroup = createElement('div', {className: 'quick-btn-group hidden', id: 'quick-btn-group'});
-            const quickBtn = createElement('button', {className: 'quick-prompt-btn', title: this.t('panelTitle')}, '✨');
-            const quickScrollTop = createElement('button', {
-                className: 'quick-prompt-btn',
-                title: this.t('scrollTop')
-            }, '⬆');
-            const quickAnchor = createElement('button', {
-                className: 'quick-prompt-btn',
-                id: 'quick-anchor-btn',
-                title: '暂无锚点',
-                style: (this.settings.showCollapsedAnchor ? 'display: flex;' : 'display: none;') + ' opacity: 0.4; cursor: default;'
-            }, '⚓');
-            const quickScrollBottom = createElement('button', {
-                className: 'quick-prompt-btn',
-                title: this.t('scrollBottom')
-            }, '⬇');
+            const quickBtnGroup = createElement('div', { className: 'quick-btn-group hidden', id: 'quick-btn-group' });
+            const quickBtn = createElement('button', { className: 'quick-prompt-btn', title: this.t('panelTitle') }, '✨');
+            const quickScrollTop = createElement(
+                'button',
+                {
+                    className: 'quick-prompt-btn',
+                    title: this.t('scrollTop'),
+                },
+                '⬆',
+            );
+            const quickAnchor = createElement(
+                'button',
+                {
+                    className: 'quick-prompt-btn',
+                    id: 'quick-anchor-btn',
+                    title: '暂无锚点',
+                    style: (this.settings.showCollapsedAnchor ? 'display: flex;' : 'display: none;') + ' opacity: 0.4; cursor: default;',
+                },
+                '⚓',
+            );
+            const quickScrollBottom = createElement(
+                'button',
+                {
+                    className: 'quick-prompt-btn',
+                    title: this.t('scrollBottom'),
+                },
+                '⬇',
+            );
 
             quickBtn.addEventListener('click', () => {
                 this.togglePanel();
@@ -4651,12 +8568,12 @@
             // 快捷跳转按钮组 - 放在面板底部
             const scrollNavContainer = createElement('div', {
                 className: 'scroll-nav-container',
-                id: 'scroll-nav-container'
+                id: 'scroll-nav-container',
             });
             const scrollTopBtn = createElement('button', {
                 className: 'scroll-nav-btn',
                 id: 'scroll-top-btn',
-                title: this.t('scrollTop')
+                title: this.t('scrollTop'),
             });
             scrollTopBtn.appendChild(createElement('span', {}, '⬆'));
             scrollTopBtn.appendChild(createElement('span', {}, this.t('scrollTop')));
@@ -4665,15 +8582,14 @@
                 className: 'scroll-nav-btn icon-only',
                 id: 'scroll-anchor-btn',
                 title: '暂无锚点',
-                style: 'opacity: 0.4; cursor: default;'
+                style: 'opacity: 0.4; cursor: default;',
             });
             anchorBtn.appendChild(createElement('span', {}, '⚓'));
-            // anchorBtn.appendChild(createElement('span', {}, this.t('anchorPoint')));
 
             const scrollBottomBtn = createElement('button', {
                 className: 'scroll-nav-btn',
                 id: 'scroll-bottom-btn',
-                title: this.t('scrollBottom')
+                title: this.t('scrollBottom'),
             });
             scrollBottomBtn.appendChild(createElement('span', {}, '⬇'));
             scrollBottomBtn.appendChild(createElement('span', {}, this.t('scrollBottom')));
@@ -4699,13 +8615,20 @@
             this.currentTab = tabName;
 
             // 更新 Tab 激活状态
-            document.querySelectorAll('.prompt-panel-tab').forEach(tab => {
+            document.querySelectorAll('.prompt-panel-tab').forEach((tab) => {
                 tab.classList.toggle('active', tab.dataset.tab === tabName);
             });
+
+            // 更新设置按钮激活状态
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) {
+                settingsBtn.classList.toggle('active', tabName === 'settings');
+            }
 
             // 切换内容区
             document.getElementById('prompts-content')?.classList.toggle('hidden', tabName !== 'prompts');
             document.getElementById('outline-content')?.classList.toggle('hidden', tabName !== 'outline');
+            document.getElementById('conversations-content')?.classList.toggle('hidden', tabName !== 'conversations');
             document.getElementById('settings-content')?.classList.toggle('hidden', tabName !== 'settings');
 
             // 通知 OutlineManager 激活状态（用于控制自动更新显隐）
@@ -4713,13 +8636,19 @@
                 this.outlineManager.setActive(tabName === 'outline');
             }
 
+            // 通知 ConversationManager 激活状态
+            if (this.conversationManager) {
+                this.conversationManager.setActive(tabName === 'conversations');
+            }
+
             // 更新刷新按钮的提示
             const refreshBtn = document.getElementById('refresh-prompts');
             if (refreshBtn) {
                 const titleMap = {
-                    'prompts': this.t('refreshPrompts'),
-                    'outline': this.t('refreshOutline'),
-                    'settings': this.t('refreshSettings')
+                    prompts: this.t('refreshPrompts'),
+                    outline: this.t('refreshOutline'),
+                    conversations: this.t('conversationsRefresh'),
+                    settings: this.t('refreshSettings'),
                 };
                 refreshBtn.title = titleMap[tabName] || this.t('refresh');
             }
@@ -4739,24 +8668,27 @@
             }
         }
 
-
         // 创建可折叠区域辅助方法
         createCollapsibleSection(title, content, options = {}) {
-            const {defaultExpanded = false} = options;
-            const section = createElement('div', {className: 'settings-section'});
+            const { defaultExpanded = false } = options;
+            const section = createElement('div', { className: 'settings-section' });
 
             // 标题栏（可点击折叠/展开）
             const header = createElement('div', {
                 className: 'settings-section-title',
-                style: 'cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;'
+                style: 'cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;',
             });
 
-            const headerLeft = createElement('div', {style: 'display: flex; align-items: center; gap: 6px;'});
+            const headerLeft = createElement('div', { style: 'display: flex; align-items: center; gap: 6px;' });
             // 箭头
-            const arrow = createElement('span', {
-                style: 'font-size: 10px; color: #9ca3af; transition: transform 0.2s; display: inline-block;',
-                className: 'collapse-arrow'
-            }, '▶');
+            const arrow = createElement(
+                'span',
+                {
+                    style: 'font-size: 10px; color: #9ca3af; transition: transform 0.2s; display: inline-block;',
+                    className: 'collapse-arrow',
+                },
+                '▶',
+            );
 
             const headerTitle = createElement('span', {}, title);
             headerLeft.appendChild(arrow);
@@ -4770,7 +8702,7 @@
             // 内容容器
             const contentContainer = createElement('div', {
                 className: 'settings-accordion-content',
-                style: `display: ${defaultExpanded ? 'block' : 'none'}; padding-top: 8px; animation: slideDown 0.2s;`
+                style: `display: ${defaultExpanded ? 'block' : 'none'}; padding-top: 8px; animation: slideDown 0.2s;`,
             });
             contentContainer.appendChild(content);
 
@@ -4783,7 +8715,6 @@
             // 初始化状态
             if (defaultExpanded) arrow.style.transform = 'rotate(90deg)';
 
-
             header.addEventListener('click', () => {
                 isExpanded = !isExpanded;
                 updateState();
@@ -4795,26 +8726,26 @@
 
         // 创建设置面板内容
         createSettingsContent(container) {
-            const content = createElement('div', {className: 'settings-content'});
+            const content = createElement('div', { className: 'settings-content' });
 
             // 1. 语言设置 (保持在顶部)
-            const langSection = createElement('div', {className: 'settings-section'});
-            langSection.appendChild(createElement('div', {className: 'settings-section-title'}, this.t('settingsTitle')));
+            const langSection = createElement('div', { className: 'settings-section' });
+            langSection.appendChild(createElement('div', { className: 'settings-section-title' }, this.t('settingsTitle')));
 
-            const langItem = createElement('div', {className: 'setting-item'});
-            const langInfo = createElement('div', {className: 'setting-item-info'});
-            langInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('languageLabel')));
-            langInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('languageDesc')));
+            const langItem = createElement('div', { className: 'setting-item' });
+            const langInfo = createElement('div', { className: 'setting-item-info' });
+            langInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('languageLabel')));
+            langInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('languageDesc')));
 
-            const langSelect = createElement('select', {className: 'setting-select', id: 'select-language'});
+            const langSelect = createElement('select', { className: 'setting-select', id: 'select-language' });
             const currentLang = GM_getValue(SETTING_KEYS.LANGUAGE, 'auto');
             [
-                {value: 'auto', label: this.t('languageAuto')},
-                {value: 'zh-CN', label: this.t('languageZhCN')},
-                {value: 'zh-TW', label: this.t('languageZhTW')},
-                {value: 'en', label: this.t('languageEn')}
-            ].forEach(opt => {
-                const option = createElement('option', {value: opt.value}, opt.label);
+                { value: 'auto', label: this.t('languageAuto') },
+                { value: 'zh-CN', label: this.t('languageZhCN') },
+                { value: 'zh-TW', label: this.t('languageZhTW') },
+                { value: 'en', label: this.t('languageEn') },
+            ].forEach((opt) => {
+                const option = createElement('option', { value: opt.value }, opt.label);
                 if (opt.value === currentLang) option.selected = true;
                 langSelect.appendChild(option);
             });
@@ -4826,16 +8757,14 @@
                 this.createUI();
                 this.bindEvents();
                 this.switchTab('settings');
-                this.showToast(langSelect.value === 'auto' ? this.t('languageAuto') : langSelect.options[langSelect.selectedIndex].text);
+                showToast(langSelect.value === 'auto' ? this.t('languageAuto') : langSelect.options[langSelect.selectedIndex].text);
             });
 
             langItem.appendChild(langInfo);
             langItem.appendChild(langSelect);
             langSection.appendChild(langItem);
 
-
             content.appendChild(langSection);
-
 
             // 2. 模型锁定设置 (可折叠)
             let lockSection = null;
@@ -4844,20 +8773,20 @@
                 if (adaptersWithLock.length > 0) {
                     const lockContainer = createElement('div', {});
                     // 为每个站点生成配置行
-                    adaptersWithLock.forEach(adapter => {
+                    adaptersWithLock.forEach((adapter) => {
                         const siteId = adapter.getSiteId();
                         const siteConfig = this.settings.modelLockConfig[siteId] || adapter.getDefaultLockSettings();
 
                         const row = createElement('div', {
                             className: 'site-lock-row',
-                            style: 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;'
+                            style: 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;',
                         });
 
-                        const leftCol = createElement('div', {style: 'display: flex; align-items: center; flex: 1; gap: 12px;'});
-                        const nameLabel = createElement('div', {style: 'font-size: 14px; font-weight: 500; color: #374151; min-width: 80px;'}, adapter.getName());
+                        const leftCol = createElement('div', { style: 'display: flex; align-items: center; flex: 1; gap: 12px;' });
+                        const nameLabel = createElement('div', { style: 'font-size: 14px; font-weight: 500; color: #374151; min-width: 80px;' }, adapter.getName());
                         const toggle = createElement('div', {
                             className: 'setting-toggle' + (siteConfig.enabled ? ' active' : ''),
-                            style: 'transform: scale(0.8);'
+                            style: 'transform: scale(0.8);',
                         });
 
                         leftCol.appendChild(nameLabel);
@@ -4869,7 +8798,7 @@
                             className: 'prompt-input-title',
                             value: siteConfig.keyword || '',
                             placeholder: this.t('modelKeywordPlaceholder'),
-                            style: 'width: 80px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; text-align: center;'
+                            style: 'width: 80px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; text-align: center;',
                         });
 
                         const updateState = () => {
@@ -4907,18 +8836,17 @@
                 }
             }
 
-
             // 3. 页面宽度设置 (可折叠)
             const widthContainer = createElement('div', {});
 
             // 启用开关
-            const enableWidthItem = createElement('div', {className: 'setting-item'});
-            const enableWidthInfo = createElement('div', {className: 'setting-item-info'});
-            enableWidthInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('enablePageWidth')));
-            enableWidthInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('pageWidthDesc')));
+            const enableWidthItem = createElement('div', { className: 'setting-item' });
+            const enableWidthInfo = createElement('div', { className: 'setting-item-info' });
+            enableWidthInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('enablePageWidth')));
+            enableWidthInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('pageWidthDesc')));
             const enableToggle = createElement('div', {
                 className: 'setting-toggle' + (this.settings.pageWidth && this.settings.pageWidth.enabled ? ' active' : ''),
-                id: 'toggle-page-width'
+                id: 'toggle-page-width',
             });
             enableToggle.addEventListener('click', () => {
                 this.settings.pageWidth.enabled = !this.settings.pageWidth.enabled;
@@ -4927,32 +8855,32 @@
                 if (this.widthStyleManager) {
                     this.widthStyleManager.updateConfig(this.settings.pageWidth);
                 }
-                this.showToast(this.settings.pageWidth.enabled ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.pageWidth.enabled ? this.t('settingOn') : this.t('settingOff'));
             });
             enableWidthItem.appendChild(enableWidthInfo);
             enableWidthItem.appendChild(enableToggle);
             widthContainer.appendChild(enableWidthItem);
 
             // 值设置
-            const widthValueItem = createElement('div', {className: 'setting-item'});
-            const widthValueInfo = createElement('div', {className: 'setting-item-info'});
-            widthValueInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('widthValue')));
+            const widthValueItem = createElement('div', { className: 'setting-item' });
+            const widthValueInfo = createElement('div', { className: 'setting-item-info' });
+            widthValueInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('widthValue')));
 
-            const widthControls = createElement('div', {className: 'setting-controls'});
+            const widthControls = createElement('div', { className: 'setting-controls' });
             const widthInput = createElement('input', {
                 type: 'number',
                 className: 'setting-select',
                 id: 'width-value-input',
                 value: this.settings.pageWidth ? this.settings.pageWidth.value : '70',
-                style: 'width: 65px !important; min-width: 65px !important; text-align: right;'
+                style: 'width: 65px !important; min-width: 65px !important; text-align: right;',
             });
             const unitSelect = createElement('select', {
                 className: 'setting-select',
                 id: 'width-unit-select',
-                style: 'width: 65px;'
+                style: 'width: 65px;',
             });
-            ['%', 'px'].forEach(unit => {
-                const option = createElement('option', {value: unit}, unit);
+            ['%', 'px'].forEach((unit) => {
+                const option = createElement('option', { value: unit }, unit);
                 if (this.settings.pageWidth && this.settings.pageWidth.unit === unit) option.selected = true;
                 unitSelect.appendChild(option);
             });
@@ -4986,7 +8914,7 @@
                 if (unitSelect.value === '%' && parseFloat(widthInput.value) > 100) widthInput.value = '70';
                 else if (unitSelect.value === 'px' && parseFloat(widthInput.value) <= 100) widthInput.value = '1200';
                 validateAndSave();
-                this.showToast(`${this.t('widthValue')}: ${widthInput.value}${unitSelect.value}`);
+                showToast(`${this.t('widthValue')}: ${widthInput.value}${unitSelect.value}`);
             });
 
             widthControls.appendChild(widthInput);
@@ -4996,14 +8924,14 @@
             widthContainer.appendChild(widthValueItem);
 
             // 防止自动滚动（从其他设置移入）
-            const scrollLockItem = createElement('div', {className: 'setting-item'});
-            const scrollLockInfo = createElement('div', {className: 'setting-item-info'});
-            scrollLockInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('preventAutoScrollLabel')));
-            scrollLockInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('preventAutoScrollDesc')));
+            const scrollLockItem = createElement('div', { className: 'setting-item' });
+            const scrollLockInfo = createElement('div', { className: 'setting-item-info' });
+            scrollLockInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('preventAutoScrollLabel')));
+            scrollLockInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('preventAutoScrollDesc')));
 
             const scrollLockToggle = createElement('div', {
                 className: 'setting-toggle' + (this.settings.preventAutoScroll ? ' active' : ''),
-                id: 'toggle-scroll-lock'
+                id: 'toggle-scroll-lock',
             });
             scrollLockToggle.addEventListener('click', () => {
                 this.settings.preventAutoScroll = !this.settings.preventAutoScroll;
@@ -5012,7 +8940,7 @@
                 if (this.scrollLockManager) {
                     this.scrollLockManager.setEnabled(this.settings.preventAutoScroll);
                 }
-                this.showToast(this.settings.preventAutoScroll ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.preventAutoScroll ? this.t('settingOn') : this.t('settingOff'));
             });
             scrollLockItem.appendChild(scrollLockInfo);
             scrollLockItem.appendChild(scrollLockToggle);
@@ -5020,25 +8948,29 @@
 
             const widthSection = this.createCollapsibleSection(this.t('pageDisplaySettings'), widthContainer);
 
-
             // 4. 界面排版 (可折叠)
             const layoutContainer = createElement('div', {});
-            const tabDesc = createElement('div', {
-                className: 'setting-item-desc',
-                style: 'padding: 0 12px 8px 12px; margin-bottom: 4px;'
-            }, this.t('tabOrderDesc'));
+            const tabDesc = createElement(
+                'div',
+                {
+                    className: 'setting-item-desc',
+                    style: 'padding: 0 12px 8px 12px; margin-bottom: 4px;',
+                },
+                this.t('tabOrderDesc'),
+            );
             layoutContainer.appendChild(tabDesc);
 
             const currentOrder = this.settings.tabOrder || DEFAULT_TAB_ORDER;
-            const validOrder = currentOrder.filter(id => TAB_DEFINITIONS[id]);
+            // 过滤掉 settings（已移到 header 按钮，不参与排序）
+            const validOrder = currentOrder.filter((id) => TAB_DEFINITIONS[id] && id !== 'settings');
 
             validOrder.forEach((tabId, index) => {
                 const def = TAB_DEFINITIONS[tabId];
-                const item = createElement('div', {className: 'setting-item'});
-                const info = createElement('div', {className: 'setting-item-info'});
-                info.appendChild(createElement('div', {className: 'setting-item-label'}, this.t(def.labelKey)));
+                const item = createElement('div', { className: 'setting-item' });
+                const info = createElement('div', { className: 'setting-item-info' });
+                info.appendChild(createElement('div', { className: 'setting-item-label' }, this.t(def.labelKey)));
 
-                const controls = createElement('div', {className: 'setting-controls'});
+                const controls = createElement('div', { className: 'setting-controls' });
 
                 // 特殊处理：如果是大纲 Tab，在排序按钮旁边添加开关
                 if (tabId === 'outline') {
@@ -5046,7 +8978,7 @@
                         className: 'setting-toggle' + (this.settings.outline?.enabled ? ' active' : ''),
                         id: 'toggle-outline-inline',
                         style: 'transform: scale(0.8); margin-right: 12px;',
-                        title: this.t('enableOutline') // 添加提示
+                        title: this.t('enableOutline'), // 添加提示
                     });
                     outlineToggle.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -5065,7 +8997,7 @@
                             this.outlineManager.updateAutoUpdateState();
                         }
 
-                        this.showToast(this.settings.outline.enabled ? this.t('settingOn') : this.t('settingOff'));
+                        showToast(this.settings.outline.enabled ? this.t('settingOn') : this.t('settingOff'));
                     });
                     controls.appendChild(outlineToggle);
                 }
@@ -5076,7 +9008,7 @@
                         className: 'setting-toggle' + (this.settings.prompts?.enabled ? ' active' : ''),
                         id: 'toggle-prompts-inline',
                         style: 'transform: scale(0.8); margin-right: 12px;',
-                        title: this.t('togglePrompts')
+                        title: this.t('togglePrompts'),
                     });
                     promptsToggle.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -5089,23 +9021,43 @@
 
                         if (!this.settings.prompts.enabled && this.currentTab === 'prompts') this.switchTab('settings');
 
-                        this.showToast(this.settings.prompts.enabled ? this.t('settingOn') : this.t('settingOff'));
+                        showToast(this.settings.prompts.enabled ? this.t('settingOn') : this.t('settingOff'));
                     });
                     controls.appendChild(promptsToggle);
                 }
 
-                // 大纲高级设置（如果是在大纲 Tab 行）
-                if (tabId === 'outline') {
-                    // 插入大纲高级设置的可折叠区域到下面（或者作为子项）
-                    // 为保持 UI 简洁，我们可以在点击大纲 toggle 时不做额外展示，而是有一个专门的“大纲高级设置”区域
-                    // 由于这里是排序拖拽区，不适合放太多配置。
-                    // 决定：在排序列表下方新增一个独立的大纲设置区域
+                // 特殊处理：如果是会话 Tab，在排序按钮旁边添加开关
+                if (tabId === 'conversations') {
+                    // 确保 conversations 设置对象存在
+                    if (!this.settings.conversations) {
+                        this.settings.conversations = { enabled: true };
+                    }
+                    const conversationsToggle = createElement('div', {
+                        className: 'setting-toggle' + (this.settings.conversations?.enabled !== false ? ' active' : ''),
+                        id: 'toggle-conversations-inline',
+                        style: 'transform: scale(0.8); margin-right: 12px;',
+                        title: this.t('toggleConversations'),
+                    });
+                    conversationsToggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.settings.conversations.enabled = !this.settings.conversations.enabled;
+                        conversationsToggle.classList.toggle('active', this.settings.conversations.enabled);
+                        this.saveSettings();
+
+                        const conversationsTab = document.getElementById('conversations-tab');
+                        if (conversationsTab) conversationsTab.classList.toggle('hidden', !this.settings.conversations.enabled);
+
+                        if (!this.settings.conversations.enabled && this.currentTab === 'conversations') this.switchTab('settings');
+
+                        showToast(this.settings.conversations.enabled ? this.t('settingOn') : this.t('settingOff'));
+                    });
+                    controls.appendChild(conversationsToggle);
                 }
 
                 const upBtn = createElement('button', {
                     className: 'prompt-panel-btn',
                     style: 'background: #f3f4f6; color: #4b5563; width: 32px; height: 32px; font-size: 16px; margin-right: 4px; border: 1px solid #e5e7eb;',
-                    title: this.t('moveUp')
+                    title: this.t('moveUp'),
                 });
                 upBtn.textContent = '⬆';
                 upBtn.disabled = index === 0;
@@ -5113,12 +9065,12 @@
                 const downBtn = createElement('button', {
                     className: 'prompt-panel-btn',
                     style: 'background: #f3f4f6; color: #4b5563; width: 32px; height: 32px; font-size: 16px; border: 1px solid #e5e7eb;',
-                    title: this.t('moveDown')
+                    title: this.t('moveDown'),
                 });
                 downBtn.textContent = '⬇';
                 downBtn.disabled = index === validOrder.length - 1;
 
-                [upBtn, downBtn].forEach(btn => {
+                [upBtn, downBtn].forEach((btn) => {
                     if (btn.disabled) {
                         btn.style.opacity = '0.4';
                         btn.style.cursor = 'not-allowed';
@@ -5171,50 +9123,50 @@
 
             const layoutSection = this.createCollapsibleSection(this.t('tabOrderSettings'), layoutContainer);
 
-            // 4.5 阅读历史设置 (新增独立版块)
+            // 4.5 阅读历史设置
             const anchorContainer = createElement('div', {});
 
             // 持久化开关
-            const anchorPersistenceItem = createElement('div', {className: 'setting-item'});
-            const anchorPersistenceInfo = createElement('div', {className: 'setting-item-info'});
-            anchorPersistenceInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('readingHistoryPersistence')));
-            anchorPersistenceInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('readingHistoryPersistenceDesc')));
+            const anchorPersistenceItem = createElement('div', { className: 'setting-item' });
+            const anchorPersistenceInfo = createElement('div', { className: 'setting-item-info' });
+            anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('readingHistoryPersistence')));
+            anchorPersistenceInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('readingHistoryPersistenceDesc')));
 
             const anchorPersistenceToggle = createElement('div', {
                 className: 'setting-toggle' + (this.settings.readingHistory.persistence ? ' active' : ''),
-                id: 'toggle-anchor-persistence'
+                id: 'toggle-anchor-persistence',
             });
 
             // 自动恢复开关
-            const anchorAutoRestoreItem = createElement('div', {className: 'setting-item'});
-            const anchorAutoRestoreInfo = createElement('div', {className: 'setting-item-info'});
-            anchorAutoRestoreInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('autoRestore')));
-            anchorAutoRestoreInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('autoRestoreDesc')));
+            const anchorAutoRestoreItem = createElement('div', { className: 'setting-item' });
+            const anchorAutoRestoreInfo = createElement('div', { className: 'setting-item-info' });
+            anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('autoRestore')));
+            anchorAutoRestoreInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('autoRestoreDesc')));
             const anchorAutoRestoreToggle = createElement('div', {
                 className: 'setting-toggle' + (this.settings.readingHistory.autoRestore ? ' active' : ''),
-                id: 'toggle-anchor-auto-restore'
+                id: 'toggle-anchor-auto-restore',
             });
 
             // 清理时间设置
-            const anchorCleanupItem = createElement('div', {className: 'setting-item'});
-            const anchorCleanupInfo = createElement('div', {className: 'setting-item-info'});
-            anchorCleanupInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('readingHistoryCleanup')));
-            anchorCleanupInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('readingHistoryCleanupDesc')));
+            const anchorCleanupItem = createElement('div', { className: 'setting-item' });
+            const anchorCleanupInfo = createElement('div', { className: 'setting-item-info' });
+            anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('readingHistoryCleanup')));
+            anchorCleanupInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('readingHistoryCleanupDesc')));
 
-            const anchorCleanupControls = createElement('div', {className: 'setting-controls'});
-            const anchorCleanupInput = createElement('select', {className: 'setting-select'});
+            const anchorCleanupControls = createElement('div', { className: 'setting-controls' });
+            const anchorCleanupInput = createElement('select', { className: 'setting-select' });
 
             // 填充清理选项
             const cleanupOptions = [
-                {val: 1, label: `1 ${this.t('daysSuffix')}`},
-                {val: 3, label: `3 ${this.t('daysSuffix')}`},
-                {val: 7, label: `7 ${this.t('daysSuffix')}`},
-                {val: 30, label: `30 ${this.t('daysSuffix')}`},
-                {val: 90, label: `90 ${this.t('daysSuffix')}`},
-                {val: -1, label: this.t('cleanupInfinite')}
+                { val: 1, label: `1 ${this.t('daysSuffix')}` },
+                { val: 3, label: `3 ${this.t('daysSuffix')}` },
+                { val: 7, label: `7 ${this.t('daysSuffix')}` },
+                { val: 30, label: `30 ${this.t('daysSuffix')}` },
+                { val: 90, label: `90 ${this.t('daysSuffix')}` },
+                { val: -1, label: this.t('cleanupInfinite') },
             ];
-            cleanupOptions.forEach(opt => {
-                const option = createElement('option', {value: opt.val}, opt.label);
+            cleanupOptions.forEach((opt) => {
+                const option = createElement('option', { value: opt.val }, opt.label);
                 if (this.settings.readingHistory.cleanupDays == opt.val) option.selected = true;
                 anchorCleanupInput.appendChild(option);
             });
@@ -5242,20 +9194,20 @@
                 anchorPersistenceToggle.classList.toggle('active', this.settings.readingHistory.persistence);
                 this.saveSettings();
                 updateDependency(this.settings.readingHistory.persistence);
-                this.showToast(this.settings.readingHistory.persistence ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.readingHistory.persistence ? this.t('settingOn') : this.t('settingOff'));
             });
 
             anchorAutoRestoreToggle.addEventListener('click', () => {
                 this.settings.readingHistory.autoRestore = !this.settings.readingHistory.autoRestore;
                 anchorAutoRestoreToggle.classList.toggle('active', this.settings.readingHistory.autoRestore);
                 this.saveSettings();
-                this.showToast(this.settings.readingHistory.autoRestore ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.readingHistory.autoRestore ? this.t('settingOn') : this.t('settingOff'));
             });
 
             anchorCleanupInput.addEventListener('change', () => {
                 this.settings.readingHistory.cleanupDays = parseInt(anchorCleanupInput.value);
                 this.saveSettings();
-                this.showToast(`${this.t('readingHistoryCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
+                showToast(`${this.t('readingHistoryCleanup')}: ${anchorCleanupInput.options[anchorCleanupInput.selectedIndex].text}`);
             });
 
             anchorPersistenceItem.appendChild(anchorPersistenceInfo);
@@ -5272,15 +9224,15 @@
             anchorContainer.appendChild(anchorAutoRestoreItem);
             anchorContainer.appendChild(anchorCleanupItem);
 
-            // 折叠面板显示锚点（从其他设置移入）
-            const showAnchorItem = createElement('div', {className: 'setting-item'});
-            const showAnchorInfo = createElement('div', {className: 'setting-item-info'});
-            showAnchorInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('showCollapsedAnchorLabel')));
-            showAnchorInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('showCollapsedAnchorDesc')));
+            // 折叠面板显示锚点
+            const showAnchorItem = createElement('div', { className: 'setting-item' });
+            const showAnchorInfo = createElement('div', { className: 'setting-item-info' });
+            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showCollapsedAnchorLabel')));
+            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showCollapsedAnchorDesc')));
 
             const showAnchorToggle = createElement('div', {
                 className: 'setting-toggle' + (this.settings.showCollapsedAnchor ? ' active' : ''),
-                id: 'toggle-show-collapsed-anchor'
+                id: 'toggle-show-collapsed-anchor',
             });
             showAnchorToggle.addEventListener('click', () => {
                 this.settings.showCollapsedAnchor = !this.settings.showCollapsedAnchor;
@@ -5294,7 +9246,7 @@
                     quickAnchor.style.display = this.settings.showCollapsedAnchor ? 'flex' : 'none';
                 }
 
-                this.showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
             });
             showAnchorItem.appendChild(showAnchorInfo);
             showAnchorItem.appendChild(showAnchorToggle);
@@ -5302,41 +9254,41 @@
 
             const anchorSection = this.createCollapsibleSection(this.t('readingNavigationSettings'), anchorContainer);
 
-            // 5. 大纲详细设置 (高级配置)
+            // 5. 大纲详细设置
             const outlineSettingsContainer = createElement('div', {});
 
             // 自动更新开关
-            const autoUpdateItem = createElement('div', {className: 'setting-item'});
-            const autoUpdateInfo = createElement('div', {className: 'setting-item-info'});
-            autoUpdateInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('outlineAutoUpdateLabel')));
-            autoUpdateInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('outlineAutoUpdateDesc')));
+            const autoUpdateItem = createElement('div', { className: 'setting-item' });
+            const autoUpdateInfo = createElement('div', { className: 'setting-item-info' });
+            autoUpdateInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('outlineAutoUpdateLabel')));
+            autoUpdateInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('outlineAutoUpdateDesc')));
 
             const autoUpdateToggle = createElement('div', {
                 className: 'setting-toggle' + (this.settings.outline.autoUpdate ? ' active' : ''),
-                id: 'toggle-outline-auto-update'
+                id: 'toggle-outline-auto-update',
             });
             autoUpdateToggle.addEventListener('click', () => {
                 this.settings.outline.autoUpdate = !this.settings.outline.autoUpdate;
                 autoUpdateToggle.classList.toggle('active', this.settings.outline.autoUpdate);
                 this.saveSettings();
                 if (this.outlineManager) this.outlineManager.updateAutoUpdateState();
-                this.showToast(this.settings.outline.autoUpdate ? this.t('settingOn') : this.t('settingOff'));
+                showToast(this.settings.outline.autoUpdate ? this.t('settingOn') : this.t('settingOff'));
             });
             autoUpdateItem.appendChild(autoUpdateInfo);
             autoUpdateItem.appendChild(autoUpdateToggle);
             outlineSettingsContainer.appendChild(autoUpdateItem);
 
             // 更新间隔
-            const updateIntervalItem = createElement('div', {className: 'setting-item'});
-            const updateIntervalInfo = createElement('div', {className: 'setting-item-info'});
-            updateIntervalInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('outlineUpdateIntervalLabel')));
-            const updateIntervalControls = createElement('div', {className: 'setting-controls'});
+            const updateIntervalItem = createElement('div', { className: 'setting-item' });
+            const updateIntervalInfo = createElement('div', { className: 'setting-item-info' });
+            updateIntervalInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('outlineUpdateIntervalLabel')));
+            const updateIntervalControls = createElement('div', { className: 'setting-controls' });
             const updateIntervalInput = createElement('input', {
                 type: 'number',
                 className: 'setting-select',
                 value: this.settings.outline.updateInterval,
                 style: 'width: 60px !important; text-align: center;',
-                min: 1
+                min: 1,
             });
             updateIntervalInput.addEventListener('change', () => {
                 let val = parseInt(updateIntervalInput.value, 10);
@@ -5345,29 +9297,28 @@
                 this.settings.outline.updateInterval = val;
                 this.saveSettings();
                 // OutlineManager 在触发下一次更新时会自动使用新间隔
-                this.showToast(this.t('outlineIntervalUpdated').replace('{val}', val));
+                showToast(this.t('outlineIntervalUpdated').replace('{val}', val));
             });
             updateIntervalControls.appendChild(updateIntervalInput);
             updateIntervalItem.appendChild(updateIntervalInfo);
             updateIntervalItem.appendChild(updateIntervalControls);
             outlineSettingsContainer.appendChild(updateIntervalItem);
 
-            const outlineSettingsSection = this.createCollapsibleSection(this.t('outlineSettings'), outlineSettingsContainer, {defaultExpanded: false});
+            const outlineSettingsSection = this.createCollapsibleSection(this.t('outlineSettings'), outlineSettingsContainer, { defaultExpanded: false });
 
-
-            // 6. 标签页设置 (折叠面板)
+            // 6. 标签页设置
             const tabSettingsContainer = createElement('div', {});
 
             // 6.1 新标签页打开开关
             if (this.siteAdapter.supportsNewTab()) {
-                const newTabItem = createElement('div', {className: 'setting-item'});
-                const newTabInfo = createElement('div', {className: 'setting-item-info'});
-                newTabInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('openNewTabLabel')));
-                newTabInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('openNewTabDesc')));
+                const newTabItem = createElement('div', { className: 'setting-item' });
+                const newTabInfo = createElement('div', { className: 'setting-item-info' });
+                newTabInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('openNewTabLabel')));
+                newTabInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('openNewTabDesc')));
 
                 const newTabToggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.tabSettings?.openInNewTab ? ' active' : ''),
-                    id: 'toggle-new-tab'
+                    id: 'toggle-new-tab',
                 });
                 newTabToggle.addEventListener('click', () => {
                     this.settings.tabSettings.openInNewTab = !this.settings.tabSettings.openInNewTab;
@@ -5378,7 +9329,7 @@
                     if (this.currentTab === 'settings') {
                         this.switchTab('settings');
                     }
-                    this.showToast(this.settings.tabSettings.openInNewTab ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.openInNewTab ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 newTabItem.appendChild(newTabInfo);
@@ -5388,33 +9339,33 @@
 
             // 6.2 自动重命名标签页开关 (仅支持的站点显示)
             if (this.siteAdapter.supportsTabRename()) {
-                const renameTabItem = createElement('div', {className: 'setting-item'});
-                const renameTabInfo = createElement('div', {className: 'setting-item-info'});
-                renameTabInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('autoRenameTabLabel')));
-                renameTabInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('autoRenameTabDesc')));
+                const renameTabItem = createElement('div', { className: 'setting-item' });
+                const renameTabInfo = createElement('div', { className: 'setting-item-info' });
+                renameTabInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('autoRenameTabLabel')));
+                renameTabInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('autoRenameTabDesc')));
 
                 const renameTabToggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.tabSettings?.autoRenameTab ? ' active' : ''),
-                    id: 'toggle-auto-rename-tab'
+                    id: 'toggle-auto-rename-tab',
                 });
                 renameTabItem.appendChild(renameTabInfo);
                 renameTabItem.appendChild(renameTabToggle);
                 tabSettingsContainer.appendChild(renameTabItem);
 
                 // 6.3 检测频率
-                const intervalItem = createElement('div', {className: 'setting-item'});
-                const intervalInfo = createElement('div', {className: 'setting-item-info'});
-                intervalInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('renameIntervalLabel')));
-                intervalInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('renameIntervalDesc')));
+                const intervalItem = createElement('div', { className: 'setting-item' });
+                const intervalInfo = createElement('div', { className: 'setting-item-info' });
+                intervalInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('renameIntervalLabel')));
+                intervalInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('renameIntervalDesc')));
 
-                const intervalControls = createElement('div', {className: 'setting-controls'});
+                const intervalControls = createElement('div', { className: 'setting-controls' });
                 const intervalSelect = createElement('select', {
                     className: 'setting-select',
-                    id: 'select-rename-interval'
+                    id: 'select-rename-interval',
                 });
                 const intervalOptions = [1, 3, 5, 10, 30, 60];
-                intervalOptions.forEach(val => {
-                    const option = createElement('option', {value: val}, `${val} ${this.t('secondsSuffix')}`);
+                intervalOptions.forEach((val) => {
+                    const option = createElement('option', { value: val }, `${val} ${this.t('secondsSuffix')}`);
                     if (this.settings.tabSettings?.renameInterval === val) option.selected = true;
                     intervalSelect.appendChild(option);
                 });
@@ -5424,7 +9375,7 @@
                     if (this.tabRenameManager && this.tabRenameManager.isActive()) {
                         this.tabRenameManager.setInterval(this.settings.tabSettings.renameInterval);
                     }
-                    this.showToast(`${this.t('renameIntervalLabel')}: ${intervalSelect.value}${this.t('secondsSuffix')}`);
+                    showToast(`${this.t('renameIntervalLabel')}: ${intervalSelect.value}${this.t('secondsSuffix')}`);
                 });
 
                 intervalControls.appendChild(intervalSelect);
@@ -5461,27 +9412,27 @@
                         }
                     }
 
-                    this.showToast(this.settings.tabSettings.autoRenameTab ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.autoRenameTab ? this.t('settingOn') : this.t('settingOff'));
                 });
             }
 
             // 6.4 显示生成状态 (showStatus)
             if (this.siteAdapter.supportsTabRename()) {
-                const showStatusItem = createElement('div', {className: 'setting-item'});
-                const showStatusInfo = createElement('div', {className: 'setting-item-info'});
-                showStatusInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('showStatusLabel')));
-                showStatusInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('showStatusDesc')));
+                const showStatusItem = createElement('div', { className: 'setting-item' });
+                const showStatusInfo = createElement('div', { className: 'setting-item-info' });
+                showStatusInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showStatusLabel')));
+                showStatusInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showStatusDesc')));
 
                 const showStatusToggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.tabSettings?.showStatus !== false ? ' active' : ''),
-                    id: 'toggle-show-status'
+                    id: 'toggle-show-status',
                 });
                 showStatusToggle.addEventListener('click', () => {
                     this.settings.tabSettings.showStatus = !this.settings.tabSettings.showStatus;
                     showStatusToggle.classList.toggle('active', this.settings.tabSettings.showStatus);
                     this.saveSettings();
                     if (this.tabRenameManager) this.tabRenameManager.updateTabName(true);
-                    this.showToast(this.settings.tabSettings.showStatus ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.showStatus ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 showStatusItem.appendChild(showStatusInfo);
@@ -5491,16 +9442,16 @@
 
             // 6.5 标题格式 (titleFormat)
             if (this.siteAdapter.supportsTabRename()) {
-                const formatItem = createElement('div', {className: 'setting-item'});
-                const formatInfo = createElement('div', {className: 'setting-item-info'});
-                formatInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('titleFormatLabel')));
-                formatInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('titleFormatDesc')));
+                const formatItem = createElement('div', { className: 'setting-item' });
+                const formatInfo = createElement('div', { className: 'setting-item-info' });
+                formatInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('titleFormatLabel')));
+                formatInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('titleFormatDesc')));
 
                 const formatInput = createElement('input', {
                     type: 'text',
                     className: 'prompt-input-title',
                     value: this.settings.tabSettings?.titleFormat || '{status}{title}',
-                    style: 'width: 130px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;'
+                    style: 'width: 130px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;',
                 });
                 formatInput.addEventListener('change', () => {
                     this.settings.tabSettings.titleFormat = formatInput.value.trim() || '{status}{title}';
@@ -5515,20 +9466,20 @@
 
             // 6.6 发送桌面通知 (showNotification)
             if (this.siteAdapter.supportsTabRename()) {
-                const notificationItem = createElement('div', {className: 'setting-item'});
-                const notificationInfo = createElement('div', {className: 'setting-item-info'});
-                notificationInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('showNotificationLabel')));
-                notificationInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('showNotificationDesc')));
+                const notificationItem = createElement('div', { className: 'setting-item' });
+                const notificationInfo = createElement('div', { className: 'setting-item-info' });
+                notificationInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showNotificationLabel')));
+                notificationInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showNotificationDesc')));
 
                 const notificationToggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.tabSettings?.showNotification ? ' active' : ''),
-                    id: 'toggle-show-notification'
+                    id: 'toggle-show-notification',
                 });
                 notificationToggle.addEventListener('click', () => {
                     this.settings.tabSettings.showNotification = !this.settings.tabSettings.showNotification;
                     notificationToggle.classList.toggle('active', this.settings.tabSettings.showNotification);
                     this.saveSettings();
-                    this.showToast(this.settings.tabSettings.showNotification ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.showNotification ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 notificationItem.appendChild(notificationInfo);
@@ -5538,20 +9489,20 @@
 
             // 6.7 自动窗口置顶 (autoFocus)
             if (this.siteAdapter.supportsTabRename()) {
-                const autoFocusItem = createElement('div', {className: 'setting-item'});
-                const autoFocusInfo = createElement('div', {className: 'setting-item-info'});
-                autoFocusInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('autoFocusLabel')));
-                autoFocusInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('autoFocusDesc')));
+                const autoFocusItem = createElement('div', { className: 'setting-item' });
+                const autoFocusInfo = createElement('div', { className: 'setting-item-info' });
+                autoFocusInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('autoFocusLabel')));
+                autoFocusInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('autoFocusDesc')));
 
                 const autoFocusToggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.tabSettings?.autoFocus ? ' active' : ''),
-                    id: 'toggle-auto-focus'
+                    id: 'toggle-auto-focus',
                 });
                 autoFocusToggle.addEventListener('click', () => {
                     this.settings.tabSettings.autoFocus = !this.settings.tabSettings.autoFocus;
                     autoFocusToggle.classList.toggle('active', this.settings.tabSettings.autoFocus);
                     this.saveSettings();
-                    this.showToast(this.settings.tabSettings.autoFocus ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.tabSettings.autoFocus ? this.t('settingOn') : this.t('settingOff'));
                 });
 
                 autoFocusItem.appendChild(autoFocusInfo);
@@ -5561,14 +9512,14 @@
 
             // 6.8 隐私模式 (privacyMode)
             if (this.siteAdapter.supportsTabRename()) {
-                const privacyItem = createElement('div', {className: 'setting-item'});
-                const privacyInfo = createElement('div', {className: 'setting-item-info'});
-                privacyInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('privacyModeLabel')));
-                privacyInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('privacyModeDesc')));
+                const privacyItem = createElement('div', { className: 'setting-item' });
+                const privacyInfo = createElement('div', { className: 'setting-item-info' });
+                privacyInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('privacyModeLabel')));
+                privacyInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('privacyModeDesc')));
 
                 const privacyToggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.tabSettings?.privacyMode ? ' active' : ''),
-                    id: 'toggle-privacy-mode'
+                    id: 'toggle-privacy-mode',
                 });
 
                 privacyItem.appendChild(privacyInfo);
@@ -5576,16 +9527,16 @@
                 tabSettingsContainer.appendChild(privacyItem);
 
                 // 6.9 伪装标题输入框 (privacyTitle)
-                const privacyTitleItem = createElement('div', {className: 'setting-item'});
-                const privacyTitleInfo = createElement('div', {className: 'setting-item-info'});
-                privacyTitleInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('privacyTitleLabel')));
+                const privacyTitleItem = createElement('div', { className: 'setting-item' });
+                const privacyTitleInfo = createElement('div', { className: 'setting-item-info' });
+                privacyTitleInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('privacyTitleLabel')));
 
                 const privacyTitleInput = createElement('input', {
                     type: 'text',
                     className: 'prompt-input-title',
                     value: this.settings.tabSettings?.privacyTitle || 'Google',
                     placeholder: this.t('privacyTitlePlaceholder'),
-                    style: 'width: 100px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;'
+                    style: 'width: 100px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;',
                 });
                 privacyTitleInput.addEventListener('change', () => {
                     this.settings.tabSettings.privacyTitle = privacyTitleInput.value.trim() || 'Google';
@@ -5618,38 +9569,37 @@
                     if (this.tabRenameManager) this.tabRenameManager.updateTabName(true);
                     // 更新伪装标题项状态
                     updatePrivacyTitleState();
-                    this.showToast(this.settings.tabSettings.privacyMode ? '🔒 ' + this.t('settingOn') : '🔓 ' + this.t('settingOff'));
+                    showToast(this.settings.tabSettings.privacyMode ? '🔒 ' + this.t('settingOn') : '🔓 ' + this.t('settingOff'));
                 });
             }
 
-            const tabSettingsSection = this.createCollapsibleSection(this.t('tabSettingsTitle'), tabSettingsContainer, {defaultExpanded: false});
-
+            const tabSettingsSection = this.createCollapsibleSection(this.t('tabSettingsTitle'), tabSettingsContainer, { defaultExpanded: false });
 
             // 7. 其他设置 (折叠面板) - 仅保留站点特定功能
             const otherSettingsContainer = createElement('div', {});
 
             // Gemini Business 专属设置
             if (this.siteAdapter instanceof GeminiBusinessAdapter) {
-                const clearItem = createElement('div', {className: 'setting-item'});
-                const clearInfo = createElement('div', {className: 'setting-item-info'});
-                clearInfo.appendChild(createElement('div', {className: 'setting-item-label'}, this.t('clearOnSendLabel')));
-                clearInfo.appendChild(createElement('div', {className: 'setting-item-desc'}, this.t('clearOnSendDesc')));
+                const clearItem = createElement('div', { className: 'setting-item' });
+                const clearInfo = createElement('div', { className: 'setting-item-info' });
+                clearInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('clearOnSendLabel')));
+                clearInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('clearOnSendDesc')));
                 const toggle = createElement('div', {
                     className: 'setting-toggle' + (this.settings.clearTextareaOnSend ? ' active' : ''),
-                    id: 'toggle-clear-on-send'
+                    id: 'toggle-clear-on-send',
                 });
                 toggle.addEventListener('click', () => {
                     this.settings.clearTextareaOnSend = !this.settings.clearTextareaOnSend;
                     toggle.classList.toggle('active', this.settings.clearTextareaOnSend);
                     this.saveSettings();
-                    this.showToast(this.settings.clearTextareaOnSend ? this.t('settingOn') : this.t('settingOff'));
+                    showToast(this.settings.clearTextareaOnSend ? this.t('settingOn') : this.t('settingOff'));
                 });
                 clearItem.appendChild(clearInfo);
                 clearItem.appendChild(toggle);
                 otherSettingsContainer.appendChild(clearItem);
             }
 
-            const otherSettingsSection = this.createCollapsibleSection(this.t('otherSettingsTitle'), otherSettingsContainer, {defaultExpanded: false});
+            const otherSettingsSection = this.createCollapsibleSection(this.t('otherSettingsTitle'), otherSettingsContainer, { defaultExpanded: false });
 
             // ========== 统一管理分类顺序 ==========
             // 1. 通用设置（语言）- 已在上方添加
@@ -5688,13 +9638,12 @@
             }
         }
 
-
         // ==================== Auto-Resume & Anchor Logic ====================
 
         // 恢复阅读历史 (Auto-Resume)
         async restoreReadingProgress() {
             // 将 showToast 传给 manager 以显示加载进度
-            const success = await this.readingProgressManager.restoreProgress((msg) => this.showToast(msg));
+            const success = await this.readingProgressManager.restoreProgress((msg) => showToast(msg));
 
             const onRestorationComplete = () => {
                 // 延迟一点开启记录，避开惯性滚动等干扰，确保后续的用户滚动能被正确记录
@@ -5709,7 +9658,7 @@
                 if (restoredTop !== undefined) {
                     this.anchorManager.setAnchor(restoredTop);
                 }
-                this.showToast(this.t('restoredPosition'));
+                showToast(this.t('restoredPosition'));
             }
 
             // 无论成功失败，最后都开启记录
@@ -5725,15 +9674,15 @@
         handleAnchorClick() {
             if (this.anchorManager.hasAnchor()) {
                 this.anchorManager.backToAnchor();
-                this.showToast(this.t('jumpToAnchor'));
+                showToast(this.t('jumpToAnchor'));
             } else {
-                this.showToast('暂无阅读锚点 (点击顶部/底部按钮可自动生成)');
+                showToast('暂无阅读锚点 (点击顶部/底部按钮可自动生成)');
             }
         }
 
         // 更新锚点按钮状态 (UI)
         updateAnchorButtonState(hasAnchor) {
-            [document.getElementById('quick-anchor-btn'), document.getElementById('scroll-anchor-btn')].forEach(btn => {
+            [document.getElementById('quick-anchor-btn'), document.getElementById('scroll-anchor-btn')].forEach((btn) => {
                 if (btn) {
                     if (hasAnchor) {
                         btn.style.opacity = '1';
@@ -5742,7 +9691,7 @@
                     } else {
                         btn.style.opacity = '0.4';
                         btn.style.cursor = 'default';
-                        btn.title = "暂无锚点";
+                        btn.title = '暂无锚点';
                     }
                 }
             });
@@ -5752,34 +9701,43 @@
         scrollToTop() {
             // 点击去顶部时，自动记录当前位置为锚点
             this.anchorManager.setAnchor(this.scrollManager.scrollTop);
-            this.scrollManager.scrollTo({top: 0, behavior: 'smooth'});
+            this.scrollManager.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // 滚动到页面底部
         scrollToBottom() {
             // 点击去底部时，自动记录当前位置为锚点
             this.anchorManager.setAnchor(this.scrollManager.scrollTop);
-            this.scrollManager.scrollTo({top: this.scrollManager.scrollHeight, behavior: 'smooth'});
+            this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth' });
         }
-
 
         refreshCategories() {
             const container = document.getElementById('prompt-categories');
             if (!container) return;
             const categories = this.getCategories();
             clearElement(container);
-            container.appendChild(createElement('span', {
-                className: 'category-tag active',
-                'data-category': 'all'
-            }, this.t('allCategory')));
-            categories.forEach(cat => {
-                container.appendChild(createElement('span', {className: 'category-tag', 'data-category': cat}, cat));
+            container.appendChild(
+                createElement(
+                    'span',
+                    {
+                        className: 'category-tag active',
+                        'data-category': 'all',
+                    },
+                    this.t('allCategory'),
+                ),
+            );
+            categories.forEach((cat) => {
+                container.appendChild(createElement('span', { className: 'category-tag', 'data-category': cat }, cat));
             });
             // 添加分类管理按钮
-            const manageBtn = createElement('button', {
-                className: 'category-manage-btn',
-                title: this.t('categoryManage')
-            }, this.t('manageCategory'));
+            const manageBtn = createElement(
+                'button',
+                {
+                    className: 'category-manage-btn',
+                    title: this.t('categoryManage'),
+                },
+                this.t('manageCategory'),
+            );
             manageBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.showCategoryModal();
@@ -5790,28 +9748,28 @@
         // 显示分类管理弹窗
         showCategoryModal() {
             const categories = this.getCategories();
-            const modal = createElement('div', {className: 'prompt-modal'});
-            const modalContent = createElement('div', {className: 'prompt-modal-content category-modal-content'});
+            const modal = createElement('div', { className: 'prompt-modal' });
+            const modalContent = createElement('div', { className: 'prompt-modal-content category-modal-content' });
 
-            const modalHeader = createElement('div', {className: 'prompt-modal-header'}, this.t('categoryManage'));
+            const modalHeader = createElement('div', { className: 'prompt-modal-header' }, this.t('categoryManage'));
             modalContent.appendChild(modalHeader);
 
-            const categoryList = createElement('div', {className: 'category-list'});
+            const categoryList = createElement('div', { className: 'category-list' });
 
             if (categories.length === 0) {
-                categoryList.appendChild(createElement('div', {className: 'category-empty'}, this.t('categoryEmpty')));
+                categoryList.appendChild(createElement('div', { className: 'category-empty' }, this.t('categoryEmpty')));
             } else {
-                categories.forEach(cat => {
-                    const count = this.prompts.filter(p => p.category === cat).length;
-                    const item = createElement('div', {className: 'category-item'});
+                categories.forEach((cat) => {
+                    const count = this.prompts.filter((p) => p.category === cat).length;
+                    const item = createElement('div', { className: 'category-item' });
 
-                    const info = createElement('div', {className: 'category-item-info'});
-                    info.appendChild(createElement('span', {className: 'category-item-name'}, cat));
-                    info.appendChild(createElement('span', {className: 'category-item-count'}, `${count} 个提示词`));
+                    const info = createElement('div', { className: 'category-item-info' });
+                    info.appendChild(createElement('span', { className: 'category-item-name' }, cat));
+                    info.appendChild(createElement('span', { className: 'category-item-count' }, `${count} 个提示词`));
 
-                    const actions = createElement('div', {className: 'category-item-actions'});
-                    const renameBtn = createElement('button', {className: 'category-action-btn rename'}, this.t('rename'));
-                    const deleteBtn = createElement('button', {className: 'category-action-btn delete'}, this.t('delete'));
+                    const actions = createElement('div', { className: 'category-item-actions' });
+                    const renameBtn = createElement('button', { className: 'category-action-btn rename' }, this.t('rename'));
+                    const deleteBtn = createElement('button', { className: 'category-action-btn delete' }, this.t('delete'));
 
                     renameBtn.addEventListener('click', () => {
                         const newName = window.prompt(this.t('newCategoryName'), cat);
@@ -5840,8 +9798,8 @@
 
             modalContent.appendChild(categoryList);
 
-            const btnGroup = createElement('div', {className: 'prompt-modal-btns'});
-            const closeBtn = createElement('button', {className: 'prompt-modal-btn secondary'}, this.t('cancel'));
+            const btnGroup = createElement('div', { className: 'prompt-modal-btns' });
+            const closeBtn = createElement('button', { className: 'prompt-modal-btn secondary' }, this.t('cancel'));
             closeBtn.addEventListener('click', () => modal.remove());
             btnGroup.appendChild(closeBtn);
             modalContent.appendChild(btnGroup);
@@ -5855,7 +9813,7 @@
 
         // 重命名分类
         renameCategory(oldName, newName) {
-            this.prompts.forEach(p => {
+            this.prompts.forEach((p) => {
                 if (p.category === oldName) {
                     p.category = newName;
                 }
@@ -5863,12 +9821,12 @@
             this.savePrompts();
             this.refreshCategories();
             this.refreshPromptList();
-            this.showToast(`分类已重命名为"${newName}"`);
+            showToast(`分类已重命名为"${newName}"`);
         }
 
         // 删除分类（将关联提示词移至"未分类"）
         deleteCategory(name) {
-            this.prompts.forEach(p => {
+            this.prompts.forEach((p) => {
                 if (p.category === name) {
                     p.category = '未分类';
                 }
@@ -5876,7 +9834,7 @@
             this.savePrompts();
             this.refreshCategories();
             this.refreshPromptList();
-            this.showToast(`分类"${name}"已删除`);
+            showToast(`分类"${name}"已删除`);
         }
 
         refreshPromptList(filter = '') {
@@ -5885,13 +9843,13 @@
             const activeCategory = document.querySelector('.category-tag.active')?.dataset.category || 'all';
             let filteredPrompts = this.prompts;
 
-            if (activeCategory !== 'all') filteredPrompts = filteredPrompts.filter(p => p.category === activeCategory);
-            if (filter) filteredPrompts = filteredPrompts.filter(p => p.title.toLowerCase().includes(filter.toLowerCase()) || p.content.toLowerCase().includes(filter.toLowerCase()));
+            if (activeCategory !== 'all') filteredPrompts = filteredPrompts.filter((p) => p.category === activeCategory);
+            if (filter) filteredPrompts = filteredPrompts.filter((p) => p.title.toLowerCase().includes(filter.toLowerCase()) || p.content.toLowerCase().includes(filter.toLowerCase()));
 
             clearElement(container);
 
             if (filteredPrompts.length === 0) {
-                container.appendChild(createElement('div', {style: 'text-align: center; padding: 20px; color: #9ca3af;'}, '暂无提示词'));
+                container.appendChild(createElement('div', { style: 'text-align: center; padding: 20px; color: #9ca3af;' }, '暂无提示词'));
                 return;
             }
 
@@ -5899,23 +9857,27 @@
                 const item = createElement('div', {
                     className: 'prompt-item',
                     draggable: 'false',
-                    style: 'user-select: none;'
+                    style: 'user-select: none;',
                 });
                 item.dataset.promptId = prompt.id;
                 item.dataset.index = index;
                 if (this.selectedPrompt?.id === prompt.id) item.classList.add('selected');
 
-                const itemHeader = createElement('div', {className: 'prompt-item-header'});
-                itemHeader.appendChild(createElement('div', {className: 'prompt-item-title'}, prompt.title));
-                itemHeader.appendChild(createElement('span', {className: 'prompt-item-category'}, prompt.category || '未分类'));
+                const itemHeader = createElement('div', { className: 'prompt-item-header' });
+                itemHeader.appendChild(createElement('div', { className: 'prompt-item-title' }, prompt.title));
+                itemHeader.appendChild(createElement('span', { className: 'prompt-item-category' }, prompt.category || '未分类'));
 
-                const itemContent = createElement('div', {className: 'prompt-item-content'}, prompt.content);
-                const itemActions = createElement('div', {className: 'prompt-item-actions'});
-                const dragBtn = createElement('button', {
-                    className: 'prompt-action-btn drag-prompt',
-                    'data-id': prompt.id,
-                    title: '拖动排序'
-                }, '☰');
+                const itemContent = createElement('div', { className: 'prompt-item-content' }, prompt.content);
+                const itemActions = createElement('div', { className: 'prompt-item-actions' });
+                const dragBtn = createElement(
+                    'button',
+                    {
+                        className: 'prompt-action-btn drag-prompt',
+                        'data-id': prompt.id,
+                        title: '拖动排序',
+                    },
+                    '☰',
+                );
                 dragBtn.style.cursor = 'grab';
 
                 // 仅当按下拖拽按钮时才允许拖动
@@ -5930,21 +9892,39 @@
                 });
 
                 itemActions.appendChild(dragBtn);
-                itemActions.appendChild(createElement('button', {
-                    className: 'prompt-action-btn copy-prompt',
-                    'data-id': prompt.id,
-                    title: '复制'
-                }, '📋'));
-                itemActions.appendChild(createElement('button', {
-                    className: 'prompt-action-btn edit-prompt',
-                    'data-id': prompt.id,
-                    title: '编辑'
-                }, '✏'));
-                itemActions.appendChild(createElement('button', {
-                    className: 'prompt-action-btn delete-prompt',
-                    'data-id': prompt.id,
-                    title: '删除'
-                }, '🗑'));
+                itemActions.appendChild(
+                    createElement(
+                        'button',
+                        {
+                            className: 'prompt-action-btn copy-prompt',
+                            'data-id': prompt.id,
+                            title: '复制',
+                        },
+                        '📋',
+                    ),
+                );
+                itemActions.appendChild(
+                    createElement(
+                        'button',
+                        {
+                            className: 'prompt-action-btn edit-prompt',
+                            'data-id': prompt.id,
+                            title: '编辑',
+                        },
+                        '✏',
+                    ),
+                );
+                itemActions.appendChild(
+                    createElement(
+                        'button',
+                        {
+                            className: 'prompt-action-btn delete-prompt',
+                            'data-id': prompt.id,
+                            title: '删除',
+                        },
+                        '🗑',
+                    ),
+                );
 
                 item.appendChild(itemHeader);
                 item.appendChild(itemContent);
@@ -5990,27 +9970,27 @@
         updatePromptOrder() {
             const container = document.getElementById('prompt-list');
             const items = Array.from(container.querySelectorAll('.prompt-item'));
-            const newOrder = items.map(item => item.dataset.promptId);
+            const newOrder = items.map((item) => item.dataset.promptId);
 
             // 重新排列 prompts 数组
             const orderedPrompts = [];
-            newOrder.forEach(id => {
-                const prompt = this.prompts.find(p => p.id === id);
+            newOrder.forEach((id) => {
+                const prompt = this.prompts.find((p) => p.id === id);
                 if (prompt) orderedPrompts.push(prompt);
             });
 
             this.prompts = orderedPrompts;
             this.savePrompts();
-            this.showToast(this.t('orderUpdated'));
+            showToast(this.t('orderUpdated'));
         }
 
         selectPrompt(prompt, itemElement) {
             if (this.isScrolling) {
-                this.showToast(this.t('scrolling'));
+                showToast(this.t('scrolling'));
                 return;
             }
             this.selectedPrompt = prompt;
-            document.querySelectorAll('.prompt-item').forEach(item => item.classList.remove('selected'));
+            document.querySelectorAll('.prompt-item').forEach((item) => item.classList.remove('selected'));
             itemElement.classList.add('selected');
 
             // 显示当前提示词悬浮条
@@ -6022,27 +10002,27 @@
             }
 
             this.insertPromptToTextarea(prompt.content);
-            this.showToast(`${this.t('inserted')}: ${prompt.title}`);
+            showToast(`${this.t('inserted')}: ${prompt.title}`);
         }
 
         insertPromptToTextarea(promptContent) {
             if (this.isScrolling) {
-                this.showToast('页面正在滚动，请稍后再选择提示词');
+                showToast('页面正在滚动，请稍后再选择提示词');
                 return;
             }
             const promiseOrResult = this.siteAdapter.insertPrompt(promptContent);
 
             // 处理异步返回 (Gemini Business 是异步的)
             if (promiseOrResult instanceof Promise) {
-                promiseOrResult.then(success => {
+                promiseOrResult.then((success) => {
                     if (!success) {
-                        this.showToast('未找到输入框，请点击输入框后重试');
+                        showToast('未找到输入框，请点击输入框后重试');
                         // 再次尝试查找
                         this.siteAdapter.findTextarea();
                     }
                 });
             } else if (!promiseOrResult) {
-                this.showToast('未找到输入框，请点击输入框后重试');
+                showToast('未找到输入框，请点击输入框后重试');
                 this.siteAdapter.findTextarea();
             }
         }
@@ -6050,44 +10030,44 @@
         clearSelectedPrompt() {
             this.selectedPrompt = null;
             document.querySelector('.selected-prompt-bar')?.classList.remove('show');
-            document.querySelectorAll('.prompt-item').forEach(item => item.classList.remove('selected'));
+            document.querySelectorAll('.prompt-item').forEach((item) => item.classList.remove('selected'));
         }
 
         showEditModal(prompt = null) {
             const isEdit = prompt !== null;
-            const modal = createElement('div', {className: 'prompt-modal'});
-            const modalContent = createElement('div', {className: 'prompt-modal-content'});
+            const modal = createElement('div', { className: 'prompt-modal' });
+            const modalContent = createElement('div', { className: 'prompt-modal-content' });
 
-            const modalHeader = createElement('div', {className: 'prompt-modal-header'}, isEdit ? this.t('editPrompt') : this.t('addNewPrompt'));
+            const modalHeader = createElement('div', { className: 'prompt-modal-header' }, isEdit ? this.t('editPrompt') : this.t('addNewPrompt'));
 
-            const titleGroup = createElement('div', {className: 'prompt-form-group'});
-            titleGroup.appendChild(createElement('label', {className: 'prompt-form-label'}, this.t('title')));
+            const titleGroup = createElement('div', { className: 'prompt-form-group' });
+            titleGroup.appendChild(createElement('label', { className: 'prompt-form-label' }, this.t('title')));
             const titleInput = createElement('input', {
                 className: 'prompt-form-input',
                 type: 'text',
-                value: isEdit ? prompt.title : ''
+                value: isEdit ? prompt.title : '',
             });
             titleGroup.appendChild(titleInput);
 
-            const categoryGroup = createElement('div', {className: 'prompt-form-group'});
-            categoryGroup.appendChild(createElement('label', {className: 'prompt-form-label'}, this.t('category')));
+            const categoryGroup = createElement('div', { className: 'prompt-form-group' });
+            categoryGroup.appendChild(createElement('label', { className: 'prompt-form-label' }, this.t('category')));
             const categoryInput = createElement('input', {
                 className: 'prompt-form-input',
                 type: 'text',
-                value: isEdit ? (prompt.category || '') : '',
-                placeholder: this.t('categoryPlaceholder')
+                value: isEdit ? prompt.category || '' : '',
+                placeholder: this.t('categoryPlaceholder'),
             });
             categoryGroup.appendChild(categoryInput);
 
-            const contentGroup = createElement('div', {className: 'prompt-form-group'});
-            contentGroup.appendChild(createElement('label', {className: 'prompt-form-label'}, this.t('content')));
-            const contentTextarea = createElement('textarea', {className: 'prompt-form-textarea'});
+            const contentGroup = createElement('div', { className: 'prompt-form-group' });
+            contentGroup.appendChild(createElement('label', { className: 'prompt-form-label' }, this.t('content')));
+            const contentTextarea = createElement('textarea', { className: 'prompt-form-textarea' });
             contentTextarea.value = isEdit ? prompt.content : '';
             contentGroup.appendChild(contentTextarea);
 
-            const modalActions = createElement('div', {className: 'prompt-modal-actions'});
-            const cancelBtn = createElement('button', {className: 'prompt-modal-btn secondary'}, this.t('cancel'));
-            const saveBtn = createElement('button', {className: 'prompt-modal-btn primary'}, isEdit ? this.t('save') : this.t('add'));
+            const modalActions = createElement('div', { className: 'prompt-modal-actions' });
+            const cancelBtn = createElement('button', { className: 'prompt-modal-btn secondary' }, this.t('cancel'));
+            const saveBtn = createElement('button', { className: 'prompt-modal-btn primary' }, isEdit ? this.t('save') : this.t('add'));
 
             modalActions.appendChild(cancelBtn);
             modalActions.appendChild(saveBtn);
@@ -6110,11 +10090,11 @@
                 }
 
                 if (isEdit) {
-                    this.updatePrompt(prompt.id, {title, category: categoryInput.value.trim(), content});
-                    this.showToast(this.t('promptUpdated'));
+                    this.updatePrompt(prompt.id, { title, category: categoryInput.value.trim(), content });
+                    showToast(this.t('promptUpdated'));
                 } else {
-                    this.addPrompt({title, category: categoryInput.value.trim(), content});
-                    this.showToast(this.t('promptAdded'));
+                    this.addPrompt({ title, category: categoryInput.value.trim(), content });
+                    showToast(this.t('promptAdded'));
                 }
                 modal.remove();
             });
@@ -6124,33 +10104,19 @@
             });
         }
 
-        showToast(message) {
-            const toast = createElement('div', {className: 'prompt-toast'}, message);
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.animation = 'toastSlideIn 0.3s reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 2000);
-        }
-
-
         findElementByComposedPath(e) {
             if (!e) return null;
             // 获取事件的完整传播路径（兼容没有 composedPath 的浏览器）
-            const path = typeof e.composedPath === 'function' ? e.composedPath() : (e.path || []);
+            const path = typeof e.composedPath === 'function' ? e.composedPath() : e.path || [];
 
             // 获取提交按钮选择器数组并合并成 selector 字符串
-            const selectors = (this.siteAdapter && typeof this.siteAdapter.getSubmitButtonSelectors === 'function')
-                ? this.siteAdapter.getSubmitButtonSelectors()
-                : [];
+            const selectors = this.siteAdapter && typeof this.siteAdapter.getSubmitButtonSelectors === 'function' ? this.siteAdapter.getSubmitButtonSelectors() : [];
             const combinedSelector = selectors.length ? selectors.join(', ') : '';
 
             if (!combinedSelector) return null;
 
             // 查找路径中第一个符合条件的元素
-            const foundElement = path.find(element =>
-                element && element instanceof Element && typeof element.matches === 'function' && element.matches(combinedSelector)
-            );
+            const foundElement = path.find((element) => element && element instanceof Element && typeof element.matches === 'function' && element.matches(combinedSelector));
 
             return foundElement || null;
         }
@@ -6163,7 +10129,7 @@
             if (categories) {
                 categories.addEventListener('click', (e) => {
                     if (e.target.classList.contains('category-tag')) {
-                        document.querySelectorAll('.category-tag').forEach(tag => tag.classList.remove('active'));
+                        document.querySelectorAll('.category-tag').forEach((tag) => tag.classList.remove('active'));
                         e.target.classList.add('active');
                         this.refreshPromptList(document.getElementById('prompt-search')?.value || '');
                     }
@@ -6173,28 +10139,31 @@
             document.getElementById('add-prompt')?.addEventListener('click', () => this.showEditModal());
             document.getElementById('prompt-list')?.addEventListener('click', (e) => {
                 if (e.target.classList.contains('edit-prompt')) {
-                    const prompt = this.prompts.find(p => p.id === e.target.dataset.id);
+                    const prompt = this.prompts.find((p) => p.id === e.target.dataset.id);
                     if (prompt) this.showEditModal(prompt);
                 } else if (e.target.classList.contains('delete-prompt')) {
                     if (confirm(this.t('confirmDelete'))) {
                         this.deletePrompt(e.target.dataset.id);
-                        this.showToast(this.t('deleted'));
+                        showToast(this.t('deleted'));
                     }
                 } else if (e.target.classList.contains('copy-prompt')) {
-                    const prompt = this.prompts.find(p => p.id === e.target.dataset.id);
+                    const prompt = this.prompts.find((p) => p.id === e.target.dataset.id);
                     if (prompt) {
-                        navigator.clipboard.writeText(prompt.content).then(() => {
-                            this.showToast(this.t('copied'));
-                        }).catch(() => {
-                            // 降级方案
-                            const textarea = document.createElement('textarea');
-                            textarea.value = prompt.content;
-                            document.body.appendChild(textarea);
-                            textarea.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(textarea);
-                            this.showToast(this.t('copied'));
-                        });
+                        navigator.clipboard
+                            .writeText(prompt.content)
+                            .then(() => {
+                                showToast(this.t('copied'));
+                            })
+                            .catch(() => {
+                                // 降级方案
+                                const textarea = document.createElement('textarea');
+                                textarea.value = prompt.content;
+                                document.body.appendChild(textarea);
+                                textarea.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(textarea);
+                                showToast(this.t('copied'));
+                            });
                     }
                 }
             });
@@ -6212,12 +10181,10 @@
                     // 其他适配器调用各自的 clearTextarea 方法
                     this.siteAdapter.clearTextarea();
                 }
-                this.showToast(this.t('cleared'));
+                showToast(this.t('cleared'));
             });
 
-
             this.makeDraggable();
-
 
             // 2. 按钮点击监听
             document.addEventListener('click', (e) => {
@@ -6236,9 +10203,7 @@
                 let matched = !!found;
                 // 如果 composedPath 没命中，尝试使用 closest 回退（兼容 Shadow DOM 之外的情况）
                 if (!matched && e && e.target && typeof e.target.closest === 'function') {
-                    const selectors = (this.siteAdapter && typeof this.siteAdapter.getSubmitButtonSelectors === 'function')
-                        ? this.siteAdapter.getSubmitButtonSelectors()
-                        : [];
+                    const selectors = this.siteAdapter && typeof this.siteAdapter.getSubmitButtonSelectors === 'function' ? this.siteAdapter.getSubmitButtonSelectors() : [];
                     const combined = selectors.length ? selectors.join(', ') : '';
                     if (combined) {
                         try {
@@ -6266,31 +10231,33 @@
             });
 
             // 3. 回车键发送监听
-            document.addEventListener('keydown', (e) => {
-                // 仅处理 Enter 键（不带 Shift 修饰符，避免干扰换行操作）
-                if (e.key !== 'Enter' || e.shiftKey) return;
+            document.addEventListener(
+                'keydown',
+                (e) => {
+                    // 仅处理 Enter 键（不带 Shift 修饰符，避免干扰换行操作）
+                    if (e.key !== 'Enter' || e.shiftKey) return;
 
-                // 使用 composedPath 检查事件源是否来自输入框（兼容 Shadow DOM）
-                const path = typeof e.composedPath === 'function' ? e.composedPath() : (e.path || []);
-                const isFromTextarea = path.some(element =>
-                    element && element instanceof Element && this.siteAdapter.isValidTextarea(element)
-                );
+                    // 使用 composedPath 检查事件源是否来自输入框（兼容 Shadow DOM）
+                    const path = typeof e.composedPath === 'function' ? e.composedPath() : e.path || [];
+                    const isFromTextarea = path.some((element) => element && element instanceof Element && this.siteAdapter.isValidTextarea(element));
 
-                if (!isFromTextarea) return;
+                    if (!isFromTextarea) return;
 
-                // 清理逻辑
-                if (this.selectedPrompt) {
-                    setTimeout(() => {
-                        this.clearSelectedPrompt();
-                    }, 100);
-                }
-                // 针对 Gemini Business：无论是否使用提示词，发送后都修复中文输入
-                if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
-                    setTimeout(() => {
-                        this.siteAdapter.clearTextarea();
-                    }, 200);
-                }
-            }, true); // 使用捕获阶段确保在 Shadow DOM 场景下也能捕获
+                    // 清理逻辑
+                    if (this.selectedPrompt) {
+                        setTimeout(() => {
+                            this.clearSelectedPrompt();
+                        }, 100);
+                    }
+                    // 针对 Gemini Business：无论是否使用提示词，发送后都修复中文输入
+                    if (this.siteAdapter instanceof GeminiBusinessAdapter && this.settings.clearTextareaOnSend) {
+                        setTimeout(() => {
+                            this.siteAdapter.clearTextarea();
+                        }, 200);
+                    }
+                },
+                true,
+            ); // 使用捕获阶段确保在 Shadow DOM 场景下也能捕获
 
             document.getElementById('toggle-panel')?.addEventListener('click', () => this.togglePanel());
             this.makeDraggable();
@@ -6319,7 +10286,7 @@
                         // 清除缓存的会话名称，强制从新会话获取
                         this.tabRenameManager.lastSessionName = null;
                         // 多次尝试更新，因为 Gemini 可能需要时间来更新页面标题
-                        [300, 800, 1500].forEach(delay => {
+                        [300, 800, 1500].forEach((delay) => {
                             setTimeout(() => {
                                 this.tabRenameManager.updateTabName(true);
                             }, delay);
@@ -6357,7 +10324,14 @@
             };
 
             // 3. 定时器兜底 (防止某些框架绕过 history API)
-            setInterval(checkUrl, 1000);
+            // 同时用于检测 Sidebar Observer 的存活状态
+            setInterval(() => {
+                checkUrl();
+                // 周期性检查 Observer 是否存活 (Zombie Check)
+                if (this.conversationManager) {
+                    this.conversationManager.checkObserverStatus();
+                }
+            }, 1000);
         }
 
         makeDraggable() {
@@ -6365,7 +10339,13 @@
             const header = panel?.querySelector('.prompt-panel-header');
             if (!panel || !header) return;
 
-            let isDragging = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+            let isDragging = false,
+                currentX,
+                currentY,
+                initialX,
+                initialY,
+                xOffset = 0,
+                yOffset = 0;
 
             header.addEventListener('mousedown', (e) => {
                 if (e.target.closest('.prompt-panel-controls')) return;
