@@ -6820,8 +6820,7 @@
             // 绑定新对话监听 (点击按钮或快捷键)
             this.siteAdapter.bindNewChatListeners(() => {
                 console.log('Gemini Helper: New chat detected, re-initializing...');
-                // 重新加载配置并执行初始化逻辑
-                this.settings = this.loadSettings();
+                // 使用当前内存中的设置重新应用配置（无需重新加载）
                 const currentSiteId = this.siteAdapter.getSiteId();
                 const adapterOptions = {
                     clearOnInit: this.siteAdapter instanceof GeminiBusinessAdapter ? this.settings.clearTextareaOnSend : false,
