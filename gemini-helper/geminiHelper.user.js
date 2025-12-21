@@ -7400,7 +7400,7 @@
                     --gh-border-active: #6366f1;
                 }
 
-                body.gh-dark-mode-active {
+                body[data-gh-mode="dark"] {
                     --gh-bg: #1e1e1e;
                     --gh-bg-secondary: #2d2d2d;
                     --gh-text: #e3e3e3;
@@ -8315,20 +8315,22 @@
                 const isDark = isDarkTheme || hasDarkClass;
 
                 if (isDark) {
-                    document.body.classList.add('gh-dark-mode-active');
+                    document.body.dataset.ghMode = 'dark';
                 } else {
-                    document.body.classList.remove('gh-dark-mode-active');
+                    delete document.body.dataset.ghMode;
                 }
             };
 
             checkTheme();
 
             if (!this.themeObserver) {
-                this.themeObserver = new MutationObserver(() => {
+                this.themeObserver = new MutationObserver((mutations) => {
+                    // 避免循环触发：如果变动的是 data-gh-mode，则忽略（虽然 attributeFilter 已经排除了，但在某些浏览器/复杂场景下可能需要）
+                    // 由于我们只监听 class 和 data-theme, 修改 data-gh-mode 不会触发此 Observer。
                     checkTheme();
                 });
                 this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
-                this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+                this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
             }
         }
 
