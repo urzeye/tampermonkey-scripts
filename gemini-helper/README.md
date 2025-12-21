@@ -1,8 +1,8 @@
 # Gemini-helper
 
-> Gemini 助手：支持对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版/Genspark
+> Gemini 助手：支持会话管理、对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版/Genspark
 
-> Gemini Helper: Supports outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart adaptation for Gemini Standard/Enterprise/Genspark
+> Gemini Helper: Supports conversation management, outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini Standard/Enterprise/Genspark
 
 ## ✨ 功能特性
 
@@ -76,6 +76,11 @@
 -   ✅ Gemini 标准版 (gemini.google.com)
 -   ✅ Gemini 企业版 (business.gemini.google)
 
+### 🌓 自动暗色模式
+
+-   **智能检测**：实时跟随系统/网页切换亮/暗模式
+-   **全局适配**：精心调配的深色主题配色，保护眼睛
+
 ## 📸 功能预览
 
 -   右侧悬浮面板，支持拖拽移动（优化拖动体验，不会误选文本）
@@ -106,6 +111,10 @@
 | ⬆ / ⬇ 按钮  | 跳转页面顶部/底部 |
 
 ## 📋 [更新日志](./changelog.md)
+
+### v1.9.1
+
+-   ✨ **新功能**：**自动暗色模式** - 完美适配深色主题，智能检测切换，全 UI 重绘
 
 ### v1.9.0
 
