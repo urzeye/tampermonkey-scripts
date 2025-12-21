@@ -1779,6 +1779,36 @@
         }
 
         /**
+         * 获取当前会话名称（用于标签页重命名）
+         * 从 Shadow DOM 中的侧边栏获取当前活动会话的标题
+         * @returns {string|null}
+         */
+        getSessionName() {
+            // DOMToolkit 在 Shadow DOM 穿透时，复杂后代选择器可能不生效
+            // 所以遍历所有会话，找到活动的那个
+            const conversations = DOMToolkit.query('.conversation', { all: true, shadow: true });
+
+            for (const conv of conversations) {
+                const button = conv.querySelector('button.list-item') || conv.querySelector('button');
+                if (!button) continue;
+
+                // 检查是否为活动会话
+                const isActive = button.classList.contains('selected') || button.classList.contains('active') || button.getAttribute('aria-selected') === 'true';
+
+                if (isActive) {
+                    const titleEl = button.querySelector('.conversation-title');
+                    if (titleEl) {
+                        const name = titleEl.textContent?.trim();
+                        if (name) return name;
+                    }
+                }
+            }
+
+            // 回退到基类默认实现（从 document.title 提取）
+            return super.getSessionName();
+        }
+
+        /**
          * 获取当前的团队
          */
         getCurrentCid() {
@@ -2578,12 +2608,13 @@
                 return false;
             };
 
-            if (isPolluted(sessionName)) {
-                sessionName = this.lastSessionName;
-            } else if (sessionName && sessionName !== this.lastSessionName) {
+            // 如果获取到有效且非污染的标题，更新缓存并返回
+            if (sessionName && !isPolluted(sessionName)) {
                 this.lastSessionName = sessionName;
+                return sessionName;
             }
 
+            // 否则返回缓存的标题（可能为 null）
             return this.lastSessionName;
         }
 
