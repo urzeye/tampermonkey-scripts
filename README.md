@@ -20,9 +20,9 @@
 -   ✅ 双向锚点（类似 `git switch -`，在两个位置间来回切换）
 -   ✅ 快捷导航（跳转顶部/底部）
 -   ✅ 设置面板（Tab 管理、排序自定义、语言切换）
--   ✅ 多站点支持（Gemini 标准版/企业版、Genspark）
+-   ✅ 多站点支持（Gemini 标准版/企业版）
 
-**最新版本**: v1.9.0
+**最新版本**: v1.9.1
 
 [查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 
