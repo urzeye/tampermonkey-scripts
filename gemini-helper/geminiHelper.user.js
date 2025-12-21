@@ -7378,22 +7378,29 @@
             const style = document.createElement('style');
             style.id = 'gemini-helper-styles';
             style.textContent = `
-                /* CSS Variables Definition */
-                #gemini-helper-panel {
+                /* CSS Variables Definition (Global Scope) */
+                :root {
                     --gh-bg: #ffffff;
-                    --gh-bg-secondary: var(--gh-bg-secondary, #f9fafb);
-                    --gh-text: var(--gh-text, #1f2937);
-                    --gh-text-secondary: var(--gh-text-secondary, #6b7280);
-                    --gh-border: var(--gh-border, #e5e7eb);
-                    --gh-hover: var(--gh-hover, #f3f4f6);
+                    --gh-bg-secondary: #f9fafb;
+                    --gh-text: #1f2937;
+                    --gh-text-secondary: #6b7280;
+                    --gh-border: #e5e7eb;
+                    --gh-hover: #f3f4f6;
                     --gh-shadow: 0 10px 40px rgba(0,0,0,0.15);
                     --gh-input-bg: #ffffff;
-                    --gh-input-border: var(--gh-input-border, #d1d5db);
-                    --gh-active-bg: var(--gh-border, #e5e7eb);
+                    --gh-input-border: #d1d5db;
+                    --gh-active-bg: #e5e7eb;
                     --gh-danger: #ef4444;
                     --gh-gradient: ${gradient};
+                    
+                    /* Semantic Variables */
+                    --gh-header-bg: ${gradient};
+                    --gh-folder-bg-default: #e0f2fe;
+                    --gh-folder-bg-expanded: #c7d2fe;
+                    --gh-border-active: #6366f1;
                 }
-                #gemini-helper-panel.gh-dark {
+
+                body.gh-dark-mode-active {
                     --gh-bg: #1e1e1e;
                     --gh-bg-secondary: #2d2d2d;
                     --gh-text: #e3e3e3;
@@ -7404,6 +7411,12 @@
                     --gh-input-bg: #2f2f2f;
                     --gh-input-border: #555555;
                     --gh-active-bg: #404040;
+
+                    /* Dark Mode Semantic Overrides */
+                    --gh-header-bg: #1e1e1e;
+                    --gh-folder-bg-default: rgba(66, 133, 244, 0.15);
+                    --gh-folder-bg-expanded: rgba(66, 133, 244, 0.3);
+                    --gh-border-active: #818cf8;
                 }
 
                 /* 主面板样式 */
@@ -7423,12 +7436,12 @@
                     flex-direction: column;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     transition: all 0.3s ease;
-                    border: 1px solid #e0e0e0;
+                    border: 1px solid var(--gh-border, #e0e0e0);
                 }
                 #gemini-helper-panel.collapsed { display: none; }
                 .prompt-panel-header {
                     padding: 16px;
-                    background: ${gradient};
+                    background: var(--gh-header-bg);
                     color: white;
                     border-radius: 12px 12px 0 0;
                     display: flex;
@@ -7603,14 +7616,14 @@
                 }
                 .conversations-toolbar-btn:hover { background: var(--gh-hover, #f3f4f6); border-color: #9ca3af; }
                 .conversations-toolbar-btn.sync { padding: 6px 10px; }
-                .conversations-toolbar-btn.batch-mode.active { background: #6366f1; color: white; border-color: #6366f1; }
+                .conversations-toolbar-btn.batch-mode.active { background: var(--gh-border-active); color: white; border-color: var(--gh-border-active); }
                 .conversations-toolbar-btn:disabled { opacity: 0.6; cursor: wait; }
                 .conversations-folder-select {
                     padding: 6px 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px;
                     background: var(--gh-bg-secondary, #f9fafb); font-size: 13px; color: var(--gh-text, #374151); cursor: pointer;
                     flex: 1; min-width: 0; max-width: 150px;
                 }
-                .conversations-folder-select:focus { outline: none; border-color: #6366f1; }
+                .conversations-folder-select:focus { outline: none; border-color: var(--gh-border-active); }
                 .conversations-folder-list {
                     flex: 1; overflow-y: auto; padding: 8px;
                     scrollbar-width: none; /* Firefox */
@@ -7624,10 +7637,10 @@
                     flex-wrap: wrap; /* 允许换行，会话列表在下方 */
                 }
                 .conversations-folder-item:hover { background: var(--gh-hover, #f3f4f6); }
-                .conversations-folder-item.default { background: #e0f2fe; }
+                .conversations-folder-item.default { background: var(--gh-folder-bg-default); }
                 .conversations-folder-item.expanded {
-                    background: #c7d2fe !important; /* 更深的紫蓝色 */
-                    border: 2px solid #6366f1; /* 明显的边框 */
+                    background: var(--gh-folder-bg-expanded) !important; /* 更深的紫蓝色 */
+                    border: 2px solid var(--gh-border-active); /* 明显的边框 */
                     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
                     border-radius: 8px 8px 0 0; /* 展开时上方圆角 */
                 }
@@ -7726,7 +7739,7 @@
                 }
                 .conversations-search-input:focus {
                     outline: none;
-                    border-color: #6366f1;
+                    border-color: var(--gh-border-active);
                     z-index: 1;
                     position: relative;
                 }
@@ -7740,7 +7753,7 @@
                 }
                 .conversations-pin-filter-btn:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); }
                 .conversations-pin-filter-btn.active { 
-                    color: #6366f1; background: #eef2ff; 
+                    color: var(--gh-border-active); background: var(--gh-folder-bg-default); 
                     box-shadow: inset 0 0 0 1px #818cf8;
                 }
 
@@ -7776,7 +7789,7 @@
                 }
                 .conversations-tag-search-btn:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); }
                 .conversations-tag-search-btn.active { 
-                    color: #6366f1; background: #eef2ff; 
+                    color: var(--gh-border-active); background: var(--gh-folder-bg-default); 
                     box-shadow: inset 0 0 0 1px #818cf8; /* Fix 7: Distinct active border/shadow */
                 }
                 .conversations-tag-search-btn.empty { opacity: 0.5; }
@@ -7828,7 +7841,7 @@
                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
                 }
                 .conversations-tag-filter-item:hover { background: var(--gh-hover, #f3f4f6); }
-                .conversations-tag-filter-item.selected { background: #eff6ff; color: #2563eb; font-weight: 500; }
+                .conversations-tag-filter-item.selected { background: var(--gh-folder-bg-default); color: #2563eb; font-weight: 500; }
                 
                 /* Checkmark for selected */
                 .conversations-tag-filter-item.selected::after {
@@ -7842,7 +7855,7 @@
                 }
                 
                 .conversations-tag-filter-divider { height: 1px; background: #eee; margin: 4px 0; flex-shrink: 0; }
-                .conversations-tag-filter-action { color: #6366f1; font-weight: 500; justify-content: center; }
+                .conversations-tag-filter-action { color: var(--gh-border-active); font-weight: 500; justify-content: center; }
 
                 /* 标签管理弹窗 */
                 .conversations-tag-manager-list {
@@ -7881,9 +7894,9 @@
                 .conversations-result-bar {
                     text-align: center;
                     padding: 6px;
-                    color: #6366f1;
+                    color: var(--gh-border-active);
                     font-size: 13px;
-                    background: #eef2ff;
+                    background: var(--gh-folder-bg-default);
                     border-radius: 4px;
                     margin-top: 8px;
                     display: none;
@@ -7895,7 +7908,7 @@
                     width: 100%; /* 占满父容器宽度 */
                     padding: 8px 12px;
                     background: #f8fafc;
-                    border: 2px solid #6366f1;
+                    border: 2px solid var(--gh-border-active);
                     border-top: none;
                     border-radius: 0 0 8px 8px;
                     margin-top: -4px; /* 与文件夹项视觉连接 */
@@ -8213,12 +8226,12 @@
                 }
                 .outline-level-slider::-webkit-slider-thumb {
                     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-                    background: ${colors.primary}; cursor: pointer; border: 2px solid white;
+                    background: ${colors.primary}; cursor: pointer; border: 2px solid var(--gh-bg);
                     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                 }
                 .outline-level-slider::-moz-range-thumb {
                     width: 14px; height: 14px; border-radius: 50%;
-                    background: ${colors.primary}; cursor: pointer; border: 2px solid white;
+                    background: ${colors.primary}; cursor: pointer; border: 2px solid var(--gh-bg);
                     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                 }
                 .outline-level-dots {
@@ -8228,7 +8241,7 @@
                 .outline-level-dot {
                     width: 12px; height: 12px; border-radius: 50%; background: var(--gh-input-border, #d1d5db);
                     cursor: pointer; transition: all 0.2s; position: relative; z-index: 2;
-                    border: 2px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    border: 2px solid var(--gh-bg); box-shadow: 0 1px 2px rgba(0,0,0,0.1);
                 }
                 .outline-level-dot:hover { background: ${colors.primary}; transform: scale(1.2); }
                 .outline-level-dot.active { background: ${colors.primary}; }
@@ -8257,7 +8270,7 @@
                     display: flex; align-items: center; position: relative;
                 }
                 .outline-item:hover { background: var(--gh-hover, #f3f4f6); }
-                .outline-item.highlight { background: #dbeafe; border-color: ${colors.primary}; }
+                .outline-item.highlight { background: var(--gh-folder-bg-expanded); border-color: ${colors.primary}; }
 				.outline-item-toggle {
 					width: 24px; min-width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
 					color: #9ca3af; cursor: pointer; transition: all 0.2s ease;
@@ -8302,9 +8315,9 @@
                 const isDark = isDarkTheme || hasDarkClass;
 
                 if (isDark) {
-                    panel.classList.add('gh-dark');
+                    document.body.classList.add('gh-dark-mode-active');
                 } else {
-                    panel.classList.remove('gh-dark');
+                    document.body.classList.remove('gh-dark-mode-active');
                 }
             };
 
