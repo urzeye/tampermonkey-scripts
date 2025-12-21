@@ -20,8 +20,7 @@
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
-// @note         https://update.greasyfork.org/scripts/559176/1715343/domToolkit.js
-// @require      https://update.greasyfork.org/scripts/559176/1717005/domToolkit.js
+// @require      https://update.greasyfork.org/scripts/559176/1718116/domToolkit.js
 // @license      MIT
 // @downloadURL https://update.greasyfork.org/scripts/558318/gemini-helper.user.js
 // @updateURL https://update.greasyfork.org/scripts/558318/gemini-helper.meta.js
@@ -3442,8 +3441,8 @@
                 const maxRetries = 5; // 最多重试5次
                 const retryDelay = 1000; // 每次重试间隔1秒
 
-                // 确定监听起点
-                const sidebarContainer = config.shadow ? document : this.siteAdapter.getSidebarScrollContainer() || document;
+                // 确定监听起点：始终使用最精确的容器，让 Observer 能监听 Shadow DOM 内部的变化
+                const sidebarContainer = this.siteAdapter.getSidebarScrollContainer() || document;
 
                 // 对于需要 Shadow DOM 穿透的站点，检查侧边栏容器是否已加载
                 if (config.shadow && retryCount < maxRetries) {
@@ -3498,11 +3497,64 @@
 
             // 启动观察器
             startObserver();
+
+            // 补充：仅对 Shadow DOM 站点启用轮询（Observer 可能因 DOM 复用/替换而失效）
+            // 普通站点的 Observer 工作正常，无需轮询
+            if (config.shadow) {
+                this.pollNewConversations();
+            }
+        }
+
+        /**
+         * 轮询检测新会话
+         * 作为 MutationObserver 的补充机制
+         */
+        pollNewConversations() {
+            if (this.pollInterval) return; // 已在轮询
+
+            this.pollInterval = setInterval(() => {
+                if (!this.observerConfig) return;
+
+                const config = this.observerConfig;
+                const elements = DOMToolkit.query(config.selector, { all: true, shadow: config.shadow });
+
+                elements.forEach((el) => {
+                    const info = config.extractInfo(el);
+                    if (info?.id && !this.data.conversations[info.id]) {
+                        // 发现未记录的会话
+                        const folderId = this.data.lastUsedFolderId || 'inbox';
+                        this.data.conversations[info.id] = {
+                            id: info.id,
+                            siteId: this.siteAdapter.getSiteId(),
+                            cid: info.cid || null,
+                            title: info.title || 'New Conversation',
+                            url: info.url,
+                            folderId: folderId,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now(),
+                        };
+                        this.saveData();
+                        this.updateFolderCount(folderId);
+                        // 启动标题监听
+                        this.monitorConversationTitle(el, info.id);
+                    }
+                });
+            }, 3000);
+        }
+
+        /**
+         * 停止轮询
+         */
+        stopPolling() {
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+            }
         }
 
         /**
          * 监听会话标题变化
-         * 当侧边栏标题改变时，自动更新本地数据
+         * 使用共享的 watchMultiple 减少 Observer 数量
          * @param {HTMLElement} el 会话元素
          * @param {string} id 会话ID
          */
@@ -3514,41 +3566,38 @@
             // 使用配置获取正确的标题元素
             const titleEl = this.observerConfig?.getTitleElement?.(el) || el;
 
-            // 使用 DOMToolkit.watch 监听文本变化，防抖 500ms
-            DOMToolkit.watch(
-                titleEl,
-                () => {
-                    // 每次回调时重新从元素提取 ID，确保 ID 匹配
-                    const currentInfo = this.observerConfig?.extractInfo?.(el);
-                    const currentId = currentInfo?.id;
+            // 确保共享 watcher 已初始化
+            if (!this.titleWatcher) {
+                const container = this.siteAdapter.getSidebarScrollContainer() || document.body;
+                this.titleWatcher = DOMToolkit.watchMultiple(container, { debounce: 500 });
+            }
 
-                    if (!currentId || currentId !== id) {
-                        // ID 不匹配则跳过（防止元素被复用时错误更新）
-                        return;
-                    }
+            // 添加到共享监听器
+            this.titleWatcher.add(titleEl, () => {
+                // 每次回调时重新从元素提取 ID，确保 ID 匹配
+                const currentInfo = this.observerConfig?.extractInfo?.(el);
+                const currentId = currentInfo?.id;
 
-                    const currentTitle = titleEl.textContent?.trim();
-                    const stored = this.data.conversations[currentId];
+                if (!currentId || currentId !== id) {
+                    // ID 不匹配则跳过（防止元素被复用时错误更新）
+                    return;
+                }
 
-                    if (currentTitle && stored && stored.title !== currentTitle) {
-                        console.log(`[Gemini Helper] Title changed for ${currentId}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
+                const currentTitle = titleEl.textContent?.trim();
+                const stored = this.data.conversations[currentId];
 
-                        // 更新本地数据的标题
-                        stored.title = currentTitle;
-                        stored.updatedAt = Date.now();
-                        this.saveData();
+                if (currentTitle && stored && stored.title !== currentTitle) {
+                    console.log(`[Gemini Helper] Title changed for ${currentId}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
 
-                        // 刷新 UI (更新显示)
-                        this.createUI();
-                    }
-                },
-                {
-                    characterData: true,
-                    subtree: true,
-                    childList: true,
-                    debounce: 500,
-                },
-            );
+                    // 更新本地数据的标题
+                    stored.title = currentTitle;
+                    stored.updatedAt = Date.now();
+                    this.saveData();
+
+                    // 刷新 UI (更新显示)
+                    this.createUI();
+                }
+            });
         }
 
         /**
@@ -3559,6 +3608,13 @@
                 this.sidebarObserverStop();
                 this.sidebarObserverStop = null;
             }
+            // 清理共享的标题监听器
+            if (this.titleWatcher) {
+                this.titleWatcher.stop();
+                this.titleWatcher = null;
+            }
+            // 清理轮询
+            this.stopPolling();
         }
 
         /**
