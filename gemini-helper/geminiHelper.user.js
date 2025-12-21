@@ -78,38 +78,38 @@
         lastUsedFolderId: 'inbox',
     };
 
-    // 预设标签颜色 (30色)
+    // 预设标签颜色 (29色 - 中国传统色精选 - 优化对比度)
     const TAG_COLORS = [
-        '#ef4444',
-        '#f97316',
-        '#f59e0b',
-        '#eab308',
-        '#84cc16',
-        '#22c55e',
-        '#10b981',
-        '#14b8a6',
-        '#06b6d4',
-        '#0ea5e9',
-        '#3b82f6',
-        '#6366f1',
-        '#8b5cf6',
-        '#a855f7',
-        '#d946ef',
-        '#ec4899',
-        '#f43f5e',
-        '#be185d',
-        '#78350f',
-        '#92400e',
-        '#365314',
-        '#064e3b',
-        '#0c4a6e',
-        '#312e81',
-        '#581c87',
-        '#701a75',
-        '#831843',
-        '#7c2d12',
-        '#1e3a5f',
-        '#1e1e1e',
+        '#ff461f', // 朱砂
+        '#e35c64', // 桃夭
+        '#db5a6b', // 海棠红
+        '#f2481b', // 榴花红
+        '#9d2933', // 胭脂
+        '#ffa631', // 杏黄
+        '#d6a01d', // 姜黄
+        '#f0c239', // 缃色
+        '#d9b611', // 秋香色
+        '#8cc540', // 柳绿
+        '#0eb83a', // 葱绿
+        '#227d51', // 官绿
+        '#789262', // 竹青
+        '#29b7cb', // 湖蓝
+        '#177cb0', // 靛蓝
+        '#1685a9', // 石青
+        '#4b5cc4', // 宝蓝
+        '#2e4e7e', // 藏蓝
+        '#b088d1', // 丁香
+        '#b359ab', // 雪青
+        '#8d4bbb', // 紫罗兰
+        '#4c221b', // 紫檀
+        '#a88462', // 驼色
+        '#ca6924', // 琥珀
+        '#845a33', // 赭石
+        '#75878a', // 苍色
+        '#57c3c2', // 天水碧
+        '#ce97a8', // 藕荷
+        '#5d513c', // 墨灰
+        '#9b95c9', // 长春花 (新增第30色)
     ];
 
     // Tab 定义（用于渲染和显示）
@@ -5932,8 +5932,15 @@
 
             const content = createElement('div', { className: 'conversations-dialog-content' });
 
-            // 标签列表容器
-            const listContainer = createElement('div', { className: 'conversations-tag-manager-list' });
+            // 标签列表容器 (隐藏滚动条)
+            const listContainer = createElement('div', {
+                className: 'conversations-tag-manager-list',
+                style: 'scrollbar-width: none; -ms-overflow-style: none;', // Firefox, IE
+            });
+            // 注入隐藏 scrollbar 的样式 (Chrome/Safari)
+            const hideScrollStyle = document.createElement('style');
+            hideScrollStyle.textContent = `.conversations-tag-manager-list::-webkit-scrollbar { display: none; }`;
+            listContainer.appendChild(hideScrollStyle);
 
             const renderList = () => {
                 clearElement(listContainer);
@@ -6055,12 +6062,33 @@
             const colorPicker = createElement('div', { className: 'conversations-color-picker' });
             let selectedColor = TAG_COLORS[0];
 
-            const updateColorSelection = (color) => {
+            // 1. 渲染 30 色预设网格
+            const updateColorSelection = (color, source = 'click') => {
+                if (!color.startsWith('#')) color = '#' + color;
                 selectedColor = color;
-                Array.from(colorPicker.children).forEach((child) => {
-                    if (child.dataset.color === color) child.classList.add('selected');
-                    else child.classList.remove('selected');
-                });
+
+                // 更新 Hex 输入框
+                if (source !== 'input') {
+                    hexInput.value = color;
+                    hexInput.style.borderColor = '#ddd'; // Reset error state
+                }
+
+                // 更新选中状态
+                // 检查是否在预设中
+                const presetMatch = Array.from(colorPicker.children).find((c) => c.dataset.color && c.dataset.color.toLowerCase() === color.toLowerCase());
+
+                Array.from(colorPicker.children).forEach((c) => c.classList.remove('selected'));
+
+                if (presetMatch) {
+                    presetMatch.classList.add('selected');
+                    // 重置自定义按钮
+                    customBtnInner.style.background = 'conic-gradient(from 180deg, red, yellow, lime, aqua, blue, magenta, red)';
+                    customBtn.classList.remove('active-custom');
+                } else {
+                    // 自定义颜色选中
+                    customBtnInner.style.background = color;
+                    customBtn.classList.add('active-custom');
+                }
             };
 
             TAG_COLORS.forEach((color) => {
@@ -6074,6 +6102,85 @@
                 colorPicker.appendChild(colorItem);
             });
             formSection.appendChild(colorPicker);
+
+            // 2. 自定义颜色行 (彩虹按钮 + Hex 输入框)
+            const customRow = createElement('div', {
+                style: 'display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 0 4px;',
+            });
+
+            // 彩虹按钮容器
+            const customBtn = createElement('div', {
+                className: 'conversations-color-item custom-btn-wrapper',
+                title: '自定义颜色',
+                style: 'position: relative; cursor: pointer; border: 2px solid transparent; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);',
+            });
+            // 选中样式 CSS (通过 class 控制 border)
+            const customBtnStyle = document.createElement('style');
+            customBtnStyle.textContent = `
+                .active-custom { border-color: #666 !important; transform: scale(1.1); }
+            `;
+            customRow.appendChild(customBtnStyle);
+
+            const customBtnInner = createElement('div', {
+                style: 'width: 100%; height: 100%; background: conic-gradient(from 180deg, red, yellow, lime, aqua, blue, magenta, red);',
+            });
+
+            const nativePicker = createElement('input', {
+                type: 'color',
+                style: 'position: absolute; left: -50%; top: -50%; width: 200%; height: 200%; opacity: 0; cursor: pointer;',
+            });
+            nativePicker.addEventListener('input', (e) => updateColorSelection(e.target.value, 'picker'));
+
+            customBtn.appendChild(customBtnInner);
+            customBtn.appendChild(nativePicker);
+            customRow.appendChild(customBtn);
+
+            // Hex 输入区域
+            const hexWrapper = createElement('div', {
+                style: 'display: flex; align-items: center; gap: 8px; flex: 1;',
+            });
+            hexWrapper.appendChild(createElement('span', { style: 'font-size: 13px; color: #666;' }, 'HEX:'));
+
+            const hexInput = createElement('input', {
+                type: 'text',
+                className: 'conversations-dialog-input',
+                value: selectedColor,
+                placeholder: '#RRGGBB',
+                style: 'flex: 1; font-family: monospace; text-transform: uppercase;',
+            });
+
+            hexInput.addEventListener('input', (e) => {
+                const val = e.target.value;
+                // 正则校验: #后面跟3或6位16进制字符
+                const hexRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+                if (hexRegex.test(val)) {
+                    hexInput.style.borderColor = '#ddd'; // Valid
+                    // 补全3位到6位
+                    let expandVal = val;
+                    if (val.length === 4) {
+                        expandVal = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
+                    }
+                    updateColorSelection(expandVal, 'input');
+                } else {
+                    hexInput.style.borderColor = '#ef4444'; // Invalid
+                }
+            });
+
+            // 失去焦点时如果无效则恢复
+            hexInput.addEventListener('blur', () => {
+                if (hexInput.style.borderColor === 'rgb(239, 68, 68)' || hexInput.style.borderColor === '#ef4444') {
+                    hexInput.value = selectedColor;
+                    hexInput.style.borderColor = '#ddd';
+                }
+            });
+
+            hexWrapper.appendChild(hexInput);
+            customRow.appendChild(hexWrapper);
+
+            formSection.appendChild(customRow);
+
+            // 初始化颜色选择状态
+            updateColorSelection(selectedColor, 'init');
 
             const addBtn = createElement(
                 'button',
