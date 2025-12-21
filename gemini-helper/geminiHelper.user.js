@@ -3497,14 +3497,18 @@
                 const sidebarContainer = this.siteAdapter.getSidebarScrollContainer() || document;
 
                 // 对于需要 Shadow DOM 穿透的站点，检查侧边栏容器是否已加载
+                // 如果返回的是 document，说明没找到特定容器，可能还要等待 (除非原本就是 document)
                 if (config.shadow && retryCount < maxRetries) {
-                    const sidebar = this.siteAdapter.getSidebarScrollContainer();
-                    if (!sidebar) {
+                    const foundContainer = this.siteAdapter.getSidebarScrollContainer();
+                    if (!foundContainer) {
                         // 侧边栏还未加载，延迟重试
                         setTimeout(() => startObserver(retryCount + 1), retryDelay);
                         return;
                     }
                 }
+
+                // 保存当前从属的容器，用于后续存活检测 (Zombie Check)
+                this.observerContainer = sidebarContainer;
 
                 // 侧边栏已加载或达到最大重试次数，开始监听
                 this.sidebarObserverStop = DOMToolkit.each(
@@ -3554,6 +3558,23 @@
             // 普通站点的 Observer 工作正常，无需轮询
             if (config.shadow) {
                 this.pollNewConversations();
+            }
+        }
+
+        /**
+         * 检查侧边栏监听器是否仍然有效 (Zombie Check)
+         * 如果容器被销毁（Detached），则重启监听器
+         */
+        checkObserverStatus() {
+            // 如果监听器已停止，不需要检查
+            if (!this.sidebarObserverStop) return;
+
+            // 如果容器存在但已失去连接 (isConnected === false)，说明变成了僵尸监听器
+            if (this.observerContainer && !this.observerContainer.isConnected) {
+                console.log('Gemini Helper: Sidebar container detached. Restarting observer...');
+                this.stopSidebarObserver();
+                // 给予一点延迟等待新容器就绪
+                setTimeout(() => this.startSidebarObserver(), 500);
             }
         }
 
@@ -3660,6 +3681,9 @@
                 this.sidebarObserverStop();
                 this.sidebarObserverStop = null;
             }
+            // 清理容器引用
+            this.observerContainer = null;
+
             // 清理共享的标题监听器
             if (this.titleWatcher) {
                 this.titleWatcher.stop();
@@ -9976,7 +10000,14 @@
             };
 
             // 3. 定时器兜底 (防止某些框架绕过 history API)
-            setInterval(checkUrl, 1000);
+            // 同时用于检测 Sidebar Observer 的存活状态
+            setInterval(() => {
+                checkUrl();
+                // 周期性检查 Observer 是否存活 (Zombie Check)
+                if (this.conversationManager) {
+                    this.conversationManager.checkObserverStatus();
+                }
+            }, 1000);
         }
 
         makeDraggable() {
