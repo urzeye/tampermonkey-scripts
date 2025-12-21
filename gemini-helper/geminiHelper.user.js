@@ -6122,6 +6122,11 @@
             // 渲染列表
             renderList();
 
+            // 点击遮罩关闭
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+
             // ESC 关闭
             overlay.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') overlay.remove();
