@@ -27,6 +27,14 @@
 
 [查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 
+### <img src="https://thumbs.onlyfans.com/public/files/thumbs/c50/m/mk/mka/mkamcrf6rjmcwo0jj4zoavhmalzohe5a1640180203/avatar.jpg" height="24" alt="Coomer" /> coomer 佬友严选
+
+> coomer 佬友严选，值得信赖！
+
+**最新版本**: v1.0.0
+
+[查看详细文档](./coomer/README.md) | [安装脚本](https://sleazyfork.org/zh-CN/scripts/559828-coomer-%E4%BD%AC%E5%8F%8B%E4%B8%A5%E9%80%89)
+
 ## 📝 开发计划
 
 -   [ ] 更多实用脚本敬请期待...
