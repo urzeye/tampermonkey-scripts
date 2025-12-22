@@ -1402,15 +1402,6 @@
             // ... (existing code)
         }
 
-        /**
-         * 是否支持通过直接修改 DOM (classList/style) 来切换主题
-         * 默认：支持
-         * 重写：Gemini Business 不支持 (需模拟点击)
-         */
-        supportsDOMThemeToggle() {
-            return true;
-        }
-
         lockModel(keyword, onSuccess = null) {
             const config = this.getModelSwitcherConfig(keyword);
             if (!config) return;
@@ -2453,10 +2444,6 @@
                     document.body.classList.remove('gh-stealth-mode');
                 }, 200);
             }
-        }
-
-        supportsDOMThemeToggle() {
-            return false;
         }
     }
 
