@@ -8469,18 +8469,29 @@
             if (!panel) return;
 
             const checkTheme = () => {
-                // 1. Detect current state from DOM
+                // Refined Detection Logic: Priority Class > Data > Style
                 const bodyClass = document.body.className;
-                // dark-theme is the key class for both versions
                 const hasDarkClass = /\bdark-theme\b/i.test(bodyClass);
-                // Fallback checks just in case
-                const dataTheme = document.body.dataset.theme || document.documentElement.dataset.theme;
-                const isDarkTheme = dataTheme === 'dark';
+                const hasLightClass = /\blight-theme\b/i.test(bodyClass);
 
-                // Check color-scheme style (Critical for Gemini Business)
-                const isDarkStyle = document.body.style.colorScheme === 'dark';
-
-                const isDark = hasDarkClass || isDarkTheme || isDarkStyle;
+                // 1. Explicit Class (Gemini Standard uses this)
+                let isDark = false;
+                if (hasDarkClass) {
+                    isDark = true;
+                } else if (hasLightClass) {
+                    isDark = false;
+                } else {
+                    // 2. Data Attribute
+                    const dataTheme = document.body.dataset.theme || document.documentElement.dataset.theme;
+                    if (dataTheme === 'dark') {
+                        isDark = true;
+                    } else if (dataTheme === 'light') {
+                        isDark = false;
+                    } else {
+                        // 3. Style color-scheme (Gemini Business uses this)
+                        isDark = document.body.style.colorScheme === 'dark';
+                    }
+                }
 
                 // 2. Sync to Plugin UI (ghMode)
                 if (isDark) {
