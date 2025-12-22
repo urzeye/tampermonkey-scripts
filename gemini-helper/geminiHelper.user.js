@@ -1399,6 +1399,19 @@
 		 * @param {Function} onSuccess 成功后的回调（可选）
 		 */
         lockModel(keyword, onSuccess = null) {
+            // ... (existing code)
+        }
+
+        /**
+         * 是否支持通过直接修改 DOM (classList/style) 来切换主题
+         * 默认：支持
+         * 重写：Gemini Business 不支持 (需模拟点击)
+         */
+        supportsDOMThemeToggle() {
+            return true;
+        }
+
+        lockModel(keyword, onSuccess = null) {
             const config = this.getModelSwitcherConfig(keyword);
             if (!config) return;
 
@@ -2339,6 +2352,85 @@
                     this.findHeadingsInShadowDOM(el.shadowRoot, outline, maxLevel, depth + 1);
                 }
             }
+        }
+
+        /**
+         * 模拟点击原生设置切换主题 (针对 Gemini Business)
+         * @param {'light'|'dark'} targetMode
+         */
+        async toggleTheme(targetMode) {
+            console.log(`[GeminiBusinessAdapter] Attempting to switch theme to: ${targetMode}`);
+
+            // 1. 找到并点击设置按钮
+            // 使用 DOMToolkit 穿透 Shadow DOM 查找
+            const settingsBtn = DOMToolkit.query('#settings-menu-anchor', { shadow: true });
+
+            if (!settingsBtn) {
+                console.error('[GeminiBusinessAdapter] Settings button not found (#settings-menu-anchor)');
+                // 尝试备用选择器 (class based)
+                const fallbackBtn = DOMToolkit.query('.setting-btn', { shadow: true });
+                if (fallbackBtn) {
+                    console.log('[GeminiBusinessAdapter] Found settings button via fallback class');
+                    if (typeof fallbackBtn.click === 'function') fallbackBtn.click();
+                    else fallbackBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                } else {
+                    return false;
+                }
+            } else {
+                // Click settings button
+                if (typeof settingsBtn.click === 'function') {
+                    settingsBtn.click();
+                } else {
+                    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                    settingsBtn.dispatchEvent(clickEvent);
+                }
+            }
+
+            // 2. 等待菜单弹出 (md-menu / md-primary-tab)
+            // 简单轮询等待
+            let attempts = 0;
+            const findAndClickOption = () => {
+                // User HTML: <md-primary-tab ...><md-icon>dark_mode</md-icon><div class="label">深色</div></md-primary-tab>
+                const targetIcon = targetMode === 'dark' ? 'dark_mode' : 'light_mode';
+
+                // Query all md-primary-tab in the document (the menu is likely top-level or hung on body, but might be in shadow)
+                // Use DOMToolkit to find ALL tabs
+                const tabs = DOMToolkit.query('md-primary-tab', { all: true, shadow: true });
+
+                for (const tab of tabs) {
+                    // Check icon content
+                    const icon = tab.querySelector('md-icon') || DOMToolkit.query('md-icon', { root: tab, shadow: true });
+                    if (icon && icon.textContent.trim() === targetIcon) {
+                        console.log(`[GeminiBusinessAdapter] Found target option: ${targetIcon}`);
+                        tab.click();
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            return new Promise((resolve) => {
+                const interval = setInterval(() => {
+                    attempts++;
+                    if (findAndClickOption()) {
+                        clearInterval(interval);
+                        resolve(true);
+                        // Optional: Close menu if it doesn't close automatically?
+                        // Usually selecting an option closes it.
+                    } else if (attempts > 20) {
+                        // Timeout 2s
+                        clearInterval(interval);
+                        console.error('[GeminiBusinessAdapter] Target theme option not found');
+                        resolve(false);
+                        // Try clicking settings again to close if failed?
+                        settingsBtn.click();
+                    }
+                }, 100);
+            });
+        }
+
+        supportsDOMThemeToggle() {
+            return false;
         }
     }
 
@@ -8363,7 +8455,10 @@
                 const dataTheme = document.body.dataset.theme || document.documentElement.dataset.theme;
                 const isDarkTheme = dataTheme === 'dark';
 
-                const isDark = hasDarkClass || isDarkTheme;
+                // Check color-scheme style (Critical for Gemini Business)
+                const isDarkStyle = document.body.style.colorScheme === 'dark';
+
+                const isDark = hasDarkClass || isDarkTheme || isDarkStyle;
 
                 // 2. Sync to Plugin UI (ghMode)
                 if (isDark) {
@@ -8398,8 +8493,8 @@
                 this.themeObserver = new MutationObserver((mutations) => {
                     checkTheme();
                 });
-                // Listen to class changes on body (primary method) and dataset attributes
-                this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+                // Listen to class changes on body (primary method), dataset attributes AND style
+                this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
                 this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
             }
         }
@@ -8412,8 +8507,10 @@
             if (mode === 'dark') {
                 document.body.classList.add('dark-theme');
                 document.body.classList.remove('light-theme'); // For standard version consistency
+                document.body.style.colorScheme = 'dark'; // Force color-scheme for Business
             } else {
                 document.body.classList.remove('dark-theme');
+                document.body.style.colorScheme = 'light'; // Force color-scheme for Business
                 // Only add light-theme if we are likely on Standard version (based on url or adapter)
                 // Gemini Business uses empty class for light. Standard uses 'light-theme'.
                 if (window.location.host === 'gemini.google.com') {
@@ -8425,8 +8522,21 @@
         // 切换主题 (User Action)
         toggleTheme() {
             const bodyClass = document.body.className;
-            const isDark = /\bdark-theme\b/i.test(bodyClass);
+            // Also check style for robustness
+            const isDark = /\bdark-theme\b/i.test(bodyClass) || document.body.style.colorScheme === 'dark';
             const nextMode = isDark ? 'light' : 'dark';
+
+            // 优先使用适配器的原生切换逻辑 (针对 Gemini Business)
+            if (typeof this.siteAdapter.toggleTheme === 'function') {
+                this.siteAdapter.toggleTheme(nextMode).then((success) => {
+                    if (!success) {
+                        // Fallback or Toast?
+                        showToast('自动切换主题失败，请尝试在网页设置中手动切换');
+                    }
+                });
+                return;
+            }
+
             this.applyTheme(nextMode);
         }
 
