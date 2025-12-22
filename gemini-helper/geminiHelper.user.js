@@ -7593,7 +7593,7 @@
                 }
                 #gemini-helper-panel.collapsed { display: none; }
                 .prompt-panel-header {
-                    padding: 16px;
+                    padding: 12px 14px;
                     background: var(--gh-header-bg);
                     color: white;
                     border-radius: 12px 12px 0 0;
@@ -7605,7 +7605,7 @@
                 }
                 .prompt-panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
                 .site-indicator { font-size: 10px; padding: 2px 5px; background: rgba(255,255,255,0.2); border-radius: 4px; margin-left: 4px; white-space: nowrap; }
-                .prompt-panel-controls { display: flex; gap: 8px; }
+                .prompt-panel-controls { display: flex; gap: 4px; align-items: center; }
                 .prompt-panel-btn {
                     background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px;
                     border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -8505,7 +8505,26 @@
 
                 const themeBtn = document.getElementById('theme-toggle-btn');
                 if (themeBtn) {
-                    themeBtn.textContent = isDark ? '🌙' : '☀';
+                    // Update icon using DOM methods (avoid TrustedHTML error)
+                    const svgNS = 'http://www.w3.org/2000/svg';
+                    const svg = document.createElementNS(svgNS, 'svg');
+                    svg.setAttribute('xmlns', svgNS);
+                    svg.setAttribute('height', '20px');
+                    svg.setAttribute('viewBox', '0 -960 960 960');
+                    svg.setAttribute('width', '20px');
+                    svg.setAttribute('fill', '#FFFFFF');
+
+                    const path = document.createElementNS(svgNS, 'path');
+                    path.setAttribute(
+                        'd',
+                        isDark
+                            ? 'M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z'
+                            : 'M480-280q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z',
+                    );
+                    svg.appendChild(path);
+
+                    themeBtn.textContent = ''; // clear
+                    themeBtn.appendChild(svg);
                 }
             };
 
@@ -8582,22 +8601,39 @@
             title.appendChild(createElement('span', {}, '✨'));
             title.appendChild(createElement('span', {}, this.t('panelTitle')));
 
-            // 主题切换按钮
+            const controls = createElement('div', { className: 'prompt-panel-controls' });
+
+            // 主题切换按钮 (SVG Icon) - Moved to Controls
             const themeBtn = createElement('button', {
                 id: 'theme-toggle-btn',
                 className: 'prompt-panel-btn',
                 title: this.t('toggleTheme'),
-                style: 'width: 24px; height: 24px; font-size: 14px; padding: 0; background: transparent; border: none; margin-left: 8px;',
+                style: '', // use class style
             });
-            // Initial icon state (will be updated by monitorTheme immediately)
-            themeBtn.textContent = '☀';
-            themeBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.toggleTheme();
-            };
-            title.appendChild(themeBtn);
+            // Initial icon state (Default to Light/Sun to prevent empty flush)
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('xmlns', svgNS);
+            svg.setAttribute('height', '20px');
+            svg.setAttribute('viewBox', '0 -960 960 960');
+            svg.setAttribute('width', '20px');
+            svg.setAttribute('fill', '#FFFFFF');
+            const path = document.createElementNS(svgNS, 'path');
+            // Default Sun Icon
+            path.setAttribute(
+                'd',
+                'M480-280q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z',
+            );
+            svg.appendChild(path);
+            themeBtn.appendChild(svg);
 
-            const controls = createElement('div', { className: 'prompt-panel-controls' });
+            themeBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止冒泡，防止触发 Header 双击（隐私模式）
+                this.toggleTheme();
+            });
+            themeBtn.addEventListener('dblclick', (e) => e.stopPropagation()); // 阻止双击冒泡
+            controls.appendChild(themeBtn);
+
             const refreshBtn = createElement(
                 'button',
                 {
