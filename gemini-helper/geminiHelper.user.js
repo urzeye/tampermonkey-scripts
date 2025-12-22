@@ -9,8 +9,6 @@
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
 // @match        https://gemini.google.com/*
 // @match        https://business.gemini.google/*
-// @match        https://www.genspark.ai/agents*
-// @match        https://genspark.ai/agents*
 // @icon         https://raw.githubusercontent.com/gist/urzeye/8d1d3afbbcd0193dbc8a2019b1ba54d3/raw/f7113d329a259963ed1b1ab8cb981e8f635d4cea/gemini.svg
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -869,7 +867,6 @@
     const DEFAULT_WIDTH_SETTINGS = {
         gemini: { enabled: false, value: '70', unit: '%' },
         'gemini-business': { enabled: false, value: '1600', unit: 'px' },
-        genspark: { enabled: false, value: '70', unit: '%' },
     };
 
     // ============= 大纲功能默认配置 =============
@@ -2470,83 +2467,6 @@
                     document.body.classList.remove('gh-stealth-mode');
                 }, 200);
             }
-        }
-    }
-
-    /**
-     * Genspark 适配器（genspark.ai）
-     */
-    class GensparkAdapter extends SiteAdapter {
-        match() {
-            return window.location.hostname.includes('genspark.ai');
-        }
-
-        getSiteId() {
-            return 'genspark';
-        }
-
-        getName() {
-            return 'Genspark';
-        }
-
-        getThemeColors() {
-            return { primary: '#667eea', secondary: '#764ba2' };
-        }
-
-        getNewTabUrl() {
-            return 'https://www.genspark.ai';
-        }
-
-        isNewConversation() {
-            const path = window.location.pathname;
-            return path === '/' || path === '/agents' || path === '/agents/';
-        }
-
-        getWidthSelectors() {
-            // Genspark 暂时不实现加宽，预留接口
-            return [];
-        }
-
-        getTextareaSelectors() {
-            return ['textarea[name="query"]', 'textarea.search-input', '.textarea-wrapper textarea', 'textarea[placeholder*="Message"]'];
-        }
-
-        getSubmitButtonSelectors() {
-            return ['button[aria-label*="Send"]', 'button[aria-label*="发送"]', '.send-button', '[data-testid*="send"]'];
-        }
-
-        getChatContentSelectors() {
-            return ['.message-content', '.markdown-body', '[data-testid="chat-message"]'];
-        }
-
-        insertPrompt(content) {
-            if (!this.textarea) return false;
-
-            const currentContent = this.textarea.value.trim();
-            this.textarea.value = currentContent ? content + '\n\n' + currentContent : content + '\n\n';
-            this.adjustTextareaHeight();
-            this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            this.textarea.focus();
-            return true;
-        }
-
-        adjustTextareaHeight() {
-            if (this.textarea) {
-                this.textarea.style.height = 'auto';
-                this.textarea.style.height = Math.min(this.textarea.scrollHeight, 200) + 'px';
-            }
-        }
-
-        clearTextarea() {
-            if (this.textarea) {
-                this.textarea.value = '';
-                this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                this.adjustTextareaHeight();
-            }
-        }
-
-        supportsScrollLock() {
-            return false;
         }
     }
 
@@ -11060,7 +10980,6 @@
             const siteRegistry = new SiteRegistry();
             siteRegistry.register(new GeminiBusinessAdapter()); // 优先检测
             siteRegistry.register(new GeminiAdapter());
-            siteRegistry.register(new GensparkAdapter());
 
             const currentAdapter = siteRegistry.detect();
 
