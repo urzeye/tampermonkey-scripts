@@ -1,16 +1,14 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.9.2
-// @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
-// @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
+// @version      1.9.3
+// @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
+// @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, collapsed button reorder, circular theme toggle animation, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
 // @homepage     https://github.com/urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
 // @match        https://gemini.google.com/*
 // @match        https://business.gemini.google/*
-// @match        https://www.genspark.ai/agents*
-// @match        https://genspark.ai/agents*
 // @icon         https://raw.githubusercontent.com/gist/urzeye/8d1d3afbbcd0193dbc8a2019b1ba54d3/raw/f7113d329a259963ed1b1ab8cb981e8f635d4cea/gemini.svg
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -48,6 +46,10 @@
         READING_HISTORY: 'gemini_reading_history_settings',
         TAB_SETTINGS: 'gemini_tab_settings',
         CONVERSATIONS: 'gemini_conversations',
+        DEFAULT_PANEL_STATE: 'gemini_default_panel_state',
+        AUTO_HIDE_PANEL: 'gemini_default_auto_hide',
+        THEME_MODE: 'gemini_theme_mode', // 'light' | 'dark' | null
+        COLLAPSED_BUTTONS_ORDER: 'gemini_collapsed_buttons_order',
     };
 
     // 默认 Tab 顺序（settings 已移到 header 按钮，不参与排序）
@@ -78,9 +80,9 @@
         lastUsedFolderId: 'inbox',
     };
 
-    // 预设标签颜色 (29色 - 中国传统色精选 - 优化对比度)
+    // 预设标签颜色 (30色 - 中国传统色精选 - 优化对比度)
     const TAG_COLORS = [
-        '#ff461f', // 朱砂
+        '#ff461f', // 朱
         '#e35c64', // 桃夭
         '#db5a6b', // 海棠红
         '#f2481b', // 榴花红
@@ -109,7 +111,7 @@
         '#57c3c2', // 天水碧
         '#ce97a8', // 藕荷
         '#5d513c', // 墨灰
-        '#9b95c9', // 长春花 (新增第30色)
+        '#9b95c9', // 长春花
     ];
 
     // Tab 定义（用于渲染和显示）
@@ -119,6 +121,22 @@
         conversations: { id: 'conversations', labelKey: 'tabConversations', icon: '💬' },
         settings: { id: 'settings', labelKey: 'tabSettings', icon: '⚙️' },
     };
+
+    // 折叠面板按钮定义
+    const COLLAPSED_BUTTON_DEFS = {
+        scrollTop: { icon: '⬆', labelKey: 'scrollTop', canToggle: false },
+        panel: { icon: '✨', labelKey: 'panelTitle', canToggle: false },
+        anchor: { icon: '⚓', labelKey: 'showCollapsedAnchorLabel', canToggle: true },
+        theme: { icon: '☀', labelKey: 'showCollapsedThemeLabel', canToggle: true },
+        scrollBottom: { icon: '⬇', labelKey: 'scrollBottom', canToggle: false },
+    };
+    const DEFAULT_COLLAPSED_BUTTONS_ORDER = [
+        { id: 'scrollTop', enabled: true },
+        { id: 'panel', enabled: true },
+        { id: 'anchor', enabled: true },
+        { id: 'theme', enabled: true },
+        { id: 'scrollBottom', enabled: true },
+    ];
 
     const I18N = {
         'zh-CN': {
@@ -209,6 +227,8 @@
             renameIntervalDesc: '检测对话名称变化的间隔时间',
             secondsSuffix: '秒',
             showStatusLabel: '显示生成状态',
+            toggleTheme: '切换亮/暗主题',
+            // 面板设置
             showStatusDesc: '在标签页标题中显示生成状态图标（⏳/✅）',
             showNotificationLabel: '发送桌面通知',
             showNotificationDesc: '生成完成时发送系统通知（目前仅 Gemini Business 有效）',
@@ -276,8 +296,11 @@
             pageDisplaySettings: '页面显示',
             // 其他设置
             otherSettingsTitle: '其他设置',
-            showCollapsedAnchorLabel: '折叠面板显示锚点',
+            showCollapsedAnchorLabel: '锚点',
             showCollapsedAnchorDesc: '当面板收起时，在侧边浮动条中显示锚点按钮',
+            showCollapsedThemeLabel: '主题',
+            showCollapsedThemeDesc: '当面板收起时，在侧边浮动条中显示主题切换按钮',
+            collapsedButtonsOrderDesc: '调整折叠面板按钮的显示顺序',
             preventAutoScrollLabel: '防止自动滚动',
             preventAutoScrollDesc: '当 AI 生成长内容时，阻止页面自动滚动到底部，方便阅读上文',
             // 界面排版开关
@@ -506,8 +529,11 @@
             pageDisplaySettings: '頁面顯示',
             // 其他設置
             otherSettingsTitle: '其他設置',
-            showCollapsedAnchorLabel: '折疊面板顯示錨點',
+            showCollapsedAnchorLabel: '錨點',
             showCollapsedAnchorDesc: '當面板收起時，在側邊浮動條中顯示錨點按鈕',
+            showCollapsedThemeLabel: '主題',
+            showCollapsedThemeDesc: '當面板收起時，在側邊浮動條中顯示主題切換按鈕',
+            collapsedButtonsOrderDesc: '調整折疊面板按鈕的顯示順序',
             preventAutoScrollLabel: '防止自動滾動',
             preventAutoScrollDesc: '當 AI 生成長內容時，阻止頁面自動滾動到底部，方便閱讀上文',
             // 介面排版開關
@@ -729,8 +755,11 @@
             pageDisplaySettings: 'Page Display',
             // Other Settings
             otherSettingsTitle: 'Other Settings',
-            showCollapsedAnchorLabel: 'Show anchor when collapsed',
+            showCollapsedAnchorLabel: 'Anchor',
             showCollapsedAnchorDesc: 'Display anchor button in sidebar when panel is collapsed',
+            showCollapsedThemeLabel: 'Theme',
+            showCollapsedThemeDesc: 'Display theme toggle button in sidebar when panel is collapsed',
+            collapsedButtonsOrderDesc: 'Adjust the display order of collapsed panel buttons',
             preventAutoScrollLabel: 'Prevent auto-scroll',
             preventAutoScrollDesc: 'Stop page from auto-scrolling to bottom during AI generation',
             // Interface Toggle
@@ -838,7 +867,6 @@
     const DEFAULT_WIDTH_SETTINGS = {
         gemini: { enabled: false, value: '70', unit: '%' },
         'gemini-business': { enabled: false, value: '1600', unit: 'px' },
-        genspark: { enabled: false, value: '70', unit: '%' },
     };
 
     // ============= 大纲功能默认配置 =============
@@ -1393,6 +1421,10 @@
 		 * @param {string} keyword - 目标模型关键字
 		 * @param {Function} onSuccess 成功后的回调（可选）
 		 */
+        lockModel(keyword, onSuccess = null) {
+            // ... (existing code)
+        }
+
         lockModel(keyword, onSuccess = null) {
             const config = this.getModelSwitcherConfig(keyword);
             if (!config) return;
@@ -2335,82 +2367,106 @@
                 }
             }
         }
-    }
 
-    /**
-     * Genspark 适配器（genspark.ai）
-     */
-    class GensparkAdapter extends SiteAdapter {
-        match() {
-            return window.location.hostname.includes('genspark.ai');
-        }
+        /**
+         * 模拟点击原生设置切换主题 (针对 Gemini Business)
+         * @param {'light'|'dark'} targetMode
+         */
+        async toggleTheme(targetMode) {
+            console.log(`[GeminiBusinessAdapter] Attempting to switch theme to: ${targetMode}`);
 
-        getSiteId() {
-            return 'genspark';
-        }
+            // 1. 启动暴力隐身模式 (JS 每一帧强制隐藏)
+            // CSS 注入可能因优先级或 Shadow DOM 隔离失效，JS 强制修改内联样式是最稳妥的
+            let stopSuppression = false;
+            const suppressMenu = () => {
+                if (stopSuppression) return;
 
-        getName() {
-            return 'Genspark';
-        }
+                // 查找所有可能的菜单容器
+                try {
+                    const menus = DOMToolkit.query('.menu[popover], md-menu-surface, .mat-menu-panel, [role="menu"]', { all: true, shadow: true });
+                    menus.forEach((el) => {
+                        // 强制隐藏，不留余地
+                        if (el.style.opacity !== '0') {
+                            el.style.setProperty('opacity', '0', 'important');
+                            el.style.setProperty('visibility', 'hidden', 'important');
+                            el.style.setProperty('pointer-events', 'none', 'important');
+                        }
+                    });
+                } catch (e) {
+                    // Ignore errors during suppression
+                }
 
-        getThemeColors() {
-            return { primary: '#667eea', secondary: '#764ba2' };
-        }
+                requestAnimationFrame(suppressMenu);
+            };
+            suppressMenu();
 
-        getNewTabUrl() {
-            return 'https://www.genspark.ai';
-        }
+            // 全局也加一个保险
+            document.body.classList.add('gh-stealth-mode');
 
-        isNewConversation() {
-            const path = window.location.pathname;
-            return path === '/' || path === '/agents' || path === '/agents/';
-        }
+            try {
+                // 2. 找到并点击设置按钮
+                const settingsBtn = DOMToolkit.query('#settings-menu-anchor', { shadow: true });
 
-        getWidthSelectors() {
-            // Genspark 暂时不实现加宽，预留接口
-            return [];
-        }
+                if (!settingsBtn) {
+                    console.error('[GeminiBusinessAdapter] Settings button not found (#settings-menu-anchor)');
+                    const fallbackBtn = DOMToolkit.query('.setting-btn', { shadow: true });
+                    if (fallbackBtn) {
+                        if (typeof fallbackBtn.click === 'function') fallbackBtn.click();
+                        else fallbackBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                    } else {
+                        return false;
+                    }
+                } else {
+                    if (typeof settingsBtn.click === 'function') {
+                        settingsBtn.click();
+                    } else {
+                        settingsBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                    }
+                }
 
-        getTextareaSelectors() {
-            return ['textarea[name="query"]', 'textarea.search-input', '.textarea-wrapper textarea', 'textarea[placeholder*="Message"]'];
-        }
+                // 3. 等待菜单弹出并点击目标
+                let attempts = 0;
+                const findAndClickOption = () => {
+                    const targetIcon = targetMode === 'dark' ? 'dark_mode' : 'light_mode';
 
-        getSubmitButtonSelectors() {
-            return ['button[aria-label*="Send"]', 'button[aria-label*="发送"]', '.send-button', '[data-testid*="send"]'];
-        }
+                    // Query all md-primary-tab in the document
+                    const tabs = DOMToolkit.query('md-primary-tab', { all: true, shadow: true });
 
-        getChatContentSelectors() {
-            return ['.message-content', '.markdown-body', '[data-testid="chat-message"]'];
-        }
+                    for (const tab of tabs) {
+                        const icon = tab.querySelector('md-icon') || DOMToolkit.query('md-icon', { root: tab, shadow: true });
+                        if (icon && icon.textContent.trim() === targetIcon) {
+                            console.log(`[GeminiBusinessAdapter] Found target option: ${targetIcon}`);
+                            tab.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                };
 
-        insertPrompt(content) {
-            if (!this.textarea) return false;
-
-            const currentContent = this.textarea.value.trim();
-            this.textarea.value = currentContent ? content + '\n\n' + currentContent : content + '\n\n';
-            this.adjustTextareaHeight();
-            this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            this.textarea.focus();
-            return true;
-        }
-
-        adjustTextareaHeight() {
-            if (this.textarea) {
-                this.textarea.style.height = 'auto';
-                this.textarea.style.height = Math.min(this.textarea.scrollHeight, 200) + 'px';
+                return await new Promise((resolve) => {
+                    const interval = setInterval(() => {
+                        attempts++;
+                        if (findAndClickOption()) {
+                            clearInterval(interval);
+                            resolve(true);
+                        } else if (attempts > 20) {
+                            // Timeout 2s
+                            clearInterval(interval);
+                            console.error('[GeminiBusinessAdapter] Target theme option not found');
+                            resolve(false);
+                            // Try clicking settings again to close if failed
+                            if (settingsBtn && typeof settingsBtn.click === 'function') settingsBtn.click();
+                        }
+                    }, 100);
+                });
+            } finally {
+                // 停止暴力抑制
+                stopSuppression = true;
+                // 延迟移除隐身模式
+                setTimeout(() => {
+                    document.body.classList.remove('gh-stealth-mode');
+                }, 200);
             }
-        }
-
-        clearTextarea() {
-            if (this.textarea) {
-                this.textarea.value = '';
-                this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                this.adjustTextareaHeight();
-            }
-        }
-
-        supportsScrollLock() {
-            return false;
         }
     }
 
@@ -7146,15 +7202,18 @@
                 prompts: promptsSettings,
                 tabOrder: tabOrder,
                 preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
-                showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
+                collapsedButtonsOrder: GM_getValue(SETTING_KEYS.COLLAPSED_BUTTONS_ORDER, DEFAULT_COLLAPSED_BUTTONS_ORDER),
                 tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
                 readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) },
                 conversations: { enabled: true },
-                defaultPanelState: GM_getValue('gemini_default_panel_state', true),
-                autoHidePanel: GM_getValue('gemini_default_auto_hide', false),
+                // 默认面板状态
+                defaultPanelState: GM_getValue(SETTING_KEYS.DEFAULT_PANEL_STATE, true),
+                // 自动隐藏面板
+                autoHidePanel: GM_getValue(SETTING_KEYS.AUTO_HIDE_PANEL, false),
+                // 主题模式 (null=跟随系统/默认, 'light', 'dark')
+                themeMode: GM_getValue(`gemini_theme_mode_${currentAdapter ? currentAdapter.getSiteId() : 'default'}`, null),
             };
         }
-
         /**
          * 保存设置
          * @param {Object} settings 当前设置对象
@@ -7191,6 +7250,14 @@
             }
             GM_setValue('gemini_default_panel_state', settings.defaultPanelState);
             GM_setValue('gemini_default_auto_hide', settings.autoHidePanel);
+            // 保存主题模式 (使用站点特有的 Key)
+            if (currentAdapter) {
+                GM_setValue(`gemini_theme_mode_${currentAdapter.getSiteId()}`, settings.themeMode);
+            } else {
+                GM_setValue('gemini_theme_mode_default', settings.themeMode);
+            }
+            // 保存折叠面板按钮顺序
+            GM_setValue(SETTING_KEYS.COLLAPSED_BUTTONS_ORDER, settings.collapsedButtonsOrder);
         }
     }
 
@@ -7211,6 +7278,11 @@
             this.i18n = I18N[this.lang]; // 当前语言文本
             this.settingsManager = new SettingsManager();
             this.settings = this.loadSettings(); // 加载设置
+
+            // Restore saved theme preference if exists
+            if (this.settings.themeMode) {
+                this.applyTheme(this.settings.themeMode);
+            }
 
             // 根据设置初始化面板折叠状态 (默认显示面板 -> !collapsed)
             this.isCollapsed = !this.settings.defaultPanelState;
@@ -7474,7 +7546,7 @@
                 }
                 #gemini-helper-panel.collapsed { display: none; }
                 .prompt-panel-header {
-                    padding: 16px;
+                    padding: 12px 14px;
                     background: var(--gh-header-bg);
                     color: white;
                     border-radius: 12px 12px 0 0;
@@ -7486,7 +7558,7 @@
                 }
                 .prompt-panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
                 .site-indicator { font-size: 10px; padding: 2px 5px; background: rgba(255,255,255,0.2); border-radius: 4px; margin-left: 4px; white-space: nowrap; }
-                .prompt-panel-controls { display: flex; gap: 8px; }
+                .prompt-panel-controls { display: flex; gap: 4px; align-items: center; }
                 .prompt-panel-btn {
                     background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px;
                     border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -7611,6 +7683,32 @@
                 @keyframes toastSlideIn {
                     from { transform: translate(-50%, -20px) scale(0.95); opacity: 0; }
                     to { transform: translate(-50%, 0) scale(1); opacity: 1; }
+                }
+                /* Theme Toggle Animation (View Transitions API) */
+                ::view-transition-old(root),
+                ::view-transition-new(root) {
+                    animation: none;
+                    mix-blend-mode: normal;
+                }
+                ::view-transition-old(root) {
+                    z-index: 1;
+                }
+                ::view-transition-new(root) {
+                    z-index: 9999;
+                }
+                .dark-theme::view-transition-old(root) {
+                    z-index: 9999;
+                }
+                .dark-theme::view-transition-new(root) {
+                    z-index: 1;
+                }
+                @keyframes themeReveal {
+                    from { clip-path: circle(0% at var(--theme-x, 95%) var(--theme-y, 5%)); }
+                    to { clip-path: circle(150% at var(--theme-x, 95%) var(--theme-y, 5%)); }
+                }
+                @keyframes themeShrink {
+                    from { clip-path: circle(150% at var(--theme-x, 95%) var(--theme-y, 5%)); }
+                    to { clip-path: circle(0% at var(--theme-x, 95%) var(--theme-y, 5%)); }
                 }
                 /* 快捷跳转按钮组（面板内） */
                 .scroll-nav-container {
@@ -8244,6 +8342,15 @@
                 }
                 .outline-search-clear:hover { background: #9ca3af; }
                 .outline-search-wrapper { position: relative; flex: 1; display: flex; align-items: center; }
+
+                /* 隐身模式：隐藏 Gemini Business 设置菜单 (防止切换主题时闪烁) */
+                body.gh-stealth-mode md-menu,
+                body.gh-stealth-mode md-menu-surface,
+                body.gh-stealth-mode .mat-menu-panel,
+                body.gh-stealth-mode [role="menu"] {
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                }
                 .outline-search-result { font-size: 12px; color: var(--gh-text-secondary, #6b7280); margin-left: 8px; white-space: nowrap; }
                 .outline-result-bar {
                     padding: 6px 12px; background: #eff6ff; color: #1d4ed8; font-size: 12px;
@@ -8341,30 +8448,175 @@
             if (!panel) return;
 
             const checkTheme = () => {
-                const dataTheme = document.body.dataset.theme || document.documentElement.dataset.theme;
-                const isDarkTheme = dataTheme === 'dark';
+                // Refined Detection Logic: Priority Class > Data > Style
                 const bodyClass = document.body.className;
-                const hasDarkClass = /\bdark\b|\bdark-mode\b|\bdark-theme\b/i.test(bodyClass);
+                const hasDarkClass = /\bdark-theme\b/i.test(bodyClass);
+                const hasLightClass = /\blight-theme\b/i.test(bodyClass);
 
-                const isDark = isDarkTheme || hasDarkClass;
+                // 1. Explicit Class (Gemini Standard uses this)
+                let isDark = false;
+                if (hasDarkClass) {
+                    isDark = true;
+                } else if (hasLightClass) {
+                    isDark = false;
+                } else {
+                    // 2. Data Attribute
+                    const dataTheme = document.body.dataset.theme || document.documentElement.dataset.theme;
+                    if (dataTheme === 'dark') {
+                        isDark = true;
+                    } else if (dataTheme === 'light') {
+                        isDark = false;
+                    } else {
+                        // 3. Style color-scheme (Gemini Business uses this)
+                        isDark = document.body.style.colorScheme === 'dark';
+                    }
+                }
 
+                // 2. Sync to Plugin UI (ghMode)
                 if (isDark) {
                     document.body.dataset.ghMode = 'dark';
                 } else {
                     delete document.body.dataset.ghMode;
                 }
+
+                // 3. Sync to Settings (Persistence) & Button Icon
+                // Only update if changed to avoid redundant saves
+                const currentSavedMode = this.settings.themeMode;
+                const detectedMode = isDark ? 'dark' : 'light';
+
+                // Avoid saving on every check, only if truly changed from what we think it is
+                // But we need to distinguish between "detected change" and "just checking"
+                // Actually, just save it if it's different.
+                if (currentSavedMode !== detectedMode) {
+                    this.settings.themeMode = detectedMode;
+                    this.saveSettings();
+                    // GM_setValue handled in saveSettings with site-scoped key
+                }
+
+                const themeBtns = [document.getElementById('theme-toggle-btn'), document.getElementById('quick-theme-btn')];
+                themeBtns.forEach((themeBtn) => {
+                    if (themeBtn) {
+                        // Update icon using DOM methods (avoid TrustedHTML error)
+                        const svgNS = 'http://www.w3.org/2000/svg';
+                        const svg = document.createElementNS(svgNS, 'svg');
+                        svg.setAttribute('xmlns', svgNS);
+                        svg.setAttribute('height', '20px');
+                        svg.setAttribute('viewBox', '0 -960 960 960');
+                        svg.setAttribute('width', '20px');
+                        svg.setAttribute('fill', '#FFFFFF');
+
+                        const path = document.createElementNS(svgNS, 'path');
+                        path.setAttribute(
+                            'd',
+                            isDark
+                                ? 'M480-280q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z'
+                                : 'M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z',
+                        );
+                        svg.appendChild(path);
+
+                        themeBtn.textContent = ''; // clear
+                        themeBtn.appendChild(svg);
+                    }
+                });
             };
 
             checkTheme();
 
             if (!this.themeObserver) {
                 this.themeObserver = new MutationObserver((mutations) => {
-                    // 避免循环触发：如果变动的是 data-gh-mode，则忽略（虽然 attributeFilter 已经排除了，但在某些浏览器/复杂场景下可能需要）
-                    // 由于我们只监听 class 和 data-theme, 修改 data-gh-mode 不会触发此 Observer。
                     checkTheme();
                 });
-                this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+                // Listen to class changes on body (primary method), dataset attributes AND style
+                this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
                 this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+            }
+        }
+
+        // 应用主题 (Web -> DOM)
+        applyTheme(targetMode) {
+            const mode = targetMode || this.settings.themeMode;
+            if (!mode) return;
+
+            if (mode === 'dark') {
+                document.body.classList.add('dark-theme');
+                document.body.classList.remove('light-theme'); // For standard version consistency
+                document.body.style.colorScheme = 'dark'; // Force color-scheme for Business
+            } else {
+                document.body.classList.remove('dark-theme');
+                document.body.style.colorScheme = 'light'; // Force color-scheme for Business
+                // Only add light-theme if we are likely on Standard version (based on url or adapter)
+                // Gemini Business uses empty class for light. Standard uses 'light-theme'.
+                if (window.location.host === 'gemini.google.com') {
+                    document.body.classList.add('light-theme');
+                }
+            }
+        }
+
+        // 切换主题 (User Action) - 带圆形扩散动画
+        toggleTheme(event) {
+            const bodyClass = document.body.className;
+            // Also check style for robustness
+            const isDark = /\bdark-theme\b/i.test(bodyClass) || document.body.style.colorScheme === 'dark';
+            const nextMode = isDark ? 'light' : 'dark';
+
+            // 计算动画起点坐标（从点击位置或默认右上角）
+            let x = 95,
+                y = 5;
+            if (event && event.clientX !== undefined) {
+                x = (event.clientX / window.innerWidth) * 100;
+                y = (event.clientY / window.innerHeight) * 100;
+            } else {
+                // 尝试从主题按钮位置获取
+                const themeBtn = document.getElementById('theme-toggle-btn') || document.getElementById('quick-theme-btn');
+                if (themeBtn) {
+                    const rect = themeBtn.getBoundingClientRect();
+                    x = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+                    y = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+                }
+            }
+
+            // 设置 CSS 变量
+            document.documentElement.style.setProperty('--theme-x', `${x}%`);
+            document.documentElement.style.setProperty('--theme-y', `${y}%`);
+
+            // 执行主题切换的核心逻辑
+            const doToggle = () => {
+                // 优先使用适配器的原生切换逻辑 (针对 Gemini Business)
+                if (typeof this.siteAdapter.toggleTheme === 'function') {
+                    return this.siteAdapter.toggleTheme(nextMode).then((success) => {
+                        if (!success) {
+                            showToast('自动切换主题失败，请尝试在网页设置中手动切换');
+                        }
+                    });
+                }
+                this.applyTheme(nextMode);
+            };
+
+            // 使用 View Transitions API（如果浏览器支持）
+            if (document.startViewTransition) {
+                const transition = document.startViewTransition(() => {
+                    doToggle();
+                });
+
+                // 应用自定义动画
+                transition.ready.then(() => {
+                    const animation = isDark ? 'themeReveal' : 'themeShrink';
+                    document.documentElement.animate(
+                        {
+                            clipPath: isDark
+                                ? ['circle(0% at var(--theme-x) var(--theme-y))', 'circle(150% at var(--theme-x) var(--theme-y))']
+                                : ['circle(150% at var(--theme-x) var(--theme-y))', 'circle(0% at var(--theme-x) var(--theme-y))'],
+                        },
+                        {
+                            duration: 800,
+                            easing: 'ease-in-out',
+                            pseudoElement: isDark ? '::view-transition-new(root)' : '::view-transition-old(root)',
+                        },
+                    );
+                });
+            } else {
+                // 降级：直接切换
+                doToggle();
             }
         }
 
@@ -8389,6 +8641,38 @@
             title.appendChild(createElement('span', {}, this.t('panelTitle')));
 
             const controls = createElement('div', { className: 'prompt-panel-controls' });
+
+            // 主题切换按钮 (SVG Icon) - Moved to Controls
+            const themeBtn = createElement('button', {
+                id: 'theme-toggle-btn',
+                className: 'prompt-panel-btn',
+                title: this.t('toggleTheme'),
+                style: '', // use class style
+            });
+            // Initial icon state (Default to Light mode -> Show Moon for toggle to dark)
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('xmlns', svgNS);
+            svg.setAttribute('height', '20px');
+            svg.setAttribute('viewBox', '0 -960 960 960');
+            svg.setAttribute('width', '20px');
+            svg.setAttribute('fill', '#FFFFFF');
+            const path = document.createElementNS(svgNS, 'path');
+            // Default Moon Icon (for Light Mode)
+            path.setAttribute(
+                'd',
+                'M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z',
+            );
+            svg.appendChild(path);
+            themeBtn.appendChild(svg);
+
+            themeBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止冒泡，防止触发 Header 双击（隐私模式）
+                this.toggleTheme();
+            });
+            themeBtn.addEventListener('dblclick', (e) => e.stopPropagation()); // 阻止双击冒泡
+            controls.appendChild(themeBtn);
+
             const refreshBtn = createElement(
                 'button',
                 {
@@ -8642,45 +8926,67 @@
                 className: 'quick-btn-group' + (this.isCollapsed ? '' : ' hidden'),
                 id: 'quick-btn-group',
             });
-            const quickBtn = createElement('button', { className: 'quick-prompt-btn', title: this.t('panelTitle') }, '✨');
-            const quickScrollTop = createElement(
-                'button',
-                {
-                    className: 'quick-prompt-btn',
-                    title: this.t('scrollTop'),
-                },
-                '⬆',
-            );
-            const quickAnchor = createElement(
-                'button',
-                {
-                    className: 'quick-prompt-btn',
-                    id: 'quick-anchor-btn',
-                    title: '暂无锚点',
-                    style: (this.settings.showCollapsedAnchor ? 'display: flex;' : 'display: none;') + ' opacity: 0.4; cursor: default;',
-                },
-                '⚓',
-            );
-            const quickScrollBottom = createElement(
-                'button',
-                {
-                    className: 'quick-prompt-btn',
-                    title: this.t('scrollBottom'),
-                },
-                '⬇',
-            );
 
-            quickBtn.addEventListener('click', () => {
-                this.togglePanel();
+            // 按钮工厂函数
+            const createQuickButton = (id, def, enabled) => {
+                const btn = createElement(
+                    'button',
+                    {
+                        className: 'quick-prompt-btn',
+                        id: id === 'anchor' ? 'quick-anchor-btn' : id === 'theme' ? 'quick-theme-btn' : undefined,
+                        title: this.t(def.labelKey),
+                        style: enabled ? 'display: flex;' : 'display: none;',
+                    },
+                    def.icon,
+                );
+
+                // 锚点按钮初始状态置灰
+                if (id === 'anchor') {
+                    btn.style.opacity = '0.4';
+                    btn.style.cursor = 'default';
+                    btn.title = '暂无锚点';
+                }
+
+                return btn;
+            };
+
+            // 事件处理器
+            const buttonActions = {
+                scrollTop: () => this.scrollToTop(),
+                scrollBottom: () => this.scrollToBottom(),
+                panel: () => this.togglePanel(),
+                anchor: () => this.handleAnchorClick(),
+                theme: (e) => {
+                    e.stopPropagation();
+                    this.toggleTheme();
+                },
+            };
+
+            // 保存按钮引用以便后续绑定事件
+            const quickButtons = {};
+
+            // 根据配置动态创建按钮
+            const btnOrder = this.settings.collapsedButtonsOrder || DEFAULT_COLLAPSED_BUTTONS_ORDER;
+            btnOrder.forEach((btnConfig) => {
+                const def = COLLAPSED_BUTTON_DEFS[btnConfig.id];
+                if (!def) return;
+
+                // 可切换按钮检查 enabled 状态
+                const isVisible = def.canToggle ? btnConfig.enabled : true;
+                const btn = createQuickButton(btnConfig.id, def, isVisible);
+                quickButtons[btnConfig.id] = btn;
+                quickBtnGroup.appendChild(btn);
             });
-            quickScrollTop.addEventListener('click', () => this.scrollToTop());
-            quickAnchor.addEventListener('click', () => this.handleAnchorClick());
-            quickScrollBottom.addEventListener('click', () => this.scrollToBottom());
 
-            quickBtnGroup.appendChild(quickScrollTop);
-            quickBtnGroup.appendChild(quickAnchor);
-            quickBtnGroup.appendChild(quickBtn);
-            quickBtnGroup.appendChild(quickScrollBottom);
+            // 绑定事件
+            Object.keys(quickButtons).forEach((id) => {
+                const btn = quickButtons[id];
+                const action = buttonActions[id];
+                if (action) {
+                    btn.addEventListener('click', action);
+                }
+            });
+
             document.body.appendChild(quickBtnGroup);
 
             // 快捷跳转按钮组 - 放在面板底部
@@ -9444,33 +9750,119 @@
             autoHidePanelItem.appendChild(autoHidePanelToggle);
             panelSettingsContainer.appendChild(autoHidePanelItem);
 
-            // 5.5.3 折叠面板显示锚点
-            const showAnchorItem = createElement('div', { className: 'setting-item' });
-            const showAnchorInfo = createElement('div', { className: 'setting-item-info' });
-            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showCollapsedAnchorLabel')));
-            showAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showCollapsedAnchorDesc')));
+            // 5.5.3 折叠面板按钮排序
+            const collapsedBtnDesc = createElement(
+                'div',
+                {
+                    className: 'setting-item-desc',
+                    style: 'padding: 0 12px 8px 12px; margin-bottom: 4px;',
+                },
+                this.t('collapsedButtonsOrderDesc') || '调整折叠面板按钮的显示顺序',
+            );
+            panelSettingsContainer.appendChild(collapsedBtnDesc);
 
-            const showAnchorToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.showCollapsedAnchor ? ' active' : ''),
-                id: 'toggle-show-collapsed-anchor',
-            });
-            showAnchorToggle.addEventListener('click', () => {
-                this.settings.showCollapsedAnchor = !this.settings.showCollapsedAnchor;
-                showAnchorToggle.classList.toggle('active', this.settings.showCollapsedAnchor);
-                this.saveSettings();
+            const currentBtnOrder = this.settings.collapsedButtonsOrder || DEFAULT_COLLAPSED_BUTTONS_ORDER;
 
-                // 实时更新UI
-                GM_setValue('gemini_show_collapsed_anchor', this.settings.showCollapsedAnchor);
-                const quickAnchor = document.getElementById('quick-anchor-btn');
-                if (quickAnchor) {
-                    quickAnchor.style.display = this.settings.showCollapsedAnchor ? 'flex' : 'none';
+            currentBtnOrder.forEach((btnConfig, index) => {
+                const def = COLLAPSED_BUTTON_DEFS[btnConfig.id];
+                if (!def) return;
+
+                const item = createElement('div', { className: 'setting-item' });
+                const info = createElement('div', { className: 'setting-item-info' });
+                const label = createElement('div', { className: 'setting-item-label', style: 'display: flex; align-items: center;' });
+                const iconSpan = createElement('span', { style: 'display: inline-block; width: 24px; text-align: center; margin-right: 4px;' }, def.icon);
+                const textSpan = createElement('span', {}, this.t(def.labelKey));
+                label.appendChild(iconSpan);
+                label.appendChild(textSpan);
+                info.appendChild(label);
+
+                const controls = createElement('div', { className: 'setting-controls' });
+
+                // 可切换的按钮（anchor/theme）添加开关
+                if (def.canToggle) {
+                    const toggle = createElement('div', {
+                        className: 'setting-toggle' + (btnConfig.enabled ? ' active' : ''),
+                        style: 'transform: scale(0.8); margin-right: 12px;',
+                    });
+                    toggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        btnConfig.enabled = !btnConfig.enabled;
+                        toggle.classList.toggle('active', btnConfig.enabled);
+                        this.saveSettings();
+                        this.createUI();
+                        this.bindEvents();
+                        this.switchTab('settings');
+                        showToast(btnConfig.enabled ? this.t('settingOn') : this.t('settingOff'));
+                    });
+                    controls.appendChild(toggle);
                 }
 
-                showToast(this.settings.showCollapsedAnchor ? this.t('settingOn') : this.t('settingOff'));
+                // 上下移动按钮
+                const upBtn = createElement('button', {
+                    className: 'prompt-panel-btn',
+                    style: 'background: var(--gh-hover, #f3f4f6); color: #4b5563; width: 32px; height: 32px; font-size: 16px; margin-right: 4px; border: 1px solid var(--gh-border, #e5e7eb);',
+                    title: this.t('moveUp'),
+                });
+                upBtn.textContent = '⬆';
+                upBtn.disabled = index === 0;
+
+                const downBtn = createElement('button', {
+                    className: 'prompt-panel-btn',
+                    style: 'background: var(--gh-hover, #f3f4f6); color: #4b5563; width: 32px; height: 32px; font-size: 16px; border: 1px solid var(--gh-border, #e5e7eb);',
+                    title: this.t('moveDown'),
+                });
+                downBtn.textContent = '⬇';
+                downBtn.disabled = index === currentBtnOrder.length - 1;
+
+                [upBtn, downBtn].forEach((btn) => {
+                    if (btn.disabled) {
+                        btn.style.opacity = '0.4';
+                        btn.style.cursor = 'not-allowed';
+                    } else {
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                        btn.onmouseover = () => {
+                            btn.style.background = 'var(--gh-border, #e5e7eb)';
+                            btn.style.color = '#111827';
+                        };
+                        btn.onmouseout = () => {
+                            btn.style.background = 'var(--gh-hover, #f3f4f6)';
+                            btn.style.color = '#4b5563';
+                        };
+                    }
+                });
+
+                upBtn.addEventListener('click', () => {
+                    if (index > 0) {
+                        const newOrder = [...currentBtnOrder];
+                        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                        this.settings.collapsedButtonsOrder = newOrder;
+                        this.saveSettings();
+                        this.createUI();
+                        this.bindEvents();
+                        this.switchTab('settings');
+                    }
+                });
+
+                downBtn.addEventListener('click', () => {
+                    if (index < currentBtnOrder.length - 1) {
+                        const newOrder = [...currentBtnOrder];
+                        [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                        this.settings.collapsedButtonsOrder = newOrder;
+                        this.saveSettings();
+                        this.createUI();
+                        this.bindEvents();
+                        this.switchTab('settings');
+                    }
+                });
+
+                controls.appendChild(upBtn);
+                controls.appendChild(downBtn);
+
+                item.appendChild(info);
+                item.appendChild(controls);
+                panelSettingsContainer.appendChild(item);
             });
-            showAnchorItem.appendChild(showAnchorInfo);
-            showAnchorItem.appendChild(showAnchorToggle);
-            panelSettingsContainer.appendChild(showAnchorItem);
 
             const panelSettingsSection = this.createCollapsibleSection(this.t('panelSettingsTitle'), panelSettingsContainer, { defaultExpanded: false });
 
@@ -9780,19 +10172,19 @@
             // 1. 通用设置（语言）- 已在上方添加
             // 2. 面板设置 (New)
             content.appendChild(panelSettingsSection);
-            // 3. 标签页设置
-            if (tabSettingsSection) content.appendChild(tabSettingsSection);
-            // 3. 阅读导航
-            content.appendChild(anchorSection);
-            // 4. 大纲设置
-            content.appendChild(outlineSettingsSection);
-            // 5. 页面显示
-            content.appendChild(widthSection);
-            // 6. 模型锁定
-            if (lockSection) content.appendChild(lockSection);
-            // 7. 界面排版
+            // 3. 界面排版
             content.appendChild(layoutSection);
-            // 8. 其他设置
+            // 4. 标签页设置
+            if (tabSettingsSection) content.appendChild(tabSettingsSection);
+            // 5. 阅读导航
+            content.appendChild(anchorSection);
+            // 6. 大纲设置
+            content.appendChild(outlineSettingsSection);
+            // 7. 页面显示
+            content.appendChild(widthSection);
+            // 8. 模型锁定
+            if (lockSection) content.appendChild(lockSection);
+            // 9. 其他设置
             content.appendChild(otherSettingsSection);
 
             container.appendChild(content);
@@ -10588,7 +10980,6 @@
             const siteRegistry = new SiteRegistry();
             siteRegistry.register(new GeminiBusinessAdapter()); // 优先检测
             siteRegistry.register(new GeminiAdapter());
-            siteRegistry.register(new GensparkAdapter());
 
             const currentAdapter = siteRegistry.detect();
 
