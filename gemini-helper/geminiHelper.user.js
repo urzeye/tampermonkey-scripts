@@ -283,6 +283,8 @@
             otherSettingsTitle: '其他设置',
             showCollapsedAnchorLabel: '折叠面板显示锚点',
             showCollapsedAnchorDesc: '当面板收起时，在侧边浮动条中显示锚点按钮',
+            showCollapsedThemeLabel: '折叠面板显示主题切换',
+            showCollapsedThemeDesc: '当面板收起时，在侧边浮动条中显示主题切换按钮',
             preventAutoScrollLabel: '防止自动滚动',
             preventAutoScrollDesc: '当 AI 生成长内容时，阻止页面自动滚动到底部，方便阅读上文',
             // 界面排版开关
@@ -513,6 +515,8 @@
             otherSettingsTitle: '其他設置',
             showCollapsedAnchorLabel: '折疊面板顯示錨點',
             showCollapsedAnchorDesc: '當面板收起時，在側邊浮動條中顯示錨點按鈕',
+            showCollapsedThemeLabel: '折疊面板顯示主題切換',
+            showCollapsedThemeDesc: '當面板收起時，在側邊浮動條中顯示主題切換按鈕',
             preventAutoScrollLabel: '防止自動滾動',
             preventAutoScrollDesc: '當 AI 生成長內容時，阻止頁面自動滾動到底部，方便閱讀上文',
             // 介面排版開關
@@ -736,6 +740,8 @@
             otherSettingsTitle: 'Other Settings',
             showCollapsedAnchorLabel: 'Show anchor when collapsed',
             showCollapsedAnchorDesc: 'Display anchor button in sidebar when panel is collapsed',
+            showCollapsedThemeLabel: 'Show theme toggle when collapsed',
+            showCollapsedThemeDesc: 'Display theme toggle button in sidebar when panel is collapsed',
             preventAutoScrollLabel: 'Prevent auto-scroll',
             preventAutoScrollDesc: 'Stop page from auto-scrolling to bottom during AI generation',
             // Interface Toggle
@@ -7257,6 +7263,7 @@
                 tabOrder: tabOrder,
                 preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
                 showCollapsedAnchor: GM_getValue('gemini_show_collapsed_anchor', true),
+                showCollapsedTheme: GM_getValue('gemini_show_collapsed_theme', true),
                 tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
                 readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) },
                 conversations: { enabled: true },
@@ -8519,29 +8526,31 @@
                     // GM_setValue handled in saveSettings with site-scoped key
                 }
 
-                const themeBtn = document.getElementById('theme-toggle-btn');
-                if (themeBtn) {
-                    // Update icon using DOM methods (avoid TrustedHTML error)
-                    const svgNS = 'http://www.w3.org/2000/svg';
-                    const svg = document.createElementNS(svgNS, 'svg');
-                    svg.setAttribute('xmlns', svgNS);
-                    svg.setAttribute('height', '20px');
-                    svg.setAttribute('viewBox', '0 -960 960 960');
-                    svg.setAttribute('width', '20px');
-                    svg.setAttribute('fill', '#FFFFFF');
+                const themeBtns = [document.getElementById('theme-toggle-btn'), document.getElementById('quick-theme-btn')];
+                themeBtns.forEach((themeBtn) => {
+                    if (themeBtn) {
+                        // Update icon using DOM methods (avoid TrustedHTML error)
+                        const svgNS = 'http://www.w3.org/2000/svg';
+                        const svg = document.createElementNS(svgNS, 'svg');
+                        svg.setAttribute('xmlns', svgNS);
+                        svg.setAttribute('height', '20px');
+                        svg.setAttribute('viewBox', '0 -960 960 960');
+                        svg.setAttribute('width', '20px');
+                        svg.setAttribute('fill', '#FFFFFF');
 
-                    const path = document.createElementNS(svgNS, 'path');
-                    path.setAttribute(
-                        'd',
-                        isDark
-                            ? 'M480-280q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z'
-                            : 'M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z',
-                    );
-                    svg.appendChild(path);
+                        const path = document.createElementNS(svgNS, 'path');
+                        path.setAttribute(
+                            'd',
+                            isDark
+                                ? 'M480-280q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z'
+                                : 'M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Z',
+                        );
+                        svg.appendChild(path);
 
-                    themeBtn.textContent = ''; // clear
-                    themeBtn.appendChild(svg);
-                }
+                        themeBtn.textContent = ''; // clear
+                        themeBtn.appendChild(svg);
+                    }
+                });
             };
 
             checkTheme();
@@ -8904,6 +8913,15 @@
                 id: 'quick-btn-group',
             });
             const quickBtn = createElement('button', { className: 'quick-prompt-btn', title: this.t('panelTitle') }, '✨');
+
+            // 快速主题切换按钮
+            const quickThemeBtn = createElement('button', {
+                className: 'quick-prompt-btn',
+                id: 'quick-theme-btn',
+                title: this.t('toggleTheme'),
+                style: this.settings.showCollapsedTheme ? 'display: flex;' : 'display: none;',
+            });
+
             const quickScrollTop = createElement(
                 'button',
                 {
@@ -8934,12 +8952,17 @@
             quickBtn.addEventListener('click', () => {
                 this.togglePanel();
             });
+            quickThemeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleTheme();
+            });
             quickScrollTop.addEventListener('click', () => this.scrollToTop());
             quickAnchor.addEventListener('click', () => this.handleAnchorClick());
             quickScrollBottom.addEventListener('click', () => this.scrollToBottom());
 
             quickBtnGroup.appendChild(quickScrollTop);
             quickBtnGroup.appendChild(quickAnchor);
+            quickBtnGroup.appendChild(quickThemeBtn);
             quickBtnGroup.appendChild(quickBtn);
             quickBtnGroup.appendChild(quickScrollBottom);
             document.body.appendChild(quickBtnGroup);
@@ -9732,6 +9755,33 @@
             showAnchorItem.appendChild(showAnchorInfo);
             showAnchorItem.appendChild(showAnchorToggle);
             panelSettingsContainer.appendChild(showAnchorItem);
+
+            // 折叠面板显示主题切换
+            const collapsedThemeItem = createElement('div', { className: 'setting-item' });
+            const collapsedThemeInfo = createElement('div', { className: 'setting-item-info' });
+            collapsedThemeInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('showCollapsedThemeLabel')));
+            collapsedThemeInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('showCollapsedThemeDesc')));
+
+            const collapsedThemeToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.showCollapsedTheme ? ' active' : ''),
+                id: 'toggle-collapsed-theme',
+            });
+            collapsedThemeToggle.addEventListener('click', () => {
+                this.settings.showCollapsedTheme = !this.settings.showCollapsedTheme;
+                collapsedThemeToggle.classList.toggle('active', this.settings.showCollapsedTheme);
+                this.saveSettings();
+
+                // 实时更新UI
+                const quickThemeBtn = document.getElementById('quick-theme-btn');
+                if (quickThemeBtn) {
+                    quickThemeBtn.style.display = this.settings.showCollapsedTheme ? 'flex' : 'none';
+                }
+
+                showToast(this.settings.showCollapsedTheme ? this.t('settingOn') : this.t('settingOff'));
+            });
+            collapsedThemeItem.appendChild(collapsedThemeInfo);
+            collapsedThemeItem.appendChild(collapsedThemeToggle);
+            panelSettingsContainer.appendChild(collapsedThemeItem);
 
             const panelSettingsSection = this.createCollapsibleSection(this.t('panelSettingsTitle'), panelSettingsContainer, { defaultExpanded: false });
 
