@@ -1,8 +1,8 @@
 # Gemini-helper
 
-> Gemini 助手：支持会话管理、对话大纲、提示词管理、模型锁定、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版/Genspark
+> Gemini 助手：支持会话管理、对话大纲、提示词管理、模型锁定、主题一键切换、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 
-> Gemini Helper: Supports conversation management, outline navigation, prompt management, model locking, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini Standard/Enterprise/Genspark
+> Gemini Helper: Supports conversation management, outline navigation, prompt management, model locking, collapsed button reorder, circular theme toggle animation, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini Standard/Enterprise
 
 ## ✨ 功能特性
 
@@ -112,6 +112,12 @@
 | ⬆ / ⬇ 按钮  | 跳转页面顶部/底部 |
 
 ## 📋 [更新日志](./changelog.md)
+
+### v1.9.3
+
+-   ✨ **新功能**：**主题切换动画** - 圆形扩散效果，从点击位置开始扩散/收缩
+-   ✨ **新功能**：**折叠按钮排序** - 自定义折叠面板 5 个快捷按钮的显示顺序
+-   ✨ **新功能**：**锚点/主题开关** - 独立控制锚点和主题按钮的显示/隐藏
 
 ### v1.9.2
 
