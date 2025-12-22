@@ -7497,15 +7497,15 @@
 
                 body[data-gh-mode="dark"] {
                     --gh-bg: #1e1e1e;
-                    --gh-bg-secondary: #2d2d2d;
+                    --gh-bg-secondary: #0b0b0b;
                     --gh-text: #e3e3e3;
                     --gh-text-secondary: #a0a0a0;
-                    --gh-border: #444444;
-                    --gh-hover: #333333;
-                    --gh-shadow: 0 10px 40px rgba(0,0,0,0.4);
-                    --gh-input-bg: #2f2f2f;
-                    --gh-input-border: #555555;
-                    --gh-active-bg: #404040;
+                    --gh-border: #333333;
+                    --gh-hover: #262626;
+                    --gh-shadow: 0 10px 40px rgba(0,0,0,0.6);
+                    --gh-input-bg: #262626;
+                    --gh-input-border: #404040;
+                    --gh-active-bg: #333333;
 
                     /* Dark Mode Semantic Overrides */
                     --gh-header-bg: #1e1e1e;
@@ -7523,6 +7523,20 @@
                     --gh-folder-bg-5: rgba(253, 224, 71, 0.1);
                     --gh-folder-bg-6: rgba(34, 211, 238, 0.15);
                     --gh-folder-bg-7: rgba(232, 121, 249, 0.15);
+                    --gh-folder-bg-6: rgba(34, 211, 238, 0.15);
+                    --gh-folder-bg-7: rgba(232, 121, 249, 0.15);
+                }
+
+                /* Dark Mode Tab Overrides */
+                body[data-gh-mode="dark"] .prompt-panel-tab {
+                    border-top: 3px solid transparent;
+                    border-bottom: 1px solid transparent;
+                    margin-bottom: -1px;
+                }
+                body[data-gh-mode="dark"] .prompt-panel-tab.active {
+                    border-top-color: var(--gh-tag-active-bg);
+                    border-bottom-color: var(--gh-bg);
+                    background: var(--gh-bg);
                 }
 
                 /* 主面板样式 */
