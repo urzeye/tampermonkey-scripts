@@ -877,6 +877,14 @@
                     padding: 12px 0;
                     cursor: pointer;
                     user-select: none;
+                    position: sticky;
+                    top: 0;
+                    background: var(--coomer-surface);
+                    z-index: 10;
+                    margin: 0 -12px;
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    border-radius: 8px 8px 0 0;
                 }
                 .coomer-group-title {
                     font-size: 13px;
@@ -1255,16 +1263,21 @@
                     }
                 }
 
-                /* 面板内收藏快捷操作（移动端显示） */
+                /* 面板上方收藏快捷操作（移动端显示） */
                 .coomer-panel-quick-actions {
                     display: none;
+                    position: fixed;
+                    left: 0;
+                    right: 0;
                     gap: 8px;
                     padding: 12px 16px;
-                    background: rgba(0, 0, 0, 0.3);
-                    border-bottom: 1px solid var(--coomer-border);
+                    background: rgba(18, 18, 18, 0.95);
+                    backdrop-filter: blur(8px);
+                    border-bottom: 1px solid var(--coomer-primary);
+                    z-index: 100000;
                 }
                 @media (max-width: 767px) {
-                    .coomer-panel-quick-actions {
+                    .coomer-panel-quick-actions.show {
                         display: flex;
                     }
                 }
@@ -1472,7 +1485,6 @@
                     <button class="coomer-tab active" data-tab="artists">👩‍🎨 艺术家</button>
                     <button class="coomer-tab" data-tab="posts">🎬 作品</button>
                 </div>
-                <div class="coomer-panel-quick-actions"></div>
                 <div class="coomer-panel-content"></div>
             `;
 
@@ -1540,7 +1552,7 @@
                 const isArtistCollected = urlInfo && ArtistManager.exists(urlInfo.userId);
                 const collectArtistBtn = document.createElement('button');
                 collectArtistBtn.className = `coomer-quick-btn collect-artist ${isArtistCollected ? 'collected' : ''}`;
-                collectArtistBtn.innerHTML = isArtistCollected ? '✓ 已藏艺术家' : '👤 艺术家';
+                collectArtistBtn.innerHTML = isArtistCollected ? '✓ 已藏艺术家' : '👤 收藏艺术家';
                 collectArtistBtn.title = isArtistCollected ? '点击取消收藏艺术家' : '收藏当前艺术家';
                 collectArtistBtn.addEventListener('click', () => this.handleCollectArtist(collectArtistBtn));
                 container.appendChild(collectArtistBtn);
@@ -1551,7 +1563,7 @@
                 const isPostCollected = urlInfo && PostManager.exists(urlInfo.postId);
                 const collectPostBtn = document.createElement('button');
                 collectPostBtn.className = `coomer-quick-btn collect-post ${isPostCollected ? 'collected' : ''}`;
-                collectPostBtn.innerHTML = isPostCollected ? '✓ 已藏作品' : '🎬 作品';
+                collectPostBtn.innerHTML = isPostCollected ? '✓ 已藏作品' : '🎬 收藏作品';
                 collectPostBtn.title = isPostCollected ? '点击取消收藏作品' : '收藏当前作品';
                 collectPostBtn.addEventListener('click', () => this.handleCollectPost(collectPostBtn));
                 container.appendChild(collectPostBtn);
@@ -1669,16 +1681,23 @@
             }
         },
 
-        // 更新面板内快捷操作（移动端）
+        // 更新面板上方快捷操作（移动端）
         updatePanelQuickActions() {
-            const container = this.panel.querySelector('.coomer-panel-quick-actions');
-            if (!container) return;
+            // 获取或创建容器
+            let container = document.querySelector('.coomer-panel-quick-actions');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'coomer-panel-quick-actions';
+                document.body.appendChild(container);
+            }
 
             const pageType = PageParser.getCurrentPageType();
             const urlInfo = PageParser.parseUrlInfo();
 
             // 清空容器
             container.innerHTML = '';
+            container.classList.remove('show');
+            container.style.top = '';
 
             // 如果不在艺术家或作品页面，不显示按钮
             if (pageType !== 'artist' && pageType !== 'post') {
@@ -1704,6 +1723,20 @@
                 postBtn.addEventListener('click', () => this.handleCollectPost(postBtn));
                 container.appendChild(postBtn);
             }
+
+            // 显示并定位在屏幕顶部
+            if (container.children.length > 0) {
+                container.style.top = '0';
+                container.classList.add('show');
+            }
+        },
+
+        // 隐藏面板上方快捷操作
+        hidePanelQuickActions() {
+            const container = document.querySelector('.coomer-panel-quick-actions');
+            if (container) {
+                container.classList.remove('show');
+            }
         },
 
         toggle() {
@@ -1727,10 +1760,12 @@
             this.isOpen = false;
             this.overlay.classList.remove('open');
             this.panel.classList.remove('open');
-            // 恢复快捷操作按钮
+            // 恢复悬浮快捷操作按钮
             if (this.quickActions) {
                 this.quickActions.style.display = '';
             }
+            // 隐藏面板上方快捷操作（移动端）
+            this.hidePanelQuickActions();
         },
 
         switchTab(tabName) {
