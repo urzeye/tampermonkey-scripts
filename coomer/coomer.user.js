@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer 佬友严选
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  OnlyFans 赛博菩萨，佬友严选，值得信赖！艺术家收藏、作品管理、视频播放
 // @author       urzeye
 // @match        https://coomer.st/*
