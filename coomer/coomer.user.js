@@ -1401,7 +1401,7 @@
                 e.preventDefault();
             };
 
-            const onEnd = () => {
+            const onEnd = (e) => {
                 if (!isDragging) return;
                 isDragging = false;
                 fab.classList.remove('dragging');
@@ -1417,6 +1417,11 @@
                 // 更新快捷操作按钮位置
                 if (this.updateQuickActionsPosition) {
                     this.updateQuickActionsPosition();
+                }
+
+                // 移动端：如果未拖拽，触发点击
+                if (!hasMoved && e.type === 'touchend') {
+                    this.toggle();
                 }
             };
 
