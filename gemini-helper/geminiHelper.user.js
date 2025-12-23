@@ -3419,6 +3419,7 @@
             // 配置参数
             const WAIT_MS = 800; // 每轮等待时间（从 1200ms 降到 800ms）
             const MAX_NO_CHANGE_ROUNDS = 3; // 连续 N 次无变化判定完成（从 5 降到 3）
+            const MAX_TOTAL_ROUNDS = 50; // 超时保护：最多 50 轮（约 40 秒）
             const OVERLAY_DELAY_MS = 1600; // 遮罩延迟显示时间（约 2 轮）
 
             const initialHeight = container.scrollHeight;
@@ -3443,6 +3444,13 @@
                 }
 
                 loopCount++;
+
+                // 超时保护：防止无限循环
+                if (loopCount >= MAX_TOTAL_ROUNDS) {
+                    console.warn('HistoryLoader: max rounds reached, force completing');
+                    this.finish(true);
+                    return;
+                }
 
                 // 跳到顶部
                 container.scrollTop = 0;
