@@ -6,7 +6,8 @@
 
 ### <img src="https://raw.githubusercontent.com/gist/urzeye/8d1d3afbbcd0193dbc8a2019b1ba54d3/raw/f7113d329a259963ed1b1ab8cb981e8f635d4cea/gemini.svg" height="24" alt="Gemini" /> [Gemini Helper](./gemini-helper/README.md)
 
-> Gemini 助手：支持对话大纲、提示词管理、模型锁定、主题一键切换、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配 Gemini 标准版/企业版
+> Gemini 助手：支持对话大纲、提示词管理、模型锁定、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复，智能适配
+> Gemini 标准版/企业版
 
 **主要功能**：
 
@@ -14,6 +15,7 @@
 -   ✅ 对话大纲（智能提取 H1-H6，支持跳转/折叠/层级过滤）
 -   ✅ 提示词管理（快速插入、分类、搜索、拖动排序）
 -   ✅ 标签页增强（生成状态显示、自定义格式、隐私模式、完成通知）
+- ✅ Markdown 加粗修复（自动修复普通版未正确渲染的加粗语法）
 -   ✅ 页面加宽（支持 px/% 单位，即时生效，智能适配 Shadow DOM）
 -   ✅ 模型锁定（全站点支持，自动切换模型）
 -   ✅ 阅读历史（自动记录/恢复阅读进度，跨会话持久化）
@@ -23,7 +25,7 @@
 -   ✅ 设置面板（面板状态控制、Tab 管理、排序自定义）
 -   ✅ 多站点支持（Gemini 标准版/企业版）
 
-**最新版本**: v1.9.4
+**最新版本**: v1.9.5
 
 [查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 

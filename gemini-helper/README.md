@@ -1,8 +1,11 @@
 # Gemini-helper
 
-> Gemini 助手：支持会话管理、对话大纲、提示词管理、模型锁定、主题一键切换、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
+> Gemini 助手：支持会话管理、对话大纲、提示词管理、模型锁定、主题一键切换、标签页增强、Markdown
+> 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 
-> Gemini Helper: Supports conversation management, outline navigation, prompt management, model locking, collapsed button reorder, circular theme toggle animation, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini Standard/Enterprise
+> Gemini Helper: Supports conversation management, outline navigation, prompt management, model locking, Markdown bold
+> fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto
+> page width, Chinese input fix, smart dark mode, adaptation for Gemini Standard/Enterprise
 
 ## ✨ 功能特性
 
@@ -112,6 +115,10 @@
 | ⬆ / ⬇ 按钮  | 跳转页面顶部/底部 |
 
 ## 📋 [更新日志](./changelog.md)
+
+### v1.9.5
+
+- ✨ **新功能**：Markdown 加粗修复 - 自动修复 Gemini 普通版响应中未正确渲染的 `**加粗**` 语法
 
 ### v1.9.4
 
