@@ -353,7 +353,7 @@
             // 会话设置
             conversationsSettingsTitle: '会话设置',
             conversationsSyncUnpinLabel: '同步时更新取消置顶',
-            conversationsSyncUnpinDesc: '手动同步时，将云端未置顶的会话在本地也取消置顶',
+            conversationsSyncUnpinDesc: '同步时，将云端未置顶的会话在本地也取消置顶',
             conversationsSyncDeleteLabel: '删除时同步删除云端',
             conversationsSyncDeleteDesc: '删除本地会话记录时，同时从 {site} 云端删除',
             conversationsSyncRenameLabel: '重命名时同步云端',
@@ -583,7 +583,7 @@
             // 會話設置
             conversationsSettingsTitle: '會話設置',
             conversationsSyncUnpinLabel: '同步時更新取消置頂',
-            conversationsSyncUnpinDesc: '手動同步時，將雲端未置頂的會話在本地也取消置頂',
+            conversationsSyncUnpinDesc: '同步時，將雲端未置頂的會話在本地也取消置頂',
             conversationsSyncDeleteLabel: '刪除時同步刪除雲端',
             conversationsSyncDeleteDesc: '刪除本地會話記錄時，同時從 {site} 雲端刪除',
             conversationsSyncRenameLabel: '重命名時同步雲端',
@@ -3756,8 +3756,9 @@
                             const info = config.extractInfo(el);
 
                             if (info?.id) {
+                                const existing = this.data.conversations[info.id];
                                 // 仅对新发现的元素尝试添加到数据（如果是全新的会话）
-                                if (isNew && !this.data.conversations[info.id]) {
+                                if (isNew && !existing) {
                                     // 自动添加新会话到当前选中文件夹
                                     const folderId = this.data.lastUsedFolderId || 'inbox';
                                     this.data.conversations[info.id] = {
@@ -3774,6 +3775,21 @@
                                     this.saveData();
                                     // 轻量级更新计数（避免重建整个 UI 丢失展开状态）
                                     this.updateFolderCount(folderId);
+                                } else if (existing) {
+                                    // 对已存在的会话，同步 pinned 状态变化
+                                    if (info.isPinned && !existing.pinned) {
+                                        // 云端置顶 -> 本地也置顶
+                                        existing.pinned = true;
+                                        existing.updatedAt = Date.now();
+                                        this.saveData();
+                                        this.createUI();
+                                    } else if (!info.isPinned && existing.pinned && this.settings?.conversations?.syncUnpin) {
+                                        // 云端取消置顶且开启了 syncUnpin -> 本地也取消置顶
+                                        existing.pinned = false;
+                                        existing.updatedAt = Date.now();
+                                        this.saveData();
+                                        this.createUI();
+                                    }
                                 }
 
                                 // 对所有会话（无论新旧）启动标题变更监听
@@ -3864,7 +3880,7 @@
         }
 
         /**
-         * 监听会话标题变化
+         * 监听会话标题和 pin 状态变化
          * 使用共享的 watchMultiple 减少 Observer 数量
          * @param {HTMLElement} el 会话元素
          * @param {string} id 会话ID
@@ -3874,18 +3890,15 @@
             if (el.dataset.ghTitleObserver) return;
             el.dataset.ghTitleObserver = 'true';
 
-            // 使用配置获取正确的标题元素
-            const titleEl = this.observerConfig?.getTitleElement?.(el) || el;
-
             // 确保共享 watcher 已初始化
             if (!this.titleWatcher) {
                 const container = this.siteAdapter.getSidebarScrollContainer() || document.body;
                 this.titleWatcher = DOMToolkit.watchMultiple(container, {debounce: 500});
             }
 
-            // 添加到共享监听器
-            this.titleWatcher.add(titleEl, () => {
-                // 每次回调时重新从元素提取 ID，确保 ID 匹配
+            // 监听整个会话元素（以便检测标题和 pin 状态变化）
+            this.titleWatcher.add(el, () => {
+                // 每次回调时重新从元素提取信息，确保 ID 匹配
                 const currentInfo = this.observerConfig?.extractInfo?.(el);
                 const currentId = currentInfo?.id;
 
@@ -3894,18 +3907,44 @@
                     return;
                 }
 
-                const currentTitle = titleEl.textContent?.trim();
                 const stored = this.data.conversations[currentId];
+                if (!stored) return;
 
-                if (currentTitle && stored && stored.title !== currentTitle) {
+                let needsSave = false;
+                let needsUIRefresh = false;
+
+                // 检测标题变化
+                const currentTitle = currentInfo?.title;
+                if (currentTitle && stored.title !== currentTitle) {
                     console.log(`[Gemini Helper] Title changed for ${currentId}: "${stored.title}" -> "${currentTitle}". Updating local copy.`);
-
-                    // 更新本地数据的标题
                     stored.title = currentTitle;
                     stored.updatedAt = Date.now();
-                    this.saveData();
+                    needsSave = true;
+                    needsUIRefresh = true;
+                }
 
-                    // 刷新 UI (更新显示)
+                // 检测 pin 状态变化
+                const currentPinned = currentInfo?.isPinned || false;
+                if (currentPinned && !stored.pinned) {
+                    // 云端置顶 -> 本地也置顶
+                    console.log(`[Gemini Helper] Pinned status changed for ${currentId}: unpinned -> pinned. Updating local copy.`);
+                    stored.pinned = true;
+                    stored.updatedAt = Date.now();
+                    needsSave = true;
+                    needsUIRefresh = true;
+                } else if (!currentPinned && stored.pinned && this.settings?.conversations?.syncUnpin) {
+                    // 云端取消置顶且开启了 syncUnpin -> 本地也取消置顶
+                    console.log(`[Gemini Helper] Pinned status changed for ${currentId}: pinned -> unpinned. Updating local copy (syncUnpin enabled).`);
+                    stored.pinned = false;
+                    stored.updatedAt = Date.now();
+                    needsSave = true;
+                    needsUIRefresh = true;
+                }
+
+                if (needsSave) {
+                    this.saveData();
+                }
+                if (needsUIRefresh) {
                     this.createUI();
                 }
             });
