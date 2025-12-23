@@ -1269,11 +1269,13 @@
                     position: fixed;
                     left: 0;
                     right: 0;
+                    bottom: 75vh;
                     gap: 8px;
-                    padding: 12px 16px;
-                    background: rgba(18, 18, 18, 0.95);
+                    padding: 10px 16px;
+                    background: rgba(18, 18, 18, 0.98);
                     backdrop-filter: blur(8px);
-                    border-bottom: 1px solid var(--coomer-primary);
+                    border-top: 1px solid var(--coomer-primary);
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                     z-index: 100000;
                 }
                 @media (max-width: 767px) {
@@ -1642,7 +1644,7 @@
             if (ArtistManager.exists(urlInfo.userId)) {
                 ArtistManager.remove(urlInfo.userId);
                 btn.classList.remove('collected');
-                btn.innerHTML = '👤 艺术家';
+                btn.innerHTML = '👤 收藏艺术家';
                 btn.title = '收藏当前艺术家';
                 this.showToast('已取消收藏', 'success');
             } else {
@@ -1656,6 +1658,10 @@
                     this.showToast('收藏失败，请稍后重试', 'error');
                 }
             }
+            // 刷新面板内容
+            if (this.isOpen && this.activeTab === 'artists') {
+                this.renderTab('artists');
+            }
         },
 
         handleCollectPost(btn) {
@@ -1665,7 +1671,7 @@
             if (PostManager.exists(urlInfo.postId)) {
                 PostManager.remove(urlInfo.postId);
                 btn.classList.remove('collected');
-                btn.innerHTML = '🎬 作品';
+                btn.innerHTML = '🎬 收藏作品';
                 btn.title = '收藏当前作品';
                 this.showToast('已取消收藏', 'success');
             } else {
@@ -1678,6 +1684,10 @@
                 } else {
                     this.showToast('收藏失败，请稍后重试', 'error');
                 }
+            }
+            // 刷新面板内容
+            if (this.isOpen && this.activeTab === 'posts') {
+                this.renderTab('posts');
             }
         },
 
@@ -1724,9 +1734,8 @@
                 container.appendChild(postBtn);
             }
 
-            // 显示并定位在屏幕顶部
+            // 显示（CSS已设置 bottom: 75vh 定位在面板上方）
             if (container.children.length > 0) {
-                container.style.top = '0';
                 container.classList.add('show');
             }
         },
