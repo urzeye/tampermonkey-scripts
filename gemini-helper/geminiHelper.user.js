@@ -13,6 +13,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_notification
 // @grant        window.focus
 // @run-at       document-idle
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
