@@ -5645,7 +5645,7 @@
                 value: selectedEmoji,
                 maxLength: 4, // 稍微放宽长度
                 placeholder: '☺',
-                style: 'width: 60px; text-align: center; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; padding: 2px; font-size: 16px;',
+                style: 'width: 60px; text-align: center; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 4px; padding: 2px; font-size: 16px; background: var(--gh-input-bg, #ffffff); color: var(--gh-text, #1f2937);',
             });
 
             customRow.appendChild(customLabel);
@@ -7583,6 +7583,7 @@
                 .prompt-search-input {
                     width: 100%; padding: 8px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px; font-size: 14px;
                     transition: all 0.2s; box-sizing: border-box;
+                    background: var(--gh-input-bg, #ffffff); color: var(--gh-text, #1f2937);
                 }
                 .prompt-search-input:focus { outline: none; border-color: ${colors.primary}; }
                 .prompt-categories { padding: 8px 12px; display: flex; gap: 6px; flex-wrap: wrap; background: var(--gh-bg, white); border-bottom: 1px solid var(--gh-border, #e5e7eb); }
@@ -7644,6 +7645,7 @@
                 .prompt-form-input, .prompt-form-textarea {
                     width: 100%; padding: 8px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px; font-size: 14px;
                     transition: all 0.2s; box-sizing: border-box;
+                    background: var(--gh-input-bg, #ffffff); color: var(--gh-text, #1f2937);
                 }
                 .prompt-form-textarea { min-height: 100px; resize: vertical; font-family: inherit; }
                 .prompt-form-input:focus, .prompt-form-textarea:focus { outline: none; border-color: ${colors.primary}; }
@@ -7882,6 +7884,7 @@
                     font-size: 14px;
                     box-sizing: border-box;
                     transition: all 0.2s;
+                    background: var(--gh-input-bg, #ffffff); color: var(--gh-text, #1f2937);
                 }
                 .conversations-search-input:focus {
                     outline: none;
@@ -8202,6 +8205,7 @@
                 .conversations-dialog-input {
                     width: 100%; padding: 10px 12px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 8px;
                     font-size: 14px; box-sizing: border-box;
+                    background: var(--gh-input-bg, #ffffff); color: var(--gh-text, #1f2937);
                 }
                 .conversations-dialog-input:focus {
                     outline: none; border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.1);
@@ -8346,6 +8350,7 @@
                 .outline-search-input {
                     flex: 1; height: 28px; padding: 0 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     font-size: 13px; color: var(--gh-text, #374151); outline: none; transition: all 0.2s;
+                    background: var(--gh-input-bg, #ffffff);
                 }
                 .outline-search-input:focus { border-color: ${colors.primary}; box-shadow: 0 0 0 2px rgba(66,133,244,0.1); }
                 .outline-search-input::placeholder { color: #9ca3af; }
