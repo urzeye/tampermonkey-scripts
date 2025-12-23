@@ -633,6 +633,11 @@
                     --coomer-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
                 }
 
+                /* 隐藏公告横幅 */
+                #announcement-banner {
+                    display: none !important;
+                }
+
                 /* 悬浮按钮 - The Orb */
                 .coomer-fab {
                     position: fixed;
