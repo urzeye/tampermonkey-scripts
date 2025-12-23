@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.9.5
+// @version      1.9.6
 // @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 // @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, Markdown bold fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
@@ -13,6 +13,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_notification
 // @grant        window.focus
 // @run-at       document-idle
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
@@ -387,6 +388,11 @@
             conversationsFilterPinned: '筛选置顶',
             conversationsClearAll: '清除所有筛选',
             conversationsBatchMode: '批量操作',
+            // 历史加载
+            loadingHistory: '正在加载历史记录...',
+            historyLoaded: '历史记录加载完成',
+            stopLoading: '停止加载',
+            loadingHint: '保持页面静止，完成后将自动停留在顶部',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -428,6 +434,7 @@
             confirmDelete: '確定刪除?',
             // 設置面板
             settingsTitle: '通用設置',
+            panelSettingsTitle: '面板設置',
             clearOnSendLabel: '發送後自動修復中文輸入',
             clearOnSendDesc: '發送訊息後插入零寬字元，修復下次輸入首字母問題（僅 Gemini Business）',
             settingOn: '開',
@@ -501,6 +508,7 @@
             refreshPrompts: '刷新提示詞',
             refreshOutline: '刷新大綱',
             refreshSettings: '刷新設置',
+            jumpToAnchor: '返回跳轉前位置',
             // 大綱高級工具欄
             outlineScrollBottom: '滾動到底部',
             outlineScrollTop: '滾動到頂部',
@@ -545,6 +553,11 @@
             preventAutoScrollDesc: '當 AI 生成長內容時，阻止頁面自動滾動到底部，方便閱讀上文',
             markdownFixLabel: 'Markdown 加粗修復',
             markdownFixDesc: '修復 Gemini 響應中未正確渲染的 **加粗** 語法',
+            // 面板設置
+            defaultPanelStateLabel: '預設顯示面板',
+            defaultPanelStateDesc: '重新整理頁面後面板預設保持展開狀態',
+            autoHidePanelLabel: '自動隱藏面板',
+            autoHidePanelDesc: '點擊面板外部（如左側側邊欄、聊天區、輸入框）時自動隱藏',
             // 介面排版開關
             disableOutline: '禁用大綱',
             togglePrompts: '啟用/禁用提示詞',
@@ -617,6 +630,11 @@
             conversationsFilterPinned: '篩選置頂',
             conversationsClearAll: '清除所有篩選',
             conversationsBatchMode: '批次操作',
+            // 歷史載入
+            loadingHistory: '正在載入歷史記錄...',
+            historyLoaded: '歷史記錄載入完成',
+            stopLoading: '停止載入',
+            loadingHint: '保持頁面靜止，完成後將自動停留在頂部',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -658,6 +676,7 @@
             confirmDelete: 'Delete this prompt?',
             // Settings panel
             settingsTitle: 'General Settings',
+            panelSettingsTitle: 'Panel Settings',
             clearOnSendLabel: 'Auto-fix Chinese input after send',
             clearOnSendDesc: 'Insert zero-width char after send to fix first letter issue (Gemini Business only)',
             settingOn: 'ON',
@@ -730,6 +749,7 @@
             refreshPrompts: 'Refresh Prompts',
             refreshOutline: 'Refresh Outline',
             refreshSettings: 'Refresh Settings',
+            jumpToAnchor: 'Go back to previous position',
             // Outline advanced toolbar
             outlineScrollBottom: 'Scroll to bottom',
             outlineScrollTop: 'Scroll to top',
@@ -774,6 +794,11 @@
             preventAutoScrollDesc: 'Stop page from auto-scrolling to bottom during AI generation',
             markdownFixLabel: 'Markdown Bold Fix',
             markdownFixDesc: 'Fix unrendered **bold** syntax in Gemini responses',
+            // Panel Settings
+            defaultPanelStateLabel: 'Show Panel by Default',
+            defaultPanelStateDesc: 'Keep panel expanded after page refresh',
+            autoHidePanelLabel: 'Auto-hide Panel',
+            autoHidePanelDesc: 'Hide panel when clicking outside (sidebar, chat area, input box)',
             // Interface Toggle
             disableOutline: 'Disable Outline',
             togglePrompts: 'Toggle Prompts',
@@ -845,6 +870,11 @@
             conversationsFilterPinned: 'Filter Pinned',
             conversationsClearAll: 'Clear all filters',
             conversationsBatchMode: 'Batch Mode',
+            // History loading
+            loadingHistory: 'Loading history...',
+            historyLoaded: 'History loaded',
+            stopLoading: 'Stop loading',
+            loadingHint: 'Keep page still, will scroll to top when done',
         },
     };
 
@@ -1959,6 +1989,23 @@
          */
         getSidebarScrollContainer() {
             return DOMToolkit.query('.conversation-list', {shadow: true}) || DOMToolkit.query('mat-sidenav', {shadow: true});
+        }
+
+        /**
+         * 获取主内容区滚动容器 (Gemini Business)
+         * 重写基类方法，避免与侧边栏混淆
+         * @returns {HTMLElement}
+         */
+        getScrollContainer() {
+            // 使用 .chat-mode-scroller 精确选择器，排除侧边栏
+            const container = DOMToolkit.query('.chat-mode-scroller', {shadow: true});
+
+            if (container && container.scrollHeight > container.clientHeight) {
+                return container;
+            }
+
+            // 回退到基类
+            return super.getScrollContainer();
         }
 
         /**
@@ -3363,6 +3410,209 @@
     }
 
     /**
+     * 历史加载管理器
+     * 负责加载全部历史记录并滚动到真正顶部
+     */
+    class HistoryLoader {
+        constructor(scrollManager, i18nFunc) {
+            this.scrollManager = scrollManager;
+            this.t = i18nFunc;
+            this.isLoading = false;
+            this.aborted = false;
+            this.overlay = null;
+            this.overlayTimeout = null;
+        }
+
+        /**
+         * 核心方法：加载全部历史并滚动到顶部
+         * 采用延迟显示遮罩策略：前 2 轮（约 2.4 秒）不显示遮罩
+         */
+        async loadAllAndScrollTop() {
+            if (this.isLoading) {
+                showToast(this.t('loadingHistory'));
+                return;
+            }
+
+            const container = this.scrollManager.container;
+            if (!container) {
+                showToast('未找到滚动容器');
+                return;
+            }
+
+            this.isLoading = true;
+            this.aborted = false;
+
+            // 配置参数
+            const WAIT_MS = 800; // 每轮等待时间（从 1200ms 降到 800ms）
+            const MAX_NO_CHANGE_ROUNDS = 3; // 连续 N 次无变化判定完成（从 5 降到 3）
+            const MAX_TOTAL_ROUNDS = 50; // 超时保护：最多 50 轮（约 40 秒）
+            const OVERLAY_DELAY_MS = 1600; // 遮罩延迟显示时间（约 2 轮）
+
+            const initialHeight = container.scrollHeight;
+            let lastHeight = initialHeight;
+            let noChangeCount = 0;
+            let loopCount = 0;
+
+            // 快速检测：如果已经在顶部附近，先跳到顶部看看有没有更多内容
+            container.scrollTop = 0;
+
+            // 延迟显示遮罩的定时器
+            this.overlayTimeout = setTimeout(() => {
+                if (this.isLoading && !this.aborted) {
+                    this.showOverlay();
+                }
+            }, OVERLAY_DELAY_MS);
+
+            const loadLoop = () => {
+                if (this.aborted) {
+                    this.finish(false);
+                    return;
+                }
+
+                loopCount++;
+
+                // 超时保护：防止无限循环
+                if (loopCount >= MAX_TOTAL_ROUNDS) {
+                    console.warn('HistoryLoader: max rounds reached, force completing');
+                    this.finish(true);
+                    return;
+                }
+
+                // 跳到顶部
+                container.scrollTop = 0;
+                // 触发 wheel 事件以激活懒加载
+                container.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, bubbles: true}));
+
+                setTimeout(() => {
+                    if (this.aborted) {
+                        this.finish(false);
+                        return;
+                    }
+
+                    const currentHeight = container.scrollHeight;
+
+                    if (currentHeight > lastHeight) {
+                        // 高度增加，说明还在加载
+                        lastHeight = currentHeight;
+                        noChangeCount = 0;
+                        this.updateOverlayText(`${this.t('loadingHistory')} (${Math.round(currentHeight / 1000)}k)`);
+                        loadLoop();
+                    } else {
+                        noChangeCount++;
+                        // 首轮就没变化且已在顶部，快速完成（短对话优化）
+                        const isAtTop = container.scrollTop < 10;
+                        const isFirstRoundNoChange = loopCount === 1 && currentHeight === initialHeight;
+
+                        if (isFirstRoundNoChange && isAtTop) {
+                            // 短对话，直接完成，不显示完成 toast
+                            this.finish(false, true); // silent = true
+                        } else if (noChangeCount >= MAX_NO_CHANGE_ROUNDS) {
+                            // 加载完成
+                            this.finish(true);
+                        } else {
+                            // 继续确认
+                            this.updateOverlayText(`${this.t('loadingHistory')} (${noChangeCount}/${MAX_NO_CHANGE_ROUNDS})`);
+                            loadLoop();
+                        }
+                    }
+                }, WAIT_MS);
+            };
+
+            // 开始加载循环
+            loadLoop();
+        }
+
+        /**
+         * 完成加载
+         * @param {boolean} success - 是否成功
+         * @param {boolean} silent - 是否静默（不显示 toast）
+         */
+        finish(success, silent = false) {
+            this.isLoading = false;
+            this.aborted = false;
+
+            // 清除遮罩延迟定时器
+            if (this.overlayTimeout) {
+                clearTimeout(this.overlayTimeout);
+                this.overlayTimeout = null;
+            }
+
+            this.hideOverlay();
+
+            if (success && !silent) {
+                showToast(this.t('historyLoaded'));
+            }
+        }
+
+        /**
+         * 中止加载
+         */
+        abort() {
+            this.aborted = true;
+        }
+
+        /**
+         * 显示加载遮罩
+         */
+        showOverlay() {
+            if (this.overlay) return;
+
+            const overlay = document.createElement('div');
+            overlay.id = 'gemini-helper-loading-overlay';
+
+            // 使用 DOM API 创建元素，避免 innerHTML
+            const spinner = document.createElement('div');
+            spinner.className = 'loading-spinner';
+            spinner.textContent = '⏳';
+
+            const text = document.createElement('div');
+            text.className = 'loading-text';
+            text.id = 'gemini-helper-loading-text';
+            text.textContent = this.t('loadingHistory');
+
+            const hint = document.createElement('div');
+            hint.className = 'loading-hint';
+            hint.textContent = this.t('loadingHint');
+
+            const stopBtn = document.createElement('button');
+            stopBtn.className = 'loading-stop-btn';
+            stopBtn.id = 'gemini-helper-stop-btn';
+            stopBtn.textContent = this.t('stopLoading');
+            stopBtn.addEventListener('click', () => {
+                this.abort();
+            });
+
+            overlay.appendChild(spinner);
+            overlay.appendChild(text);
+            overlay.appendChild(hint);
+            overlay.appendChild(stopBtn);
+
+            document.body.appendChild(overlay);
+            this.overlay = overlay;
+        }
+
+        /**
+         * 隐藏加载遮罩
+         */
+        hideOverlay() {
+            if (this.overlay) {
+                this.overlay.remove();
+                this.overlay = null;
+            }
+        }
+
+        /**
+         * 更新遮罩文本
+         */
+        updateOverlayText(text) {
+            if (this.overlay) {
+                const textEl = this.overlay.querySelector('#gemini-helper-loading-text');
+                if (textEl) textEl.textContent = text;
+            }
+        }
+    }
+
+    /**
      * 阅读进度管理器 (Auto-Resume)
      * 负责自动保存和恢复阅读位置
      */
@@ -3404,6 +3654,14 @@
                 window.removeEventListener('scroll', this.scrollHandler, {capture: true});
                 this.scrollHandler = null;
             }
+        }
+
+        /**
+         * 重启记录（用于会话切换时重新绑定滚动容器）
+         */
+        restartRecording() {
+            this.stopRecording();
+            this.startRecording();
         }
 
         handleScroll() {
@@ -3655,7 +3913,7 @@
 
             // 2.2 降级：像素位置
             if (!jumped && this.previousAnchor.top !== undefined) {
-                this.scrollManager.scrollTo({top: this.previousAnchor.top, behavior: 'smooth'});
+                this.scrollManager.scrollTo({top: this.previousAnchor.top, behavior: 'instant'});
                 jumped = true;
             }
 
@@ -7585,6 +7843,7 @@
             this.scrollManager = new ScrollManager(this.siteAdapter);
             this.readingProgressManager = new ReadingProgressManager(this.settings, this.scrollManager, (k) => this.t(k));
             this.anchorManager = new AnchorManager(this.scrollManager, (k) => this.t(k));
+            this.historyLoader = new HistoryLoader(this.scrollManager, (k) => this.t(k));
 
             // 绑定锚点状态变化更新 UI
             this.anchorManager.bindUI((hasAnchor) => this.updateAnchorButtonState(hasAnchor));
@@ -8742,6 +9001,58 @@
                 @keyframes outlineHighlight {
                     0% { background: rgba(66, 133, 244, 0.3); }
                     100% { background: transparent; }
+                }
+
+                /* 历史加载遮罩 */
+                #gemini-helper-loading-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(255, 255, 255, 0.95);
+                    z-index: 99999;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 16px;
+                    color: #333;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }
+                body[data-gh-mode="dark"] #gemini-helper-loading-overlay {
+                    background: rgba(30, 31, 32, 0.95);
+                    color: #e3e3e3;
+                }
+                #gemini-helper-loading-overlay .loading-spinner {
+                    font-size: 48px;
+                    animation: spin-anim 2s linear infinite;
+                }
+                @keyframes spin-anim {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                #gemini-helper-loading-overlay .loading-text {
+                    font-size: 18px;
+                    font-weight: 500;
+                }
+                #gemini-helper-loading-overlay .loading-hint {
+                    font-size: 14px;
+                    color: #666;
+                }
+                body[data-gh-mode="dark"] #gemini-helper-loading-overlay .loading-hint {
+                    color: #999;
+                }
+                #gemini-helper-loading-overlay .loading-stop-btn {
+                    margin-top: 12px;
+                    padding: 8px 24px;
+                    border-radius: 18px;
+                    border: 1px solid rgba(128,128,128,0.3);
+                    background: transparent;
+                    color: inherit;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.2s;
+                }
+                #gemini-helper-loading-overlay .loading-stop-btn:hover {
+                    background: rgba(128,128,128,0.1);
                 }
             `;
             document.head.appendChild(style);
@@ -10602,8 +10913,9 @@
 
             const onRestorationComplete = () => {
                 // 延迟一点开启记录，避开惯性滚动等干扰，确保后续的用户滚动能被正确记录
+                // 使用 restartRecording 而非 startRecording，确保会话切换时重新绑定滚动容器
                 setTimeout(() => {
-                    this.readingProgressManager.startRecording();
+                    this.readingProgressManager.restartRecording();
                 }, 500);
             };
 
@@ -10627,6 +10939,8 @@
 
         // 锚点按钮点击 (Back functionality)
         handleAnchorClick() {
+            // 取消进行中的历史加载
+            this.historyLoader.abort();
             if (this.anchorManager.hasAnchor()) {
                 this.anchorManager.backToAnchor();
                 showToast(this.t('jumpToAnchor'));
@@ -10656,11 +10970,14 @@
         scrollToTop() {
             // 点击去顶部时，自动记录当前位置为锚点
             this.anchorManager.setAnchor(this.scrollManager.scrollTop);
-            this.scrollManager.scrollTo({top: 0, behavior: 'smooth'});
+            // 加载全部历史记录并滚动到真正的顶部
+            this.historyLoader.loadAllAndScrollTop();
         }
 
         // 滚动到页面底部
         scrollToBottom() {
+            // 取消进行中的历史加载
+            this.historyLoader.abort();
             // 点击去底部时，自动记录当前位置为锚点
             this.anchorManager.setAnchor(this.scrollManager.scrollTop);
             this.scrollManager.scrollTo({top: this.scrollManager.scrollHeight, behavior: 'smooth'});
