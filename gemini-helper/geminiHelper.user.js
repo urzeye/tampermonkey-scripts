@@ -3630,6 +3630,14 @@
             }
         }
 
+        /**
+         * 重启记录（用于会话切换时重新绑定滚动容器）
+         */
+        restartRecording() {
+            this.stopRecording();
+            this.startRecording();
+        }
+
         handleScroll() {
             if (!this.settings || !this.settings.readingHistory || !this.settings.readingHistory.persistence) return;
 
@@ -10877,8 +10885,9 @@
 
             const onRestorationComplete = () => {
                 // 延迟一点开启记录，避开惯性滚动等干扰，确保后续的用户滚动能被正确记录
+                // 使用 restartRecording 而非 startRecording，确保会话切换时重新绑定滚动容器
                 setTimeout(() => {
-                    this.readingProgressManager.startRecording();
+                    this.readingProgressManager.restartRecording();
                 }, 500);
             };
 

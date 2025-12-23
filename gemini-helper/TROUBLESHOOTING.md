@@ -7,6 +7,7 @@
 ## 📋 目录
 
 1. [滚动容器错误匹配](#1-滚动容器错误匹配)
+2. [阅读历史会话切换后不更新](#2-阅读历史会话切换后不更新)
 
 ---
 
@@ -16,16 +17,16 @@
 
 ### 症状
 
--   "去顶部"/"去底部"按钮点击后，**侧边栏会话列表**滚动了，而非主对话区域
--   锚点跳转失效
--   大纲点击跳转到错误位置
+- "去顶部"/"去底部"按钮点击后，**侧边栏会话列表**滚动了，而非主对话区域
+- 锚点跳转失效
+- 大纲点击跳转到错误位置
 
 ### 背景
 
 在开发"会话"Tab 功能时新增了以下代码：
 
--   `SiteAdapter.getSidebarScrollContainer()` - 返回侧边栏的 `infinite-scroller`
--   `SiteAdapter.loadAllConversations()` - 滚动侧边栏加载全部会话
+- `SiteAdapter.getSidebarScrollContainer()` - 返回侧边栏的 `infinite-scroller`
+- `SiteAdapter.loadAllConversations()` - 滚动侧边栏加载全部会话
 
 ### 根因
 
@@ -68,21 +69,81 @@ getScrollContainer() {
 
 ---
 
+## 2. 阅读历史会话切换后不更新
+
+**日期**: 2025-12-23
+
+### 症状
+
+- 在会话 A 中滚动后，切换到会话 B，再回到 A，发现阅读位置没有更新
+- 只有第一个打开的会话的阅读位置会被记录
+
+### 背景
+
+`ReadingProgressManager` 通过监听滚动容器的 `scroll` 事件来记录位置。
+
+### 根因
+
+Gemini 是 SPA 应用，会话切换时 DOM 会重新渲染，**旧的滚动容器元素会被销毁**。
+
+问题代码：
+
+```javascript
+startRecording() {
+    if (this.isRecording) return;  // ⚠️ 已在记录，直接返回
+    // ... 绑定监听到当前容器
+}
+```
+
+会话切换后：
+
+1. `restoreReadingProgress` 调用 `startRecording()`
+2. 但 `isRecording = true`（首次进入时已设置），直接返回
+3. 结果：监听仍绑定在已销毁的旧容器上，新容器没有监听
+
+### 修复方案
+
+新增 `restartRecording()` 方法，会话切换时强制重新绑定：
+
+```javascript
+restartRecording() {
+    this.stopRecording();  // 先移除旧监听
+    this.startRecording(); // 再绑定新容器
+}
+```
+
+调用点修改：
+
+```javascript
+// restoreReadingProgress 中
+this.readingProgressManager.restartRecording();  // 原为 startRecording()
+```
+
+### 经验总结
+
+| 教训                     | 说明                                                                       |
+| ------------------------ | -------------------------------------------------------------------------- |
+| **SPA 容器会变**         | 单页应用中 DOM 元素可能随时被替换，事件监听需要重新绑定                    |
+| **状态标志需配套**       | `isRecording` 防重入是好的，但需要配套提供 `restart` 方法处理容器更换场景  |
+| **getter vs 引用**       | `scrollManager.container` 是 getter，每次调用重新查询 DOM，不是固定引用   |
+
+---
+
 ## N. 问题标题
 
 **日期**: YYYY-MM-DD
 
 ### 症状
 
--   描述用户可观察到的异常行为
+- 描述用户可观察到的异常行为
 
 ### 背景
 
--   问题出现的上下文
+- 问题出现的上下文
 
 ### 根因
 
--   技术层面的原因分析
+- 技术层面的原因分析
 
 ### 修复方案
 
