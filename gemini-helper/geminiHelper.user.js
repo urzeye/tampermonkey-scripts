@@ -1985,6 +1985,23 @@
         }
 
         /**
+         * 获取主内容区滚动容器 (Gemini Business)
+         * 重写基类方法，避免与侧边栏混淆
+         * @returns {HTMLElement}
+         */
+        getScrollContainer() {
+            // 使用 .chat-mode-scroller 精确选择器，排除侧边栏
+            const container = DOMToolkit.query('.chat-mode-scroller', { shadow: true });
+
+            if (container && container.scrollHeight > container.clientHeight) {
+                return container;
+            }
+
+            // 回退到基类
+            return super.getScrollContainer();
+        }
+
+        /**
          * 获取会话观察器配置（用于侧边栏实时监听）
          */
         getConversationObserverConfig() {

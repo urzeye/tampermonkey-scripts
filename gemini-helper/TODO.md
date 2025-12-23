@@ -2,7 +2,6 @@
 
 ## 🚀 优先级高 (短期)
 
-- [ ] 修复生成完成通知失效问题：// @grant        GM_notification
 - [ ] gemini 对话导出
 - [ ] 大纲 tab 添加用户提问，需设计交互
 
@@ -24,6 +23,7 @@
 
 ## ✅ 已完成
 
+- [x] 修复生成完成通知失效问题：// @grant        GM_notification
 - [x] 去顶部加载全部历史
 - [x] gemini 加粗修复
 - [x] 云端 pinned 会话同步置顶（Gemini 标准版）
