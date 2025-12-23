@@ -1263,13 +1263,12 @@
                     }
                 }
 
-                /* 面板上方收藏快捷操作（移动端显示） */
+                /* 面板上方收藏快捷操作（移动端显示，位置由JS动态计算） */
                 .coomer-panel-quick-actions {
                     display: none;
                     position: fixed;
                     left: 0;
                     right: 0;
-                    bottom: 75vh;
                     gap: 8px;
                     padding: 10px 16px;
                     background: rgba(18, 18, 18, 0.98);
@@ -1734,8 +1733,11 @@
                 container.appendChild(postBtn);
             }
 
-            // 显示（CSS已设置 bottom: 75vh 定位在面板上方）
+            // 显示并动态定位（紧贴面板顶部）
             if (container.children.length > 0) {
+                // 计算面板高度，设置 bottom 值
+                const panelHeight = this.panel.offsetHeight;
+                container.style.bottom = panelHeight + 'px';
                 container.classList.add('show');
             }
         },
@@ -1762,6 +1764,8 @@
             }
             // 更新面板内快捷操作（移动端）
             this.updatePanelQuickActions();
+            // 监听面板高度变化，动态更新收藏按钮位置
+            this.startPanelResizeObserver();
             this.renderTab(this.activeTab);
         },
 
@@ -1775,6 +1779,31 @@
             }
             // 隐藏面板上方快捷操作（移动端）
             this.hidePanelQuickActions();
+            // 停止监听面板高度变化
+            this.stopPanelResizeObserver();
+        },
+
+        // 开始监听面板高度变化
+        startPanelResizeObserver() {
+            if (this.panelResizeObserver) return;
+            const container = document.querySelector('.coomer-panel-quick-actions');
+            if (!container) return;
+
+            this.panelResizeObserver = new ResizeObserver(() => {
+                if (this.isOpen && container.classList.contains('show')) {
+                    const panelHeight = this.panel.offsetHeight;
+                    container.style.bottom = panelHeight + 'px';
+                }
+            });
+            this.panelResizeObserver.observe(this.panel);
+        },
+
+        // 停止监听面板高度变化
+        stopPanelResizeObserver() {
+            if (this.panelResizeObserver) {
+                this.panelResizeObserver.disconnect();
+                this.panelResizeObserver = null;
+            }
         },
 
         switchTab(tabName) {
