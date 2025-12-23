@@ -23,7 +23,7 @@
 -   ✅ 设置面板（面板状态控制、Tab 管理、排序自定义）
 -   ✅ 多站点支持（Gemini 标准版/企业版）
 
-**最新版本**: v1.9.3
+**最新版本**: v1.9.4
 
 [查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
 

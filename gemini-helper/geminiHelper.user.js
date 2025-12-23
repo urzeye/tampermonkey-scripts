@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.9.3
+// @version      1.9.4
 // @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强（状态显示/隐私模式/生成完成通知）、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 // @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, collapsed button reorder, circular theme toggle animation, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
