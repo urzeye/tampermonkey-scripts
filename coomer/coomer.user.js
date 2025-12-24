@@ -1729,6 +1729,13 @@
             const searchClear = panel.querySelector('.coomer-search-clear');
             this.searchInput = searchInput;
 
+            // 点击搜索框时，如果面板未完全展开则自动展开
+            searchInput.addEventListener('focus', () => {
+                if (!this.isOpen) {
+                    this.open();
+                }
+            });
+
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value;
                 searchClear.classList.toggle('visible', query.length > 0);
@@ -2588,8 +2595,8 @@
                 controlBar: {
                     children: [
                         'playToggle',
-                        'skipBackward', // 后退 15s
-                        'skipForward', // 快进 15s
+                        'skipBackward', // 后退 10s
+                        'skipForward', // 快进 10s
                         'volumePanel',
                         'currentTimeDisplay',
                         'timeDivider',
@@ -2600,8 +2607,8 @@
                         'fullscreenToggle',
                     ],
                     skipButtons: {
-                        forward: 15,
-                        backward: 15,
+                        forward: 10, // Video.js 8.x 只支持 5/10/30 秒
+                        backward: 10,
                     },
                 },
             });
