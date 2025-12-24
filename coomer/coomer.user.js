@@ -466,13 +466,16 @@
     // ============================================
     // AdBlocker - 广告拦截
     // ============================================
+    const AD_DOMAINS = ['tsyndicate.com', 'trafficstars.com', 'exoclick.com', 'exosrv.com', 'trafserv.io', 'tsyndlab.com', 'clksite.com', 'syndication.exoclick.com'];
+
     const AdBlocker = {
         init() {
             const settings = StorageManager.getSettings();
             if (!settings.blockAds) return;
 
-            // Hook fluidPlayer 初始化，移除广告配置
             this.hookFluidPlayer();
+            this.hookXHR();
+            this.hookFetch();
         },
 
         hookFluidPlayer() {
@@ -505,6 +508,64 @@
                             }
                         }
                         return originalDefineProperty.call(this, obj, prop, descriptor);
+                    };
+                })();
+            `;
+            document.documentElement.appendChild(script);
+            script.remove();
+        },
+
+        hookXHR() {
+            const script = document.createElement('script');
+            script.textContent = `
+                (function() {
+                    const adDomains = ${JSON.stringify(AD_DOMAINS)};
+                    const isAdUrl = (url) => {
+                        try {
+                            const urlObj = new URL(url, location.origin);
+                            return adDomains.some(d => urlObj.hostname.includes(d));
+                        } catch { return false; }
+                    };
+
+                    const originalOpen = XMLHttpRequest.prototype.open;
+                    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                        if (isAdUrl(url)) {
+                            this._blocked = true;
+                            return;
+                        }
+                        return originalOpen.call(this, method, url, ...args);
+                    };
+
+                    const originalSend = XMLHttpRequest.prototype.send;
+                    XMLHttpRequest.prototype.send = function(...args) {
+                        if (this._blocked) return;
+                        return originalSend.apply(this, args);
+                    };
+                })();
+            `;
+            document.documentElement.appendChild(script);
+            script.remove();
+        },
+
+        hookFetch() {
+            const script = document.createElement('script');
+            script.textContent = `
+                (function() {
+                    const adDomains = ${JSON.stringify(AD_DOMAINS)};
+                    const isAdUrl = (url) => {
+                        try {
+                            const urlObj = new URL(url, location.origin);
+                            return adDomains.some(d => urlObj.hostname.includes(d));
+                        } catch { return false; }
+                    };
+
+                    const originalFetch = window.fetch;
+                    window.fetch = function(input, init) {
+                        const url = typeof input === 'string' ? input : input.url;
+                        if (isAdUrl(url)) {
+                            return Promise.reject(new Error('Blocked by AdBlocker'));
+                        }
+                        return originalFetch.apply(this, arguments);
                     };
                 })();
             `;
