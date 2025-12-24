@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer 佬友严选
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
+// @version      1.0.3
 // @description  OnlyFans 赛博菩萨，佬友严选，值得信赖！艺术家收藏、作品管理、视频播放，去广告适配
 // @author       urzeye
 // @match        https://coomer.st/*
@@ -632,6 +632,226 @@
             } else if (element.webkitRequestFullscreen) {
                 element.webkitRequestFullscreen();
             }
+        },
+    };
+
+    // ============================================
+    // VideoPlayerEnhancer - 替换原生播放器为 Video.js
+    // ============================================
+    const VideoPlayerEnhancer = {
+        playerCounter: 0,
+        observer: null,
+
+        init() {
+            // 等待 DOM 加载完成
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.setup());
+            } else {
+                this.setup();
+            }
+        },
+
+        setup() {
+            // 处理页面上已存在的 Fluid Player
+            this.replaceExistingPlayers();
+
+            // 使用 MutationObserver 检测新出现的 Fluid Player
+            this.observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            // 检查是否是 Fluid Player 容器或包含 Fluid Player
+                            if (node.classList?.contains('fluid_video_wrapper')) {
+                                this.replacePlayer(node);
+                            } else if (node.querySelector) {
+                                const fluidWrappers = node.querySelectorAll('.fluid_video_wrapper');
+                                fluidWrappers.forEach((wrapper) => this.replacePlayer(wrapper));
+                            }
+                        }
+                    }
+                }
+            });
+
+            this.observer.observe(document.body, { childList: true, subtree: true });
+        },
+
+        replaceExistingPlayers() {
+            const fluidWrappers = document.querySelectorAll('.fluid_video_wrapper');
+            fluidWrappers.forEach((wrapper) => this.replacePlayer(wrapper));
+        },
+
+        replacePlayer(fluidWrapper) {
+            // 防止重复处理
+            if (fluidWrapper._coomerReplaced) return;
+            fluidWrapper._coomerReplaced = true;
+
+            // 获取原始视频元素和视频源
+            const originalVideo = fluidWrapper.querySelector('video');
+            if (!originalVideo) return;
+
+            const source = originalVideo.querySelector('source');
+            const videoSrc = source?.src || originalVideo.src;
+            if (!videoSrc) return;
+
+            // 获取原始尺寸
+            const computedStyle = window.getComputedStyle(fluidWrapper);
+            const originalWidth = fluidWrapper.offsetWidth || computedStyle.width;
+            const originalHeight = fluidWrapper.offsetHeight || computedStyle.height;
+
+            // 创建新的容器
+            const playerId = `coomer-player-${this.playerCounter++}`;
+            const container = document.createElement('div');
+            container.className = 'coomer-video-container';
+            container.style.cssText = `
+                width: ${typeof originalWidth === 'number' ? originalWidth + 'px' : originalWidth};
+                max-width: 100%;
+                margin: 0 auto;
+            `;
+
+            // 创建 Video.js 播放器元素
+            const videoElement = document.createElement('video');
+            videoElement.id = playerId;
+            videoElement.className = 'video-js vjs-big-play-centered';
+            videoElement.setAttribute('controls', '');
+            videoElement.setAttribute('preload', 'metadata');
+            videoElement.setAttribute('playsinline', '');
+            videoElement.setAttribute('webkit-playsinline', '');
+
+            const sourceElement = document.createElement('source');
+            sourceElement.src = videoSrc;
+            sourceElement.type = 'video/mp4';
+            videoElement.appendChild(sourceElement);
+
+            container.appendChild(videoElement);
+
+            // 替换 DOM
+            fluidWrapper.parentNode.replaceChild(container, fluidWrapper);
+
+            // 初始化 Video.js
+            this.initVideoJs(playerId);
+        },
+
+        initVideoJs(playerId) {
+            // 确保 videojs 可用
+            if (typeof videojs === 'undefined') {
+                console.warn('[Coomer] Video.js not loaded, retrying...');
+                setTimeout(() => this.initVideoJs(playerId), 500);
+                return;
+            }
+
+            const settings = StorageManager.getSettings();
+            const isMobile = window.innerWidth < 768;
+
+            const player = videojs(playerId, {
+                fluid: true,
+                responsive: true,
+                controls: true,
+                preload: 'metadata',
+                playbackRates: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+                userActions: {
+                    doubleClick: true,
+                    hotkeys: true,
+                },
+                controlBar: {
+                    children: [
+                        'playToggle',
+                        'skipBackward',
+                        'skipForward',
+                        'currentTimeDisplay',
+                        'timeDivider',
+                        'durationDisplay',
+                        'progressControl',
+                        'playbackRateMenuButton',
+                        'volumePanel',
+                        'pictureInPictureToggle',
+                        'fullscreenToggle',
+                    ],
+                    skipButtons: {
+                        forward: 10,
+                        backward: 10,
+                    },
+                },
+            });
+
+            // 键盘快捷键增强 + 自动全屏
+            player.ready(() => {
+                // 自动全屏（设置开启时尝试触发，移动端可能因浏览器限制而失败）
+                if (settings.autoFullscreen) {
+                    player.one('play', () => {
+                        // 延迟确保控件完全渲染
+                        setTimeout(() => {
+                            if (!document.fullscreenElement && !player.paused()) {
+                                player.requestFullscreen().catch(() => {});
+                            }
+                        }, 300);
+                    });
+                }
+
+                const videoEl = player.el();
+                videoEl.addEventListener('keydown', (e) => {
+                    switch (e.key) {
+                        case 'ArrowLeft':
+                            e.preventDefault();
+                            player.currentTime(Math.max(0, player.currentTime() - 10));
+                            break;
+                        case 'ArrowRight':
+                            e.preventDefault();
+                            player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
+                            break;
+                        case 'ArrowUp':
+                            e.preventDefault();
+                            player.volume(Math.min(1, player.volume() + 0.1));
+                            break;
+                        case 'ArrowDown':
+                            e.preventDefault();
+                            player.volume(Math.max(0, player.volume() - 0.1));
+                            break;
+                    }
+                });
+            });
+
+            return player;
+        },
+
+        // 注入 Video.js 容器样式
+        injectStyles() {
+            GM_addStyle(`
+                .coomer-video-container {
+                    background: #000;
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+                .coomer-video-container .video-js {
+                    width: 100%;
+                    border-radius: 8px;
+                }
+                /* Video.js 主题适配 */
+                .coomer-video-container .vjs-control-bar {
+                    background: rgba(18, 18, 18, 0.9);
+                }
+                .coomer-video-container .vjs-play-progress,
+                .coomer-video-container .vjs-volume-level {
+                    background: var(--coomer-primary, #E0AA3E);
+                }
+                .coomer-video-container .vjs-big-play-button {
+                    background: rgba(18, 18, 18, 0.8);
+                    border: 2px solid var(--coomer-primary, #E0AA3E);
+                    border-radius: 50%;
+                }
+                .coomer-video-container .vjs-big-play-button:hover {
+                    background: var(--coomer-primary, #E0AA3E);
+                }
+                /* 移动端优化 */
+                @media (max-width: 767px) {
+                    .coomer-video-container .vjs-control-bar {
+                        font-size: 12px;
+                    }
+                    .coomer-video-container .vjs-time-control {
+                        padding: 0 4px;
+                        min-width: auto;
+                    }
+                }
+            `);
         },
     };
 
@@ -2764,10 +2984,14 @@
     }
 
     function initUI() {
+        // 注入样式
+        VideoPlayerEnhancer.injectStyles();
+
         // 等待页面完全渲染（SPA 需要延迟）
         setTimeout(() => {
             UIPanel.init();
             AutoFullscreen.init();
+            VideoPlayerEnhancer.init();
 
             // 监听 SPA URL 变化
             if (window.onurlchange === null) {
