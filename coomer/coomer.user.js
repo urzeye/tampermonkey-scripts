@@ -2833,9 +2833,27 @@
                 },
             });
 
-            // 自动聚焦以便键盘控制
+            // 自动聚焦以便键盘控制 + 自动全屏
             player.ready(() => {
                 player.focus();
+
+                // 自动全屏（设置开启时）
+                const settings = StorageManager.getSettings();
+                if (settings.autoFullscreen) {
+                    player.one('play', () => {
+                        setTimeout(() => {
+                            if (!document.fullscreenElement && !player.paused()) {
+                                // 对播放器容器请求全屏，保留 Video.js 控件
+                                const playerEl = player.el();
+                                if (playerEl.requestFullscreen) {
+                                    playerEl.requestFullscreen().catch(() => {});
+                                } else if (playerEl.webkitRequestFullscreen) {
+                                    playerEl.webkitRequestFullscreen();
+                                }
+                            }
+                        }, 300);
+                    });
+                }
             });
 
             const closePlayer = () => {
