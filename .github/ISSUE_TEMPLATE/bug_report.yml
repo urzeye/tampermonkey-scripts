@@ -36,6 +36,8 @@ body:
           options:
               - Windows 11
               - Windows 10
+              - macOS Tahoe (26.x)
+              - macOS Sequoia (15.x)
               - macOS Sonoma (14.x)
               - macOS Ventura (13.x)
               - macOS Monterey (12.x)
