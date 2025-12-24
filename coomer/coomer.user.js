@@ -14,6 +14,7 @@
 // @grant        window.onurlchange
 // @resource     videojs_css https://cdnjs.cloudflare.com/ajax/libs/video.js/8.16.1/video-js.min.css
 // @require      https://cdnjs.cloudflare.com/ajax/libs/video.js/8.16.1/video.min.js
+// @require      https://cdn.jsdelivr.net/npm/fuse.js@7.1.0/dist/fuse.min.js
 // @run-at       document-start
 // ==/UserScript==
 
@@ -631,6 +632,64 @@
             } else if (element.webkitRequestFullscreen) {
                 element.webkitRequestFullscreen();
             }
+        },
+    };
+
+    // ============================================
+    // SearchManager - 搜索过滤
+    // ============================================
+    const SearchManager = {
+        artistFuse: null,
+        postFuse: null,
+        currentQuery: '',
+        debounceTimer: null,
+
+        // 初始化艺术家搜索
+        initArtistSearch(artists) {
+            this.artistFuse = new Fuse(artists, {
+                keys: [
+                    { name: 'id', weight: 0.3 },
+                    { name: 'nickname', weight: 0.5 },
+                    { name: 'platform', weight: 0.2 },
+                ],
+                threshold: 0.4,
+                includeScore: true,
+                ignoreLocation: true,
+            });
+        },
+
+        // 初始化作品搜索
+        initPostSearch(posts) {
+            this.postFuse = new Fuse(posts, {
+                keys: [
+                    { name: 'title', weight: 0.4 },
+                    { name: 'artistName', weight: 0.3 },
+                    { name: 'content', weight: 0.3 },
+                ],
+                threshold: 0.4,
+                includeScore: true,
+                ignoreLocation: true,
+            });
+        },
+
+        // 搜索艺术家
+        searchArtists(query, artists) {
+            if (!query.trim()) return null;
+            this.initArtistSearch(artists);
+            return this.artistFuse.search(query).map((r) => r.item);
+        },
+
+        // 搜索作品
+        searchPosts(query, posts) {
+            if (!query.trim()) return null;
+            this.initPostSearch(posts);
+            return this.postFuse.search(query).map((r) => r.item);
+        },
+
+        // 防抖搜索
+        debounceSearch(callback, delay = 300) {
+            if (this.debounceTimer) clearTimeout(this.debounceTimer);
+            this.debounceTimer = setTimeout(callback, delay);
         },
     };
 
@@ -1429,6 +1488,73 @@
                     background: rgba(255, 255, 255, 0.1);
                     border-color: rgba(255, 255, 255, 0.1);
                 }
+
+                /* 搜索框 */
+                .coomer-search-container {
+                    flex: 1;
+                    max-width: 200px;
+                    margin: 0 12px;
+                }
+                .coomer-search-wrapper {
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                }
+                .coomer-search-input {
+                    width: 100%;
+                    padding: 6px 28px 6px 28px;
+                    background: rgba(255, 255, 255, 0.08);
+                    border: 1px solid transparent;
+                    border-radius: 6px;
+                    color: var(--coomer-text);
+                    font-size: 12px;
+                    outline: none;
+                    transition: all 0.2s;
+                }
+                .coomer-search-input:focus {
+                    border-color: var(--coomer-primary);
+                    background: rgba(255, 255, 255, 0.12);
+                }
+                .coomer-search-input::placeholder {
+                    color: var(--coomer-text-sec);
+                }
+                .coomer-search-icon {
+                    position: absolute;
+                    left: 8px;
+                    font-size: 12px;
+                    color: var(--coomer-text-sec);
+                    pointer-events: none;
+                }
+                .coomer-search-clear {
+                    position: absolute;
+                    right: 4px;
+                    background: transparent;
+                    border: none;
+                    color: var(--coomer-text-sec);
+                    cursor: pointer;
+                    padding: 2px 6px;
+                    font-size: 14px;
+                    line-height: 1;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+                .coomer-search-clear.visible {
+                    opacity: 1;
+                }
+                .coomer-search-clear:hover {
+                    color: var(--coomer-primary);
+                }
+                /* 无搜索结果 */
+                .coomer-no-results {
+                    text-align: center;
+                    padding: 40px 20px;
+                    color: var(--coomer-text-sec);
+                }
+                .coomer-no-results-icon {
+                    font-size: 48px;
+                    margin-bottom: 12px;
+                    opacity: 0.5;
+                }
             `);
         },
 
@@ -1544,7 +1670,14 @@
             panel.className = 'coomer-panel';
             panel.innerHTML = `
                 <div class="coomer-panel-header">
-                    <span class="coomer-panel-title">👑 COOMER 臻选</span>
+                    <span class="coomer-panel-title">👑 臻选</span>
+                    <div class="coomer-search-container">
+                        <div class="coomer-search-wrapper">
+                            <span class="coomer-search-icon">🔍</span>
+                            <input type="text" class="coomer-search-input" placeholder="搜索艺术家...">
+                            <button class="coomer-search-clear">×</button>
+                        </div>
+                    </div>
                     <div class="coomer-panel-header-actions">
                         <button class="coomer-panel-settings" title="设置">⚙️</button>
                         <button class="coomer-panel-close">×</button>
@@ -1573,6 +1706,27 @@
                 this.switchTab('settings');
             });
 
+            // 搜索框事件
+            const searchInput = panel.querySelector('.coomer-search-input');
+            const searchClear = panel.querySelector('.coomer-search-clear');
+            this.searchInput = searchInput;
+
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value;
+                searchClear.classList.toggle('visible', query.length > 0);
+                SearchManager.debounceSearch(() => {
+                    this.handleSearch(query);
+                });
+            });
+
+            searchClear.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                searchInput.value = '';
+                searchClear.classList.remove('visible');
+                this.handleSearch('');
+            });
+
             // 标签页切换事件
             panel.querySelectorAll('.coomer-tab').forEach((tab) => {
                 tab.addEventListener('click', (e) => {
@@ -1593,6 +1747,28 @@
 
             // 渲染初始内容
             this.renderTab('artists');
+        },
+
+        // 处理搜索
+        handleSearch(query) {
+            SearchManager.currentQuery = query;
+            this.renderTab(this.activeTab);
+        },
+
+        // 更新搜索框占位符
+        updateSearchPlaceholder() {
+            if (!this.searchInput) return;
+            const placeholders = {
+                artists: '搜索艺术家...',
+                posts: '搜索作品...',
+                settings: '搜索设置...',
+            };
+            this.searchInput.placeholder = placeholders[this.activeTab] || '搜索...';
+            // 设置页面隐藏搜索框
+            const searchContainer = this.panel.querySelector('.coomer-search-container');
+            if (searchContainer) {
+                searchContainer.style.display = this.activeTab === 'settings' ? 'none' : 'block';
+            }
         },
 
         // SPA URL 变化时重新创建快捷操作按钮
@@ -1879,6 +2055,14 @@
             this.panel.querySelectorAll('.coomer-tab').forEach((tab) => {
                 tab.classList.toggle('active', tab.dataset.tab === tabName);
             });
+            // 切换标签时清空搜索
+            if (this.searchInput) {
+                this.searchInput.value = '';
+                SearchManager.currentQuery = '';
+                const clearBtn = this.panel.querySelector('.coomer-search-clear');
+                if (clearBtn) clearBtn.classList.remove('visible');
+            }
+            this.updateSearchPlaceholder();
             this.renderTab(tabName);
         },
 
@@ -1903,6 +2087,32 @@
             const myArtists = ArtistManager.getSortedList();
             const presetArtists = PRESET_ARTISTS;
             const settings = StorageManager.getSettings();
+            const query = SearchManager.currentQuery;
+
+            // 搜索模式
+            if (query.trim()) {
+                const allArtists = [...presetArtists.map((a) => ({ ...a, isPreset: true })), ...myArtists.map((a) => ({ ...a, isPreset: false }))];
+                const results = SearchManager.searchArtists(query, allArtists);
+
+                if (!results || results.length === 0) {
+                    container.innerHTML = `
+                        <div class="coomer-no-results">
+                            <div class="coomer-no-results-icon">🔍</div>
+                            <div>未找到匹配的艺术家</div>
+                            <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">尝试其他关键词</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const grid = document.createElement('div');
+                grid.className = 'coomer-grid';
+                results.forEach((artist) => {
+                    grid.appendChild(this.createArtistCard(artist, artist.isPreset));
+                });
+                container.appendChild(grid);
+                return;
+            }
 
             // 如果都没有内容，显示空状态
             if (myArtists.length === 0 && presetArtists.length === 0) {
@@ -2078,7 +2288,24 @@
         },
 
         renderPostsTab(container) {
-            const posts = PostManager.getSortedList(); // 使用排序后的列表
+            let posts = PostManager.getSortedList(); // 使用排序后的列表
+            const query = SearchManager.currentQuery;
+
+            // 搜索模式
+            if (query.trim()) {
+                const results = SearchManager.searchPosts(query, posts);
+                if (!results || results.length === 0) {
+                    container.innerHTML = `
+                        <div class="coomer-no-results">
+                            <div class="coomer-no-results-icon">🔍</div>
+                            <div>未找到匹配的作品</div>
+                            <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">尝试其他关键词</div>
+                        </div>
+                    `;
+                    return;
+                }
+                posts = results;
+            }
 
             if (posts.length === 0) {
                 container.innerHTML = `
