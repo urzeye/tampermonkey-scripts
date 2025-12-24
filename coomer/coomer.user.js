@@ -646,44 +646,60 @@
 
         // 初始化艺术家搜索
         initArtistSearch(artists) {
+            if (typeof Fuse === 'undefined') {
+                console.warn('[Coomer] Fuse.js not loaded');
+                return false;
+            }
             this.artistFuse = new Fuse(artists, {
-                keys: [
-                    { name: 'id', weight: 0.3 },
-                    { name: 'nickname', weight: 0.5 },
-                    { name: 'platform', weight: 0.2 },
-                ],
-                threshold: 0.4,
+                keys: ['id', 'nickname', 'platform'],
+                threshold: 0.6, // 放宽阈值，更容易匹配
                 includeScore: true,
                 ignoreLocation: true,
+                minMatchCharLength: 1,
             });
+            return true;
         },
 
         // 初始化作品搜索
         initPostSearch(posts) {
+            if (typeof Fuse === 'undefined') {
+                console.warn('[Coomer] Fuse.js not loaded');
+                return false;
+            }
             this.postFuse = new Fuse(posts, {
-                keys: [
-                    { name: 'title', weight: 0.4 },
-                    { name: 'artistName', weight: 0.3 },
-                    { name: 'content', weight: 0.3 },
-                ],
-                threshold: 0.4,
+                keys: ['title', 'artistName', 'content'],
+                threshold: 0.6,
                 includeScore: true,
                 ignoreLocation: true,
+                minMatchCharLength: 1,
             });
+            return true;
         },
 
         // 搜索艺术家
         searchArtists(query, artists) {
             if (!query.trim()) return null;
-            this.initArtistSearch(artists);
-            return this.artistFuse.search(query).map((r) => r.item);
+            if (!this.initArtistSearch(artists)) {
+                // Fuse 未加载，使用简单的字符串匹配
+                const q = query.toLowerCase();
+                return artists.filter((a) => a.id?.toLowerCase().includes(q) || a.nickname?.toLowerCase().includes(q) || a.platform?.toLowerCase().includes(q));
+            }
+            const results = this.artistFuse.search(query);
+            console.log('[Coomer] Artist search results:', query, results.length);
+            return results.map((r) => r.item);
         },
 
         // 搜索作品
         searchPosts(query, posts) {
             if (!query.trim()) return null;
-            this.initPostSearch(posts);
-            return this.postFuse.search(query).map((r) => r.item);
+            if (!this.initPostSearch(posts)) {
+                // Fuse 未加载，使用简单的字符串匹配
+                const q = query.toLowerCase();
+                return posts.filter((p) => p.title?.toLowerCase().includes(q) || p.artistName?.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q));
+            }
+            const results = this.postFuse.search(query);
+            console.log('[Coomer] Post search results:', query, results.length);
+            return results.map((r) => r.item);
         },
 
         // 防抖搜索
