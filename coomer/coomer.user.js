@@ -652,7 +652,7 @@
             }
             this.artistFuse = new Fuse(artists, {
                 keys: ['id', 'nickname', 'platform'],
-                threshold: 0.6, // 放宽阈值，更容易匹配
+                threshold: 0.4, // 较严格的匹配，允许少量拼写错误
                 includeScore: true,
                 ignoreLocation: true,
                 minMatchCharLength: 1,
@@ -668,7 +668,7 @@
             }
             this.postFuse = new Fuse(posts, {
                 keys: ['title', 'artistName', 'content'],
-                threshold: 0.6,
+                threshold: 0.4, // 较严格的匹配，允许少量拼写错误
                 includeScore: true,
                 ignoreLocation: true,
                 minMatchCharLength: 1,
@@ -678,27 +678,29 @@
 
         // 搜索艺术家
         searchArtists(query, artists) {
-            if (!query.trim()) return null;
+            const q = query.trim();
+            if (!q) return null;
             if (!this.initArtistSearch(artists)) {
                 // Fuse 未加载，使用简单的字符串匹配
-                const q = query.toLowerCase();
-                return artists.filter((a) => a.id?.toLowerCase().includes(q) || a.nickname?.toLowerCase().includes(q) || a.platform?.toLowerCase().includes(q));
+                const lowerQ = q.toLowerCase();
+                return artists.filter((a) => a.id?.toLowerCase().includes(lowerQ) || a.nickname?.toLowerCase().includes(lowerQ) || a.platform?.toLowerCase().includes(lowerQ));
             }
-            const results = this.artistFuse.search(query);
-            console.log('[Coomer] Artist search results:', query, results.length);
+            const results = this.artistFuse.search(q);
+            console.log('[Coomer] Artist search results:', q, results.length);
             return results.map((r) => r.item);
         },
 
         // 搜索作品
         searchPosts(query, posts) {
-            if (!query.trim()) return null;
+            const q = query.trim();
+            if (!q) return null;
             if (!this.initPostSearch(posts)) {
                 // Fuse 未加载，使用简单的字符串匹配
-                const q = query.toLowerCase();
-                return posts.filter((p) => p.title?.toLowerCase().includes(q) || p.artistName?.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q));
+                const lowerQ = q.toLowerCase();
+                return posts.filter((p) => p.title?.toLowerCase().includes(lowerQ) || p.artistName?.toLowerCase().includes(lowerQ) || p.content?.toLowerCase().includes(lowerQ));
             }
-            const results = this.postFuse.search(query);
-            console.log('[Coomer] Post search results:', query, results.length);
+            const results = this.postFuse.search(q);
+            console.log('[Coomer] Post search results:', q, results.length);
             return results.map((r) => r.item);
         },
 
@@ -1767,7 +1769,7 @@
 
         // 处理搜索
         handleSearch(query) {
-            SearchManager.currentQuery = query;
+            SearchManager.currentQuery = query.trim();
             this.renderTab(this.activeTab);
         },
 
