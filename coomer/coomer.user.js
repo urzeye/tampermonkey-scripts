@@ -2597,12 +2597,12 @@
                         'playToggle',
                         'skipBackward', // 后退 10s
                         'skipForward', // 快进 10s
-                        'volumePanel',
                         'currentTimeDisplay',
                         'timeDivider',
                         'durationDisplay',
                         'progressControl',
                         'playbackRateMenuButton',
+                        'volumePanel',
                         'pictureInPictureToggle',
                         'fullscreenToggle',
                     ],
