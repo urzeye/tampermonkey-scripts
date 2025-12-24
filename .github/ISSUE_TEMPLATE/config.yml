@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+    - name: 💬 讨论区
+      url: https://github.com/urzeye/tampermonkey-scripts/discussions
+      about: 如果您有问题想讨论或分享使用心得，请前往讨论区
+    - name: 📖 使用文档
+      url: https://github.com/urzeye/tampermonkey-scripts#readme
+      about: 查看项目使用文档和常见问题解答
+    - name: 🔧 故障排除
+      url: https://github.com/urzeye/tampermonkey-scripts/blob/main/gemini-helper/TROUBLESHOOTING.md
+      about: 遇到问题？先查看故障排除文档

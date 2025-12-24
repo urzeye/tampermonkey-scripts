@@ -1,0 +1,177 @@
+name: 🐛 Bug 反馈
+description: 报告脚本中的问题或异常行为
+title: '[Bug]: '
+labels: ['bug']
+body:
+    - type: markdown
+      attributes:
+          value: |
+              感谢您花时间填写此 Bug 报告！请尽可能详细地描述问题，这将帮助我们更快地定位和修复。
+
+    - type: dropdown
+      id: script
+      attributes:
+          label: 脚本名称
+          description: 请选择出现问题的脚本
+          options:
+              - Gemini Helper
+              - Coomer 佬友严选
+      validations:
+          required: true
+
+    - type: input
+      id: version
+      attributes:
+          label: 脚本版本
+          description: 请填写脚本版本号（可在脚本管理器中查看）
+          placeholder: '例如: v1.9.5'
+      validations:
+          required: true
+
+    - type: dropdown
+      id: os
+      attributes:
+          label: 操作系统
+          description: 请选择您的操作系统
+          options:
+              - Windows 11
+              - Windows 10
+              - macOS Sonoma (14.x)
+              - macOS Ventura (13.x)
+              - macOS Monterey (12.x)
+              - Ubuntu / Debian
+              - Fedora / CentOS
+              - Arch Linux
+              - 其他 Linux 发行版
+              - Android
+              - iOS / iPadOS
+              - 其他
+      validations:
+          required: true
+
+    - type: input
+      id: os_version
+      attributes:
+          label: 操作系统版本（可选）
+          description: 如选择"其他"或需要补充具体版本号
+          placeholder: '例如: Windows 11 23H2'
+
+    - type: dropdown
+      id: browser
+      attributes:
+          label: 浏览器
+          description: 请选择您使用的浏览器
+          options:
+              - Google Chrome
+              - Microsoft Edge
+              - Mozilla Firefox
+              - Safari
+              - 其他
+      validations:
+          required: true
+
+    - type: input
+      id: browser_version
+      attributes:
+          label: 浏览器版本
+          description: 请填写浏览器版本（可在浏览器设置的"关于"页面查看）
+          placeholder: '例如: 120.0.6099.130'
+      validations:
+          required: true
+
+    - type: dropdown
+      id: userscript_manager
+      attributes:
+          label: 脚本管理器
+          description: 请选择您使用的用户脚本管理器
+          options:
+              - Tampermonkey
+              - Violentmonkey
+              - Greasemonkey
+              - Userscripts (Safari)
+              - Stay
+              - 其他
+      validations:
+          required: true
+
+    - type: input
+      id: userscript_manager_version
+      attributes:
+          label: 脚本管理器版本
+          description: 请填写脚本管理器版本（可在扩展管理页面查看）
+          placeholder: '例如: 5.3.3'
+      validations:
+          required: true
+
+    - type: textarea
+      id: bug_description
+      attributes:
+          label: 问题描述
+          description: 请清晰、简洁地描述遇到的问题
+          placeholder: |
+              描述你遇到的 Bug 是什么...
+      validations:
+          required: true
+
+    - type: textarea
+      id: expected_behavior
+      attributes:
+          label: 期望行为
+          description: 请描述您期望的正确行为是什么
+          placeholder: |
+              描述你期望发生什么...
+      validations:
+          required: true
+
+    - type: textarea
+      id: steps_to_reproduce
+      attributes:
+          label: 复现步骤
+          description: 请提供详细的复现步骤
+          placeholder: |
+              1. 打开 '...'
+              2. 点击 '...'
+              3. 滚动到 '...'
+              4. 看到错误 '...'
+      validations:
+          required: true
+
+    - type: textarea
+      id: screenshots
+      attributes:
+          label: 截图或录屏
+          description: 如果适用，请添加截图或录屏帮助解释问题（可直接粘贴图片）
+          placeholder: |
+              拖拽或粘贴图片到这里...
+
+    - type: textarea
+      id: console_errors
+      attributes:
+          label: 控制台错误信息
+          description: |
+              如果有控制台报错，请提供完整的错误信息。
+              打开方式：按 F12 → Console（控制台）标签页
+          placeholder: |
+              粘贴控制台错误信息...
+          render: shell
+
+    - type: textarea
+      id: additional_context
+      attributes:
+          label: 其他信息
+          description: 添加任何其他与问题相关的上下文信息
+          placeholder: |
+              任何可能有帮助的额外信息...
+
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 提交前检查
+          description: 请确认以下事项
+          options:
+              - label: 我已搜索过现有 Issues，确认没有重复的问题
+                required: true
+              - label: 我使用的是最新版本的脚本
+                required: true
+              - label: 我已尝试禁用其他脚本/扩展来排除冲突
+                required: false
