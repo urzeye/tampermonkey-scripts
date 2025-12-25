@@ -7530,39 +7530,27 @@
 
             // 构建树形结构
             const outlineKey = outlineData.map((i) => i.text).join('|');
-            let isNewTree = false;
             // 只要 key 变了，或者是首次构建，都重新构建树
             // 注意：实时更新时 key 会不断变化，所以必须每次都重建树以包含新节点
             // 但我们需要保持用户的折叠状态
             if (this.state.treeKey !== outlineKey || !this.state.tree) {
                 this.state.tree = this.buildTree(outlineData, minLevel);
                 this.state.treeKey = outlineKey;
-                isNewTree = true;
             }
             const tree = this.state.tree;
 
             // 恢复折叠状态
+            // 策略：先根据 displayLevel 初始化所有节点的折叠状态，再恢复用户手动操作的状态
+            const displayLevel = this.state.expandLevel ?? 6;
+            const effectiveDisplayLevel = displayLevel > 0 && displayLevel < minLevel ? minLevel : displayLevel;
+
+            // 1. 先按默认规则初始化所有节点（包括新节点）
+            this.initializeCollapsedState(tree, effectiveDisplayLevel);
+
+            // 2. 再恢复用户之前的手动操作（只影响旧节点，新节点保持初始化状态）
+            // 注意：当 displayLevel=0 时，用户问题节点强制折叠，不恢复旧状态
             if (Object.keys(currentStateMap).length > 0) {
-                this.restoreTreeState(tree, currentStateMap);
-
-                // 对于新增加的节点（在 currentStateMap 中找不到的），应用默认折叠逻辑
-                // 这里需要一个递归函数只处理未初始化的节点吗？
-                // 实际上 restoreTreeState 只恢复旧的。新节点默认在 buildTree 中可能是 collapsed: false (我们在 buildTree 里初始化为 false)
-                // 我们需要根据 expandLevel 来初始化新节点。
-                // 简单的做法：先全部应用默认 expandLevel，再用 restore 覆盖旧的？
-                // 或者：restore 之后，对剩下的新节点做处理？
-
-                // 改进策略：
-                // 1. 先按默认规则初始化所有节点（基于 expandLevel）
-                const displayLevel = this.state.expandLevel ?? 6;
-                this.initializeCollapsedState(tree, displayLevel > 0 && displayLevel < minLevel ? minLevel : displayLevel);
-
-                // 2. 再恢复用户之前的操作（覆盖默认）
-                this.restoreTreeState(tree, currentStateMap);
-            } else if (isNewTree && !this.state.searchQuery) {
-                // 首次加载，无旧状态
-                const displayLevel = this.state.expandLevel ?? 6;
-                this.initializeCollapsedState(tree, displayLevel > 0 && displayLevel < minLevel ? minLevel : displayLevel);
+                this.restoreTreeState(tree, currentStateMap, effectiveDisplayLevel);
             }
 
             // 如果在搜索模式，需要重新应用搜索标记
@@ -7688,7 +7676,7 @@
                     displayLevel = this.state.expandLevel ?? 6;
                 }
 
-                if (displayLevel < this.state.minLevel) {
+                if (displayLevel > 0 && displayLevel < this.state.minLevel) {
                     displayLevel = this.state.minLevel;
                 }
 
