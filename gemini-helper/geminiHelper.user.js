@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.9.8
+// @version      1.9.9
 // @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 // @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, Markdown bold fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
@@ -72,6 +72,8 @@
         showStatus: true, // 显示生成状态图标 (⏳/✅)
         showNotification: false, // 发送桌面通知
         notificationSound: false, // 通知声音（默认关闭）
+        notificationVolume: 0.5, // 通知声音音量 (0.1-1.0)
+        notifyWhenFocused: false, // 前台时也通知（默认关闭）
         autoFocus: false, // 生成完成后自动将窗口置顶
         privacyMode: false, // 隐私模式
         privacyTitle: 'Google', // 隐私模式下的伪装标题
@@ -245,6 +247,9 @@
             showNotificationDesc: '生成完成时发送系统通知',
             notificationSoundLabel: '通知声音',
             notificationSoundDesc: '生成完成时播放提示音',
+            notificationVolumeLabel: '声音音量',
+            notifyWhenFocusedLabel: '前台时也通知',
+            notifyWhenFocusedDesc: '当前页面可见时也发送通知，而不仅在后台时',
             autoFocusLabel: '自动窗口置顶',
             autoFocusDesc: '生成完成时自动将窗口带回前台',
             privacyModeLabel: '隐私模式',
@@ -490,6 +495,9 @@
             showNotificationDesc: '生成完成時傳送系统通知',
             notificationSoundLabel: '通知聲音',
             notificationSoundDesc: '生成完成時播放提示音',
+            notificationVolumeLabel: '聲音音量',
+            notifyWhenFocusedLabel: '前台時也通知',
+            notifyWhenFocusedDesc: '當前頁面可見時也發送通知，而不僅在後台時',
             autoFocusLabel: '自動視窗置頂',
             autoFocusDesc: '生成完成時自動將視窗帶回前台',
             privacyModeLabel: '隱私模式',
@@ -734,6 +742,9 @@
             showNotificationDesc: 'Send system notification when generation completes',
             notificationSoundLabel: 'Notification Sound',
             notificationSoundDesc: 'Play a sound when generation completes',
+            notificationVolumeLabel: 'Sound Volume',
+            notifyWhenFocusedLabel: 'Notify When Focused',
+            notifyWhenFocusedDesc: 'Send notifications even when the current page is visible',
             autoFocusLabel: 'Auto Focus Window',
             autoFocusDesc: 'Bring window to front when generation completes',
             privacyModeLabel: 'Privacy Mode',
@@ -2646,8 +2657,13 @@
             const wasGenerating = this._aiState === 'generating';
             this._setAiState('completed');
 
-            // 只在后台、之前正在生成、且用户没有看到过完成状态时触发通知
-            if (wasGenerating && document.hidden && !this._userSawCompletion) {
+            // 检查是否应当发送通知
+            // 1. 必须是从生成状态完成
+            // 2. 用户没有在前台看到过完成状态
+            // 3. 要么在后台，要么开启了「前台时也通知」
+            const notifyWhenFocused = this.settings.tabSettings?.notifyWhenFocused;
+            const shouldNotify = wasGenerating && !this._userSawCompletion && (document.hidden || notifyWhenFocused);
+            if (shouldNotify) {
                 this._sendCompletionNotification();
             }
 
@@ -2725,8 +2741,10 @@
             try {
                 if (!this._notificationAudio) {
                     this._notificationAudio = new Audio();
-                    this._notificationAudio.volume = 0.5;
                 }
+                // 使用用户设置的音量，默认 0.5
+                const volume = this.settings.tabSettings?.notificationVolume ?? 0.5;
+                this._notificationAudio.volume = Math.max(0.1, Math.min(1.0, volume));
                 this._notificationAudio.src = url;
                 this._notificationAudio.currentTime = 0;
                 this._notificationAudio.play().catch(() => {
@@ -10857,16 +10875,85 @@
                     className: 'setting-toggle' + (this.settings.tabSettings?.notificationSound ? ' active' : ''),
                     id: 'toggle-notification-sound',
                 });
-                soundToggle.addEventListener('click', () => {
-                    this.settings.tabSettings.notificationSound = !this.settings.tabSettings.notificationSound;
-                    soundToggle.classList.toggle('active', this.settings.tabSettings.notificationSound);
-                    this.saveSettings();
-                    showToast(this.settings.tabSettings.notificationSound ? this.t('settingOn') : this.t('settingOff'));
-                });
 
                 soundItem.appendChild(soundInfo);
                 soundItem.appendChild(soundToggle);
                 tabSettingsContainer.appendChild(soundItem);
+
+                // 6.6.2 音量滑块 (notificationVolume)
+                const volumeItem = createElement('div', { className: 'setting-item' });
+                const volumeInfo = createElement('div', { className: 'setting-item-info' });
+                volumeInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('notificationVolumeLabel')));
+
+                const volumeControls = createElement('div', { className: 'setting-controls', style: 'display: flex; align-items: center; gap: 8px;' });
+                const volumeSlider = createElement('input', {
+                    type: 'range',
+                    min: '0.1',
+                    max: '1.0',
+                    step: '0.1',
+                    value: this.settings.tabSettings?.notificationVolume ?? 0.5,
+                    style: 'width: 80px; cursor: pointer;',
+                    id: 'slider-notification-volume',
+                });
+                const volumeDisplay = createElement(
+                    'span',
+                    {
+                        style: 'min-width: 36px; text-align: right; font-size: 12px; color: var(--gh-text-secondary, #666);',
+                    },
+                    `${Math.round((this.settings.tabSettings?.notificationVolume ?? 0.5) * 100)}%`,
+                );
+
+                volumeSlider.addEventListener('input', () => {
+                    const val = parseFloat(volumeSlider.value);
+                    volumeDisplay.textContent = `${Math.round(val * 100)}%`;
+                    this.settings.tabSettings.notificationVolume = val;
+                    this.saveSettings();
+                });
+
+                volumeControls.appendChild(volumeSlider);
+                volumeControls.appendChild(volumeDisplay);
+                volumeItem.appendChild(volumeInfo);
+                volumeItem.appendChild(volumeControls);
+                tabSettingsContainer.appendChild(volumeItem);
+
+                // 联动逻辑：音量滑块根据通知声音开关状态置灰
+                const updateVolumeState = () => {
+                    const isEnabled = this.settings.tabSettings.notificationSound;
+                    volumeSlider.disabled = !isEnabled;
+                    volumeItem.style.opacity = isEnabled ? '1' : '0.5';
+                    volumeItem.style.pointerEvents = isEnabled ? 'auto' : 'none';
+                };
+                updateVolumeState();
+
+                // 绑定通知声音开关点击事件
+                soundToggle.addEventListener('click', () => {
+                    this.settings.tabSettings.notificationSound = !this.settings.tabSettings.notificationSound;
+                    soundToggle.classList.toggle('active', this.settings.tabSettings.notificationSound);
+                    this.saveSettings();
+                    updateVolumeState();
+                    showToast(this.settings.tabSettings.notificationSound ? this.t('settingOn') : this.t('settingOff'));
+                });
+
+                // 6.6.3 前台时也通知 (notifyWhenFocused)
+                const focusNotifyItem = createElement('div', { className: 'setting-item' });
+                const focusNotifyInfo = createElement('div', { className: 'setting-item-info' });
+                focusNotifyInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('notifyWhenFocusedLabel')));
+                focusNotifyInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('notifyWhenFocusedDesc')));
+
+                const focusNotifyToggle = createElement('div', {
+                    className: 'setting-toggle' + (this.settings.tabSettings?.notifyWhenFocused ? ' active' : ''),
+                    id: 'toggle-notify-when-focused',
+                });
+                focusNotifyToggle.addEventListener('click', () => {
+                    this.settings.tabSettings.notifyWhenFocused = !this.settings.tabSettings.notifyWhenFocused;
+                    focusNotifyToggle.classList.toggle('active', this.settings.tabSettings.notifyWhenFocused);
+                    this.saveSettings();
+                    showToast(this.settings.tabSettings.notifyWhenFocused ? this.t('settingOn') : this.t('settingOff'));
+                });
+
+                focusNotifyItem.appendChild(focusNotifyInfo);
+                focusNotifyItem.appendChild(focusNotifyToggle);
+                tabSettingsContainer.appendChild(focusNotifyItem);
             }
 
             // 6.7 自动窗口置顶 (autoFocus)
