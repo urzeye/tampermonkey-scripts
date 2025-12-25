@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.9.9
+// @version      1.10.0
 // @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 // @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, Markdown bold fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
@@ -306,6 +306,9 @@
             outlineAutoUpdateLabel: '对话期间自动更新大纲',
             outlineAutoUpdateDesc: 'AI 生成内容时自动刷新目录结构',
             outlineUpdateIntervalLabel: '更新检测间隔 (秒)',
+            outlineShowUserQueries: '展示用户提问',
+            outlineShowUserQueriesTooltip: '展示用户提问',
+            outlineOnlyUserQueries: '提问',
             outlineIntervalUpdated: '间隔已设为 {val} 秒',
             // 页面显示设置
             pageDisplaySettings: '页面显示',
@@ -556,6 +559,9 @@
             outlineAutoUpdateLabel: '對話期間自動更新大綱',
             outlineAutoUpdateDesc: 'AI 生成內容時自動刷新目錄結構',
             outlineUpdateIntervalLabel: '更新檢測間隔 (秒)',
+            outlineShowUserQueries: '展示用戶提問',
+            outlineShowUserQueriesTooltip: '展示用戶提問',
+            outlineOnlyUserQueries: '提問',
             outlineIntervalUpdated: '間隔已設為 {val} 秒',
             // 頁面顯示設置
             pageDisplaySettings: '頁面顯示',
@@ -804,6 +810,9 @@
             outlineAutoUpdateLabel: 'Auto-update outline during conversation',
             outlineAutoUpdateDesc: 'Automatically refresh outline when AI generates content',
             outlineUpdateIntervalLabel: 'Update interval (seconds)',
+            outlineShowUserQueries: 'Show user queries',
+            outlineShowUserQueriesTooltip: 'Show user queries',
+            outlineOnlyUserQueries: 'Queries',
             outlineIntervalUpdated: 'Interval set to {val} seconds',
             // Page Display Settings
             pageDisplaySettings: 'Page Display',
@@ -932,6 +941,7 @@
         maxLevel: 6, // 显示到几级标题 (1-6)
         autoUpdate: true,
         updateInterval: 3,
+        showUserQueries: false, // 展示用户提问，按对话轮次分组
     };
 
     // 语言检测函数（支持手动设置）
@@ -1379,11 +1389,29 @@
         }
 
         /**
+         * 获取用户提问元素的选择器（用于大纲分组功能）
+         * @returns {string|null} CSS 选择器，返回 null 表示不支持
+         */
+        getUserQuerySelector() {
+            return null;
+        }
+
+        /**
+         * 从用户提问元素中提取文本（用于大纲分组功能）
+         * @param {Element} element 用户提问的 DOM 元素
+         * @returns {string} 用户提问的文本内容
+         */
+        extractUserQueryText(element) {
+            return element.textContent?.trim() || '';
+        }
+
+        /**
          * 从页面提取大纲（标题列表）
          * @param {number} maxLevel 最大标题级别 (1-6)
-         * @returns {Array<{level: number, text: string, element: Element|null}>}
+         * @param {boolean} includeUserQueries 是否包含用户提问（作为 level 0 节点）
+         * @returns {Array<{level: number, text: string, element: Element|null, isUserQuery?: boolean}>}
          */
-        extractOutline(maxLevel = 6) {
+        extractOutline(maxLevel = 6, includeUserQueries = false) {
             return [];
         }
 
@@ -1783,26 +1811,91 @@
             return ['.model-response-container', 'model-response', '.response-container', '[data-message-id]', 'message-content'];
         }
 
-        extractOutline(maxLevel = 6) {
+        getUserQuerySelector() {
+            return 'user-query';
+        }
+
+        extractUserQueryText(element) {
+            // 从 user-query 元素中提取 .query-text 的文本
+            const queryText = element.querySelector('.query-text');
+            if (queryText) {
+                return queryText.textContent?.trim() || '';
+            }
+            return element.textContent?.trim() || '';
+        }
+
+        extractOutline(maxLevel = 6, includeUserQueries = false) {
             const outline = [];
             const container = document.querySelector(this.getResponseContainerSelector());
             if (!container) return outline;
 
-            // Gemini 使用标准的 h1-h6 标签，带有 data-path-to-node 属性
+            // 如果不需要用户提问，走原有逻辑
+            if (!includeUserQueries) {
+                const headingSelectors = [];
+                for (let i = 1; i <= maxLevel; i++) {
+                    headingSelectors.push(`h${i}`);
+                }
+
+                const headings = container.querySelectorAll(headingSelectors.join(', '));
+                headings.forEach((heading) => {
+                    const level = parseInt(heading.tagName.charAt(1), 10);
+                    if (level <= maxLevel) {
+                        outline.push({
+                            level,
+                            text: heading.textContent.trim(),
+                            element: heading,
+                        });
+                    }
+                });
+
+                return outline;
+            }
+
+            // 开启用户提问分组模式：按 DOM 顺序遍历
+            const userQuerySelector = this.getUserQuerySelector();
             const headingSelectors = [];
             for (let i = 1; i <= maxLevel; i++) {
                 headingSelectors.push(`h${i}`);
             }
 
-            const headings = container.querySelectorAll(headingSelectors.join(', '));
-            headings.forEach((heading) => {
-                const level = parseInt(heading.tagName.charAt(1), 10);
-                if (level <= maxLevel) {
+            // 构建合并选择器
+            const combinedSelector = `${userQuerySelector}, ${headingSelectors.join(', ')}`;
+
+            // 使用 querySelectorAll 按 DOM 顺序获取所有匹配元素
+            const allElements = container.querySelectorAll(combinedSelector);
+
+            let currentUserQuery = null; // 当前用户提问节点（用于跟踪是否有后续标题）
+            let currentUserQueryHasHeadings = false; // 当前用户提问是否有后续标题
+
+            allElements.forEach((element) => {
+                const tagName = element.tagName.toLowerCase();
+
+                if (tagName === 'user-query') {
+                    // 提取用户提问文本
+                    let queryText = this.extractUserQueryText(element);
+
+                    // 截断长文本（最多 80 字符）
+                    if (queryText.length > 80) {
+                        queryText = queryText.substring(0, 80) + '...';
+                    }
+
+                    // 添加用户提问节点（即使没有后续标题也显示）
                     outline.push({
-                        level,
-                        text: heading.textContent.trim(),
-                        element: heading,
+                        level: 0,
+                        text: queryText,
+                        element: element,
+                        isUserQuery: true,
                     });
+                } else if (/^h[1-6]$/.test(tagName)) {
+                    // 标题元素
+                    const level = parseInt(tagName.charAt(1), 10);
+                    if (level <= maxLevel) {
+                        outline.push({
+                            level,
+                            text: element.textContent.trim(),
+                            element: element,
+                        });
+                    }
                 }
             });
 
@@ -2407,16 +2500,117 @@
             ];
         }
 
-        extractOutline(maxLevel = 6) {
+        /**
+         * 获取用户提问元素的选择器
+         * Gemini Business: .question-block 是用户提问的容器
+         */
+        getUserQuerySelector() {
+            return '.question-block';
+        }
+
+        /**
+         * 从用户提问元素中提取文本
+         * Gemini Business: 文本在 ucs-fast-markdown 的 Shadow DOM 中
+         * @param {Element} element .question-block 元素
+         * @returns {string}
+         */
+        extractUserQueryText(element) {
+            // 查找 ucs-fast-markdown 元素
+            const markdown = element.querySelector('ucs-fast-markdown');
+            if (!markdown || !markdown.shadowRoot) {
+                return element.textContent?.trim() || '';
+            }
+
+            // 在 Shadow DOM 中查找文本
+            // 结构: <div><div class="markdown-document"><p><span>文本</span></p></div></div>
+            const textSpan = markdown.shadowRoot.querySelector('span[data-markdown-start-index]');
+            if (textSpan) {
+                return textSpan.textContent?.trim() || '';
+            }
+
+            // 回退：获取 Shadow DOM 中的所有文本
+            const markdownDoc = markdown.shadowRoot.querySelector('.markdown-document');
+            if (markdownDoc) {
+                return markdownDoc.textContent?.trim() || '';
+            }
+
+            return element.textContent?.trim() || '';
+        }
+
+        /**
+         * 从页面提取大纲（标题列表）
+         * @param {number} maxLevel 最大标题级别 (1-6)
+         * @param {boolean} includeUserQueries 是否包含用户提问
+         * @returns {Array<{level: number, text: string, element: Element|null, isUserQuery?: boolean}>}
+         */
+        extractOutline(maxLevel = 6, includeUserQueries = false) {
             const outline = [];
-            // 在 Shadow DOM 中递归查找所有标题
-            this.findHeadingsInShadowDOM(document, outline, maxLevel, 0);
+
+            if (!includeUserQueries) {
+                // 原有逻辑：只提取标题
+                this.findHeadingsInShadowDOM(document, outline, maxLevel, 0);
+                return outline;
+            }
+
+            // 开启用户提问分组模式
+            // 策略：按轮次遍历。结构为 ucs-conversation -> shadowRoot -> .main -> .turn
+            // 每个 .turn 包含 .question-block（用户提问）和 ucs-summary（AI 回复）
+
+            // 1. 找到 ucs-conversation 元素
+            const ucsConversation = DOMToolkit.query('ucs-conversation', { shadow: true });
+            if (!ucsConversation || !ucsConversation.shadowRoot) {
+                // 回退：如果找不到 ucs-conversation，使用原有逻辑
+                this.findHeadingsInShadowDOM(document, outline, maxLevel, 0);
+                return outline;
+            }
+
+            // 2. 在 ucs-conversation 的 Shadow Root 中查找 .main 下的所有 .turn
+            const main = ucsConversation.shadowRoot.querySelector('.main');
+            if (!main) {
+                this.findHeadingsInShadowDOM(document, outline, maxLevel, 0);
+                return outline;
+            }
+
+            const turnContainers = main.querySelectorAll('.turn');
+
+            // 3. 遍历每个轮次
+            turnContainers.forEach((turn) => {
+                // 3.1 在轮次中查找用户提问 (.question-block)
+                const questionBlock = turn.querySelector('.question-block');
+                if (questionBlock) {
+                    let queryText = this.extractUserQueryText(questionBlock);
+                    if (queryText.length > 80) {
+                        queryText = queryText.substring(0, 80) + '...';
+                    }
+                    outline.push({
+                        level: 0,
+                        text: queryText,
+                        element: questionBlock,
+                        isUserQuery: true,
+                    });
+                }
+
+                // 3.2 在轮次的 ucs-summary 中查找标题（递归进入 Shadow DOM）
+                const ucsSummary = turn.querySelector('ucs-summary');
+                if (ucsSummary) {
+                    const turnHeadings = [];
+                    this.findHeadingsInShadowDOM(ucsSummary, turnHeadings, maxLevel, 0);
+                    turnHeadings.forEach((h) => outline.push(h));
+                }
+            });
+
             return outline;
         }
 
         // 在 Shadow DOM 中递归查找标题
         findHeadingsInShadowDOM(root, outline, maxLevel, depth) {
             if (depth > 15) return;
+
+            // 如果传入的是一个有 shadowRoot 的元素（如 ucs-summary），先进入其 Shadow Root
+            if (root.shadowRoot) {
+                this.findHeadingsInShadowDOM(root.shadowRoot, outline, maxLevel, depth);
+                return; // 已经在 shadowRoot 中递归，不需要再处理 root 本身
+            }
 
             // 在当前层级查找标题（h1-h6）
             if (root !== document) {
@@ -7160,18 +7354,18 @@
             // 第一行：按钮和搜索占位
             const row1 = createElement('div', { className: 'outline-toolbar-row' });
 
-            // 滚动按钮
-            const scrollBtn = createElement(
+            // 用户提问分组按钮
+            const groupBtn = createElement(
                 'button',
                 {
-                    className: 'outline-toolbar-btn',
-                    id: 'outline-scroll-btn',
-                    title: this.t('outlineScrollBottom'),
+                    className: 'outline-toolbar-btn' + (this.settings.outline?.showUserQueries ? ' active' : ''),
+                    id: 'outline-group-btn',
+                    title: this.t('outlineShowUserQueriesTooltip'),
                 },
-                '⬇',
+                '🗨️',
             );
-            scrollBtn.addEventListener('click', () => this.scrollList());
-            row1.appendChild(scrollBtn);
+            groupBtn.addEventListener('click', () => this.toggleGroupMode());
+            row1.appendChild(groupBtn);
 
             // 展开/折叠按钮
             const expandBtn = createElement(
@@ -7185,6 +7379,19 @@
             );
             expandBtn.addEventListener('click', () => this.toggleExpandAll());
             row1.appendChild(expandBtn);
+
+            // 滚动按钮
+            const scrollBtn = createElement(
+                'button',
+                {
+                    className: 'outline-toolbar-btn',
+                    id: 'outline-scroll-btn',
+                    title: this.t('outlineScrollBottom'),
+                },
+                '⬇',
+            );
+            scrollBtn.addEventListener('click', () => this.scrollList());
+            row1.appendChild(scrollBtn);
 
             // 搜索框区域
             const searchWrapper = createElement('div', { className: 'outline-search-wrapper' });
@@ -7313,8 +7520,9 @@
             });
             this.updateTooltips();
 
-            // 智能缩进：检测最高层级
-            const minLevel = Math.min(...outlineData.map((item) => item.level));
+            // 智能缩进：检测最高层级（排除用户提问节点，只考虑 AI 回复的标题）
+            const headingLevels = outlineData.filter((item) => !item.isUserQuery).map((item) => item.level);
+            const minLevel = headingLevels.length > 0 ? Math.min(...headingLevels) : 1;
             this.state.minLevel = minLevel;
 
             // 在重构树之前，捕获当前的折叠状态
@@ -7497,7 +7705,9 @@
             const stack = [];
 
             outline.forEach((item, index) => {
-                const relativeLevel = item.level - minLevel + 1;
+                // 用户提问节点固定 relativeLevel = 0
+                // AI 标题节点使用 level - minLevel + 1（实现层级提升）
+                const relativeLevel = item.isUserQuery ? 0 : item.level - minLevel + 1;
                 const node = {
                     ...item,
                     relativeLevel,
@@ -7564,11 +7774,21 @@
                     }
                 }
 
-                // 最终修正：如果父级折叠了，那肯定看不到
+                // 如果父级折叠了，那肯定看不到
                 if (parentCollapsed) shouldShow = false;
 
+                // 构建 CSS 类名
+                // 用户提问节点用 relativeLevel (0)
+                // 标题节点统一用 relativeLevel，这样层级会自动提升（如 H2 变成 level 1）
+                let cssLevel = item.relativeLevel;
+
+                let itemClassName = `outline-item outline-level-${cssLevel}`;
+                if (item.isUserQuery) {
+                    itemClassName += ' user-query-node';
+                }
+
                 const itemEl = createElement('div', {
-                    className: `outline-item outline-level-${item.relativeLevel}`,
+                    className: itemClassName,
                     'data-index': item.index,
                     'data-level': item.relativeLevel,
                 });
@@ -7594,6 +7814,12 @@
                     });
                 }
                 itemEl.appendChild(toggle);
+
+                // 用户提问节点添加前缀图标
+                if (item.isUserQuery) {
+                    const icon = createElement('span', { className: 'user-query-icon' }, '💬');
+                    itemEl.appendChild(icon);
+                }
 
                 const textEl = createElement('span', { className: 'outline-item-text' });
 
@@ -7709,12 +7935,34 @@
             if (!btn) return;
 
             if (this.state.isAllExpanded) {
-                const minLevel = this.state.minLevel || 1;
-                this.setLevel(minLevel);
+                // 如果开启了"只显示用户提问"，收起时应折叠到 Level 0 (只显示提问)
+                // 否则折叠到最小标题层级 (通常是 1)
+                const targetLevel = this.settings.outline?.showUserQueries ? 0 : this.state.minLevel || 1;
+                this.setLevel(targetLevel);
             } else {
                 const maxActualLevel = Math.max(...Object.keys(this.state.levelCounts).map(Number), 1);
                 this.setLevel(maxActualLevel);
             }
+        }
+
+        // 切换用户提问分组模式
+        toggleGroupMode() {
+            const btn = document.getElementById('outline-group-btn');
+            if (!this.settings.outline) return;
+
+            // 切换设置
+            this.settings.outline.showUserQueries = !this.settings.outline.showUserQueries;
+
+            // 更新按钮状态
+            if (btn) {
+                btn.classList.toggle('active', this.settings.outline.showUserQueries);
+            }
+
+            // 保存设置
+            if (this.onSettingsChange) this.onSettingsChange();
+
+            // 触发大纲刷新
+            window.dispatchEvent(new CustomEvent('gemini-helper-outline-auto-refresh'));
         }
 
         // 设置层级
@@ -7788,10 +8036,17 @@
         // 更新提示
         updateTooltips() {
             const dots = document.querySelectorAll('.outline-level-dot');
+            const showUserQueries = this.settings.outline?.showUserQueries || false;
+
             dots.forEach((dot) => {
                 const level = parseInt(dot.dataset.level, 10);
                 const tooltip = dot.querySelector('.outline-level-dot-tooltip');
-                if (tooltip && level > 0) {
+                if (!tooltip) return;
+
+                if (level === 0) {
+                    // Level 0: 分组模式下显示"只显示用户提问"，否则显示折叠符号
+                    tooltip.textContent = showUserQueries ? this.t('outlineOnlyUserQueries') : '⊖';
+                } else {
                     const count = this.state.levelCounts[level] || 0;
                     tooltip.textContent = `H${level}: ${count}`;
                 }
@@ -9062,14 +9317,14 @@
                     align-items: center; justify-content: center; font-size: 14px;
                     transition: all 0.2s; flex-shrink: 0;
                 }
-                .outline-toolbar-btn:hover { border-color: ${colors.primary}; color: ${colors.primary}; background: #f0f9ff; }
-                .outline-toolbar-btn.active { border-color: ${colors.primary}; color: white; background: ${colors.primary}; }
+                .outline-toolbar-btn:hover { border-color: var(--gh-border-active); color: var(--gh-border-active); background: var(--gh-folder-bg-default); }
+                .outline-toolbar-btn.active { border-color: var(--gh-tag-active-bg); color: white; background: var(--gh-tag-active-bg); }
                 .outline-search-input {
                     flex: 1; height: 28px; padding: 0 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     font-size: 13px; color: var(--gh-text, #374151); outline: none; transition: all 0.2s;
                     background: var(--gh-input-bg, #ffffff);
                 }
-                .outline-search-input:focus { border-color: ${colors.primary}; box-shadow: 0 0 0 2px rgba(66,133,244,0.1); }
+                .outline-search-input:focus { border-color: var(--gh-border-active); box-shadow: 0 0 0 2px rgba(66,133,244,0.1); }
                 .outline-search-input::placeholder { color: #9ca3af; }
                 .outline-search-clear {
                     position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
@@ -9103,12 +9358,12 @@
                 }
                 .outline-level-slider::-webkit-slider-thumb {
                     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-                    background: ${colors.primary}; cursor: pointer; border: 2px solid var(--gh-bg);
+                    background: var(--gh-tag-active-bg); cursor: pointer; border: 2px solid var(--gh-bg);
                     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                 }
                 .outline-level-slider::-moz-range-thumb {
                     width: 14px; height: 14px; border-radius: 50%;
-                    background: ${colors.primary}; cursor: pointer; border: 2px solid var(--gh-bg);
+                    background: var(--gh-tag-active-bg); cursor: pointer; border: 2px solid var(--gh-bg);
                     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                 }
                 .outline-level-dots {
@@ -9120,21 +9375,23 @@
                     cursor: pointer; transition: all 0.2s; position: relative; z-index: 2;
                     border: 2px solid var(--gh-bg); box-shadow: 0 1px 2px rgba(0,0,0,0.1);
                 }
-                .outline-level-dot:hover { background: ${colors.primary}; transform: scale(1.2); }
-                .outline-level-dot.active { background: ${colors.primary}; }
+                .outline-level-dot:hover { background: var(--gh-tag-active-bg); transform: scale(1.2); }
+                .outline-level-dot.active { background: var(--gh-tag-active-bg); }
                 .outline-level-dot-tooltip {
                     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
                     background: var(--gh-text, #374151); color: var(--gh-bg, white); padding: 4px 8px; border-radius: 4px;
                     font-size: 11px; white-space: nowrap; opacity: 0; visibility: hidden;
                     transition: all 0.2s; pointer-events: none; margin-bottom: 4px;
                 }
+                /* 第一个 dot 的 tooltip 向右对齐，防止溢出 */
+                .outline-level-dot:first-child .outline-level-dot-tooltip { left: 0; transform: none; }
                 .outline-level-dot:hover .outline-level-dot-tooltip { opacity: 1; visibility: visible; }
                 .outline-level-line {
                     position: absolute; left: 10px; right: 10px; top: 50%; height: 4px;
                     background: var(--gh-border, #e5e7eb); transform: translateY(-50%); z-index: 1; border-radius: 2px;
                 }
                 .outline-level-progress {
-                    position: absolute; left: 0; top: 0; height: 100%; background: ${colors.primary};
+                    position: absolute; left: 0; top: 0; height: 100%; background: var(--gh-tag-active-bg);
                     border-radius: 2px; transition: width 0.2s;
                 }
                 /* 大纲列表区 */
@@ -9147,24 +9404,37 @@
                     display: flex; align-items: center; position: relative;
                 }
                 .outline-item:hover { background: var(--gh-hover, #f3f4f6); }
-                .outline-item.highlight { background: var(--gh-folder-bg-expanded); border-color: ${colors.primary}; }
+                .outline-item.highlight { background: var(--gh-folder-bg-expanded); border-color: var(--gh-border-active); }
 				.outline-item-toggle {
 					width: 24px; min-width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
 					color: #9ca3af; cursor: pointer; transition: all 0.2s ease;
 					font-size: 16px; flex-shrink: 0; margin-right: 2px; box-sizing: border-box; border-radius: 4px;
 				}
-				.outline-item-toggle:hover { color: ${colors.primary}; background-color: rgba(0,0,0,0.05); }
-				.outline-item-toggle.expanded { transform: rotate(90deg); color: ${colors.primary}; }
+				.outline-item-toggle:hover { color: var(--gh-border-active); background-color: rgba(0,0,0,0.05); }
+				.outline-item-toggle.expanded { transform: rotate(90deg); color: var(--gh-border-active); }
 				.outline-item-toggle.invisible { opacity: 0; cursor: default; pointer-events: none; visibility: visible !important; display: inline-flex !important; }
 				.outline-item-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 24px; }
                 .outline-item.collapsed-children { display: none; }
                 /* 大纲层级缩进 - 箭头跟随缩进，文字保持左对齐 */
+                .outline-level-0 { padding-left: 2px; font-weight: 500; } /* 用户提问节点向左突出 */
                 .outline-level-1 { padding-left: 10px; font-weight: 600; font-size: 14px; }
                 .outline-level-2 { padding-left: 28px; font-weight: 500; }
                 .outline-level-3 { padding-left: 46px; }
                 .outline-level-4 { padding-left: 64px; font-size: 12px; }
                 .outline-level-5 { padding-left: 82px; font-size: 12px; color: var(--gh-text-secondary, #6b7280); }
                 .outline-level-6 { padding-left: 100px; font-size: 12px; color: #9ca3af; }
+                /* 用户提问节点（Level 0） */
+                .outline-item.user-query-node {
+                    background: var(--user-query-bg, rgba(66, 133, 244, 0.08));
+                    border-left: 3px solid var(--gh-border-active);
+                    font-weight: 500;
+                    padding-left: 8px !important;
+                    margin-top: 8px;
+                    border-radius: 4px;
+                }
+                .outline-item.user-query-node:first-child { margin-top: 0; }
+                .outline-item.user-query-node .user-query-icon { margin-right: 6px; font-size: 12px; }
+                .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
                 /* 大纲高亮效果 */
                 .outline-highlight { animation: outlineHighlight 2s ease-out; }
@@ -9884,7 +10154,8 @@
         // 刷新大纲
         refreshOutline() {
             if (!this.settings.outline?.enabled) return;
-            const outline = this.siteAdapter.extractOutline(6);
+            const showUserQueries = this.settings.outline?.showUserQueries || false;
+            const outline = this.siteAdapter.extractOutline(6, showUserQueries);
             if (this.outlineManager) {
                 this.outlineManager.update(outline);
             }
