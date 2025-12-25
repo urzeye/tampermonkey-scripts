@@ -9945,6 +9945,10 @@
                 onJumpBefore: () => this.anchorManager.setAnchor(this.scrollManager.scrollTop),
                 i18n: (k) => this.t(k),
             });
+            // 如果大纲是当前激活的 tab，立即启用 Observer
+            if (this.currentTab === 'outline') {
+                this.outlineManager.setActive(true);
+            }
 
             // 3. 会话面板内容区
             const conversationsContent = createElement('div', {
@@ -9958,6 +9962,10 @@
                 siteAdapter: this.siteAdapter,
                 i18n: (k) => this.t(k),
             });
+            // 如果会话是当前激活的 tab，立即启用
+            if (this.currentTab === 'conversations') {
+                this.conversationManager.setActive(true);
+            }
 
             // 4. 设置面板内容区
             const settingsContent = createElement('div', {
