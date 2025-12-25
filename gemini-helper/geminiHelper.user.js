@@ -1864,9 +1864,6 @@
             // 使用 querySelectorAll 按 DOM 顺序获取所有匹配元素
             const allElements = container.querySelectorAll(combinedSelector);
 
-            let currentUserQuery = null; // 当前用户提问节点（用于跟踪是否有后续标题）
-            let currentUserQueryHasHeadings = false; // 当前用户提问是否有后续标题
-
             allElements.forEach((element) => {
                 const tagName = element.tagName.toLowerCase();
 
@@ -7238,7 +7235,7 @@
                 tree: null,
                 treeKey: '',
                 minLevel: 1,
-                expandLevel: this.settings.outline?.maxLevel || 6,
+                expandLevel: this.settings.outline?.maxLevel ?? 6,
                 levelCounts: {},
                 isAllExpanded: false,
                 rawOutline: [],
@@ -7558,14 +7555,14 @@
                 // 改进策略：
                 // 1. 先按默认规则初始化所有节点（基于 expandLevel）
                 const displayLevel = this.state.expandLevel ?? 6;
-                this.initializeCollapsedState(tree, displayLevel < minLevel ? minLevel : displayLevel);
+                this.initializeCollapsedState(tree, displayLevel > 0 && displayLevel < minLevel ? minLevel : displayLevel);
 
                 // 2. 再恢复用户之前的操作（覆盖默认）
                 this.restoreTreeState(tree, currentStateMap);
             } else if (isNewTree && !this.state.searchQuery) {
                 // 首次加载，无旧状态
                 const displayLevel = this.state.expandLevel ?? 6;
-                this.initializeCollapsedState(tree, displayLevel < minLevel ? minLevel : displayLevel);
+                this.initializeCollapsedState(tree, displayLevel > 0 && displayLevel < minLevel ? minLevel : displayLevel);
             }
 
             // 如果在搜索模式，需要重新应用搜索标记
