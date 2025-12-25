@@ -16,6 +16,7 @@
   - **解决方案**：
     1. 重写 `makeDraggable`：在 `mousedown` 时用 `getBoundingClientRect()` 读取实际位置，切换为 `left/top` 定位
     2. CSS 精细化过渡：将 `transition: all` 改为 `transition: box-shadow, border-color`，避免定位属性参与过渡动画导致抖动
+    3. 窗口边界检测：监听 `resize` 事件，确保拖拽过的面板始终在视口内可见（collapsed 状态跳过检测）
 
 ## 版本 1.9.8 (2025-12-24)
 

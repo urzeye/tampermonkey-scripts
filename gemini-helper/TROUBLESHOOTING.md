@@ -9,6 +9,7 @@
 1. [滚动容器错误匹配](#1-滚动容器错误匹配)
 2. [阅读历史会话切换后不更新](#2-阅读历史会话切换后不更新)
 3. [用户看完生成结果后切换页面仍收到通知](#3-用户看完生成结果后切换页面仍收到通知)
+4. [面板拖拽跳动问题](#4-面板拖拽跳动问题)
 
 ---
 
@@ -220,6 +221,139 @@ stop()
 | **状态快照 vs 实时检测**        | `onComplete` 时检测 `hidden` 只是快照，无法反映整个生成过程中用户的行为 |
 | **visibilitychange 可靠** | 标准 W3C API，覆盖标签页切换、最小化、锁屏等场景，性能开销几乎为零           |
 | **边界情况可接受**             | DOM 更新的几十毫秒窗口期可能导致极小概率误判，但实际影响可忽略               |
+
+---
+
+## 4. 面板拖拽跳动问题
+
+**日期**: 2025-12-25
+
+### 症状
+
+- 页面刷新后，首次长按面板顶部拖拽时，面板会猛的向下跳动约半屏
+- 拖拽完成后，缩小浏览器窗口，面板可能跑到屏幕外不可见
+
+### 背景
+
+面板使用 CSS 实现垂直居中和拖拽功能：
+
+CSS 初始定位：
+
+```css
+#gemini-helper-panel {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);  /* 关键：居中 */
+    transition: all 0.3s ease;
+}
+```
+
+拖拽逻辑（旧）：
+
+```javascript
+let xOffset = 0, yOffset = 0;
+
+// mousedown
+initialX = e.clientX - xOffset;  // = clientX - 0
+initialY = e.clientY - yOffset;  // = clientY - 0
+
+// mousemove
+panel.style.transform = `translate(${currentX}px, ${currentY}px)`;  // 覆盖了 translateY(-50%)
+```
+
+### 根因
+
+**问题 1：首次拖拽跳动半屏**
+
+| 阶段 | 状态 |
+|------|------|
+| 初始 | CSS `top: 50%` + `translateY(-50%)` = 真正的垂直居中 |
+| 拖拽开始 | `xOffset = 0, yOffset = 0`，oldTransform 被覆盖 |
+| 拖拽中 | `translate(0, 0)` 覆盖了 `translateY(-50%)` |
+| 结果 | 面板从「垂直居中」变成「顶部边缘在屏幕中间」= 向下跳半屏 |
+
+**问题 2：首次拖拽微小抖动**
+
+`transition: all 0.3s ease` 使得 `transform` 变化产生过渡动画，视觉上有短暂抖动。
+
+**问题 3：窗口缩小后面板消失**
+
+拖拽后使用绝对像素 `left/top` 定位，窗口变小时面板可能超出视口。
+
+### 修复方案
+
+**1. 重写 `makeDraggable`：读取实际位置 + 切换定位方式**
+
+```javascript
+header.addEventListener('mousedown', (e) => {
+    // 读取面板当前的实际位置
+    const rect = panel.getBoundingClientRect();
+    
+    // 计算鼠标相对于面板左上角的偏移
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    
+    // 切换为 left/top 定位
+    panel.style.left = rect.left + 'px';
+    panel.style.top = rect.top + 'px';
+    panel.style.right = 'auto';
+    panel.style.transform = 'none';
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        panel.style.left = (e.clientX - offsetX) + 'px';
+        panel.style.top = (e.clientY - offsetY) + 'px';
+    }
+});
+```
+
+**2. CSS 精细化过渡**
+
+```css
+/* 旧 */
+transition: all 0.3s ease;
+
+/* 新：只对需要动画的属性生效 */
+transition: box-shadow 0.3s ease, border-color 0.3s ease;
+```
+
+**3. 窗口边界检测**
+
+```javascript
+let hasDragged = false;
+
+const clampToViewport = () => {
+    // 跳过：未拖拽过 或 面板已收起
+    if (!hasDragged || panel.classList.contains('collapsed')) return;
+    
+    const rect = panel.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    
+    let newLeft = parseFloat(panel.style.left);
+    let newTop = parseFloat(panel.style.top);
+    
+    if (rect.right > vw) newLeft = vw - rect.width - 10;
+    if (rect.bottom > vh) newTop = vh - rect.height - 10;
+    if (rect.left < 0) newLeft = 10;
+    if (rect.top < 0) newTop = 10;
+    
+    panel.style.left = newLeft + 'px';
+    panel.style.top = newTop + 'px';
+};
+
+window.addEventListener('resize', clampToViewport);
+```
+
+### 经验总结
+
+| 教训 | 说明 |
+|------|------|
+| **CSS 定位方式切换** | 拖拽场景中，`transform` 和 `top/right` 混用容易产生冲突，应在拖拽开始时统一为一种方式 |
+| **transition: all 的副作用** | 会影响所有属性变化，包括定位属性，导致意外的过渡动画 |
+| **SPA 中的 resize 处理** | 用户可能在任意时刻调整窗口，需要考虑边界情况 |
+| **状态标记的价值** | `hasDragged` 可以区分「从未拖拽」和「已拖拽过」，避免不必要的边界检测 |
 
 ---
 

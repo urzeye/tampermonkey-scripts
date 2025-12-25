@@ -11892,6 +11892,7 @@
             let isDragging = false;
             let offsetX = 0; // 鼠标相对于面板左上角的偏移
             let offsetY = 0;
+            let hasDragged = false; // 标记是否曾经拖拽过（用于判断是否需要边界检测）
 
             header.addEventListener('mousedown', (e) => {
                 if (e.target.closest('.prompt-panel-controls')) return;
@@ -11912,6 +11913,7 @@
                 panel.style.transform = 'none'; // 清除 translateY(-50%)
 
                 isDragging = true;
+                hasDragged = true; // 标记已拖拽过
                 // 拖动时禁止全局文本选中
                 document.body.style.userSelect = 'none';
             });
@@ -11932,6 +11934,34 @@
                     document.body.style.userSelect = '';
                 }
             });
+
+            // 边界检测：确保面板在视口内可见
+            const clampToViewport = () => {
+                // 跳过条件：未拖拽过 或 面板已收起
+                if (!hasDragged || panel.classList.contains('collapsed')) return;
+
+                const rect = panel.getBoundingClientRect();
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                const margin = 10; // 边距
+
+                let newLeft = parseFloat(panel.style.left);
+                let newTop = parseFloat(panel.style.top);
+
+                // 超出右边界
+                if (rect.right > vw) newLeft = vw - rect.width - margin;
+                // 超出下边界
+                if (rect.bottom > vh) newTop = vh - rect.height - margin;
+                // 超出左边界
+                if (rect.left < 0) newLeft = margin;
+                // 超出上边界
+                if (rect.top < 0) newTop = margin;
+
+                panel.style.left = newLeft + 'px';
+                panel.style.top = newTop + 'px';
+            };
+
+            window.addEventListener('resize', clampToViewport);
         }
     }
 
