@@ -9,6 +9,14 @@
 - **前台时也通知**：新增开关，控制当页面在前台可见时是否也发送通知。
   - 默认关闭，开启后即使用户在当前页面也会收到通知
 
+### 🐛 Bug 修复
+
+- **修复面板拖拽跳动问题**：页面刷新后首次拖拽面板时，不再出现向下跳动半屏的现象。
+  - **根因分析**：CSS 使用 `top: 50%` + `translateY(-50%)` 实现垂直居中，但拖拽时用 `translate(x, y)` 覆盖了原有的 `-50%` 偏移
+  - **解决方案**：
+    1. 重写 `makeDraggable`：在 `mousedown` 时用 `getBoundingClientRect()` 读取实际位置，切换为 `left/top` 定位
+    2. CSS 精细化过渡：将 `transition: all` 改为 `transition: box-shadow, border-color`，避免定位属性参与过渡动画导致抖动
+
 ## 版本 1.9.8 (2025-12-24)
 
 ### 🐛 Bug 修复

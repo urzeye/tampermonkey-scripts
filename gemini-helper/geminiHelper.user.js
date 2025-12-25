@@ -8260,7 +8260,7 @@
                     display: flex;
                     flex-direction: column;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                    transition: all 0.3s ease;
+                    transition: box-shadow 0.3s ease, border-color 0.3s ease;
                     border: 1px solid var(--gh-border, #e0e0e0);
                 }
                 #gemini-helper-panel.collapsed { display: none; }
@@ -11889,19 +11889,28 @@
             const header = panel?.querySelector('.prompt-panel-header');
             if (!panel || !header) return;
 
-            let isDragging = false,
-                currentX,
-                currentY,
-                initialX,
-                initialY,
-                xOffset = 0,
-                yOffset = 0;
+            let isDragging = false;
+            let offsetX = 0; // 鼠标相对于面板左上角的偏移
+            let offsetY = 0;
 
             header.addEventListener('mousedown', (e) => {
                 if (e.target.closest('.prompt-panel-controls')) return;
                 e.preventDefault(); // 阻止文本选中
-                initialX = e.clientX - xOffset;
-                initialY = e.clientY - yOffset;
+
+                // 读取面板当前的实际位置
+                const rect = panel.getBoundingClientRect();
+
+                // 计算鼠标相对于面板左上角的偏移（在整个拖拽过程中保持不变）
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+
+                // 首次拖拽时，将 CSS 定位从 right+transform 切换为 left+top
+                // 这样后续拖拽就不会有跳动问题
+                panel.style.left = rect.left + 'px';
+                panel.style.top = rect.top + 'px';
+                panel.style.right = 'auto'; // 清除 right 定位
+                panel.style.transform = 'none'; // 清除 translateY(-50%)
+
                 isDragging = true;
                 // 拖动时禁止全局文本选中
                 document.body.style.userSelect = 'none';
@@ -11910,11 +11919,9 @@
             document.addEventListener('mousemove', (e) => {
                 if (isDragging) {
                     e.preventDefault();
-                    currentX = e.clientX - initialX;
-                    currentY = e.clientY - initialY;
-                    xOffset = currentX;
-                    yOffset = currentY;
-                    panel.style.transform = `translate(${currentX}px, ${currentY}px)`;
+                    // 直接计算面板左上角位置 = 鼠标位置 - 初始偏移
+                    panel.style.left = e.clientX - offsetX + 'px';
+                    panel.style.top = e.clientY - offsetY + 'px';
                 }
             });
 
