@@ -2539,14 +2539,9 @@
                 return element.textContent?.trim() || '';
             }
 
-            // 在 Shadow DOM 中查找文本
-            // 结构: <div><div class="markdown-document"><p><span>文本</span></p></div></div>
-            const textSpan = markdown.shadowRoot.querySelector('span[data-markdown-start-index]');
-            if (textSpan) {
-                return textSpan.textContent?.trim() || '';
-            }
-
-            // 回退：获取 Shadow DOM 中的所有文本
+            // 在 Shadow DOM 中查找完整文本
+            // 结构: <div><div class="markdown-document"><p><span>文本</span></p>...</div></div>
+            // 注意：用户问题可能包含多个 <p> 段落，需要获取所有文本
             const markdownDoc = markdown.shadowRoot.querySelector('.markdown-document');
             if (markdownDoc) {
                 return markdownDoc.textContent?.trim() || '';
