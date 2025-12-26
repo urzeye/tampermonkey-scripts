@@ -10,6 +10,7 @@
 2. [阅读历史会话切换后不更新](#2-阅读历史会话切换后不更新)
 3. [用户看完生成结果后切换页面仍收到通知](#3-用户看完生成结果后切换页面仍收到通知)
 4. [面板拖拽跳动问题](#4-面板拖拽跳动问题)
+5. [同步滚动初始化失败](#5-同步滚动初始化失败)
 
 ---
 
@@ -354,6 +355,170 @@ window.addEventListener('resize', clampToViewport);
 | **transition: all 的副作用** | 会影响所有属性变化，包括定位属性，导致意外的过渡动画 |
 | **SPA 中的 resize 处理** | 用户可能在任意时刻调整窗口，需要考虑边界情况 |
 | **状态标记的价值** | `hasDragged` 可以区分「从未拖拽」和「已拖拽过」，避免不必要的边界检测 |
+
+---
+
+## 5. 同步滚动初始化失败
+
+**日期**: 2025-12-26
+
+### 症状
+
+- 大纲 Tab 位于第一个位置时，页面刷新后同步滚动功能不生效（滚动页面时大纲项不高亮）
+- 手动切换到其他 Tab 再切回大纲后，同步滚动正常工作
+- 如果大纲 Tab 不是第一个位置（如第二个），刷新后也正常
+
+### 背景
+
+大纲功能提供「同步滚动」选项：当用户滚动页面内容时，自动高亮对应的大纲项。
+
+关键代码路径：
+
+1. `UIManager.init()` → `createUI()` → `setActive(true)` → `startSyncScroll()`
+2. `startSyncScroll()` 调用 `siteAdapter.getScrollContainer()` 获取滚动容器
+3. 将 scroll 事件监听器绑定到该容器
+
+### 排查过程
+
+#### 第一轮：检查 isActive 状态
+
+**假设**：初始化时 `OutlineManager.isActive` 状态不正确。
+
+**验证**：检查 `createUI` 中的逻辑，发现确实调用了 `setActive(true)`，状态正确。
+
+**结论**：❌ 不是根因
+
+#### 第二轮：检查 refreshOutline 调用
+
+**假设**：初始化时调用了 `setActive(true)` 但没有调用 `refreshOutline()`，导致 `handleSyncScroll` 因 `this.state.tree` 为空而直接返回。
+
+**修复尝试**：在 `init()` 中添加 `setTimeout(() => this.refreshOutline(), 500)`。
+
+**结果**：❌ 问题依旧
+
+#### 第三轮：检查 startSyncScroll 的短路逻辑
+
+**假设**：`startSyncScroll` 第一行有 `if (this.syncScrollHandler) return;`，可能初始化时绑定了 handler，延迟调用时因 handler 已存在而跳过。
+
+**修复尝试**：在延迟调用 `switchTab` 之前先调用 `stopSyncScroll()` 清除旧 handler：
+
+```javascript
+setTimeout(() => {
+    if (this.currentTab === 'outline' && this.outlineManager) {
+        this.outlineManager.stopSyncScroll();
+    }
+    this.switchTab(this.currentTab);
+}, 1500);
+```
+
+**结果**：❌ 问题依旧
+
+#### 第四轮：添加调试日志
+
+既然前面的假设都不对，决定添加 `console.log` 追踪实际执行情况：
+
+```javascript
+startSyncScroll(retryCount = 0) {
+    console.log('[SyncScroll] startSyncScroll called, retryCount:', retryCount, 'handler exists:', !!this.syncScrollHandler);
+    // ...
+    const scrollContainer = this.siteAdapter.getScrollContainer();
+    console.log('[SyncScroll] scrollContainer:', scrollContainer);
+    // ...
+    console.log('[SyncScroll] Event listener added to:', scrollContainer.tagName, scrollContainer.className);
+}
+
+handleSyncScroll() {
+    console.log('[SyncScroll] handleSyncScroll called, tree:', !!this.state.tree, 'length:', this.state.tree?.length);
+    // ...
+}
+```
+
+**日志输出**：
+
+```
+[SyncScroll] startSyncScroll called, retryCount: 0 handler exists: false
+[SyncScroll] scrollContainer: <body class="theme-host light-theme google-sans-context" ...>
+[SyncScroll] Event listener added to: BODY theme-host light-theme google-sans-context
+```
+
+**关键发现**：`scrollContainer` 返回的是 `<body>` 而非 `infinite-scroller.chat-history`！
+
+#### 第五轮：分析 getScrollContainer
+
+**重新分析**：Gemini 是 SPA，页面刷新后 `infinite-scroller.chat-history` 可能还未被创建。原来的 `getScrollContainer()` 使用 `DOMToolkit.findScrollContainer()`，当选择器匹配不到时会 fallback 到 `body`。
+
+#### 第六轮：验证修改方案的安全性
+
+**检查所有调用点**：
+
+| 调用点 | 位置 | 是否处理 null |
+|--------|------|---------------|
+| `startSyncScroll` | OutlineManager | ✅ 重试机制 |
+| `stopSyncScroll` | OutlineManager | ✅ `if (scrollContainer)` |
+| `handleSyncScroll` | OutlineManager | ✅ `if (!scrollContainer) return` |
+| `getVisibleAnchorElement` | SiteAdapter | ✅ `if (!container) return null` |
+| `ScrollManager.container` getter | ScrollManager | ✅ 所有使用点都有 `if (this.container)` |
+
+**结论**：所有调用点都已正确处理 `null`，修改安全。
+
+**最终方案**：恢复所有选择器，但不使用 `findScrollContainer`，改为手动遍历并添加滚动条件检查。
+
+### 根因
+
+Gemini 是 SPA 动态渲染，初始化时 `infinite-scroller.chat-history` 可能还未创建。原来的 `getScrollContainer()` 使用 `DOMToolkit.findScrollContainer()`，当选择器匹配不到时会 fallback 到 `body`，导致滚动监听器绑定到错误的元素。
+
+```
+时序问题：
+T+0s: 脚本初始化，调用 getScrollContainer()
+      → infinite-scroller.chat-history 尚未创建
+      → fallback 到 body
+T+0s: startSyncScroll() 将滚动监听器绑定到 body
+T+1s: Gemini 完成渲染，infinite-scroller.chat-history 出现
+T+?s: 用户滚动 infinite-scroller（实际滚动容器）
+      → body 的 scroll 事件不会触发
+      → 同步滚动不工作
+```
+
+### 修复方案
+
+1. **修改 `getScrollContainer()`**：不使用 `findScrollContainer`，改为手动遍历选择器，并添加滚动条件检查，找不到则返回 `null`：
+
+```javascript
+getScrollContainer() {
+    const selectors = [
+        'infinite-scroller.chat-history',
+        '.chat-mode-scroller',
+        'main',
+        '[role="main"]',
+        '.conversation-container',
+        '.chat-container',
+    ];
+    for (const selector of selectors) {
+        const container = document.querySelector(selector);
+        // 确保是可滚动的容器
+        if (container && container.scrollHeight > container.clientHeight) {
+            return container;
+        }
+    }
+    // 不 fallback 到 body，让调用者决定如何处理
+    return null;
+}
+```
+
+1. **`startSyncScroll()` 已有重试机制**：当 `getScrollContainer()` 返回 `null` 时，会在 300ms 后重试（最多 10 次，共 3 秒）。
+
+2. **init 中增加延迟重新绑定**：确保页面稳定后重新调用 `switchTab`，并先清除旧 handler。
+
+### 经验总结
+
+| 教训 | 说明 |
+|------|------|
+| **日志是最可靠的调试手段** | 前 3 轮假设都是错的，添加日志后立即发现真正问题 |
+| **SPA 动态渲染注意时序** | 初始化时 DOM 可能不完整，需要考虑元素尚未创建的情况 |
+| **Fallback 要谨慎** | `findScrollContainer` 的 body fallback 在这个场景下是有害的 |
+| **返回 null 比返回错误值更安全** | 让调用者决定如何处理「未找到」的情况 |
+| **修改公共方法前检查所有调用点** | `getScrollContainer` 被多处使用，需确保所有调用点都正确处理 null |
+| **保留 fallback 选择器** | 不要因为修复一个问题而删除可能在其他场景需要的代码 |
 
 ---
 

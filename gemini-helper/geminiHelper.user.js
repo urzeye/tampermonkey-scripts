@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.10.0
+// @version      1.10.1
 // @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
 // @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, Markdown bold fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
 // @author       urzeye
@@ -16,6 +16,7 @@
 // @grant        GM_notification
 // @grant        GM_xmlhttpRequest
 // @grant        window.focus
+// @grant        window.onurlchange
 // @connect      v0.app
 // @run-at       document-idle
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
@@ -281,6 +282,7 @@
             outlineScrollTop: '滚动到顶部',
             outlineExpandAll: '展开全部',
             outlineCollapseAll: '折叠全部',
+            outlineLocateCurrent: '定位到当前位置',
             outlineSearch: '搜索大纲...',
             outlineSearchResult: '个结果',
             outlineLevelHint: '级标题',
@@ -310,6 +312,8 @@
             outlineShowUserQueriesTooltip: '展示用户提问',
             outlineOnlyUserQueries: '提问',
             outlineIntervalUpdated: '间隔已设为 {val} 秒',
+            outlineSyncScrollLabel: '同步滚动',
+            outlineSyncScrollDesc: '页面滚动时自动高亮对应的大纲项',
             // 页面显示设置
             pageDisplaySettings: '页面显示',
             // 其他设置
@@ -534,6 +538,7 @@
             outlineScrollTop: '滾動到頂部',
             outlineExpandAll: '展開全部',
             outlineCollapseAll: '折疊全部',
+            outlineLocateCurrent: '定位到當前位置',
             outlineSearch: '搜尋大綱...',
             outlineSearchResult: '個結果',
             outlineLevelHint: '級標題',
@@ -563,6 +568,8 @@
             outlineShowUserQueriesTooltip: '展示用戶提問',
             outlineOnlyUserQueries: '提問',
             outlineIntervalUpdated: '間隔已設為 {val} 秒',
+            outlineSyncScrollLabel: '同步滾動',
+            outlineSyncScrollDesc: '頁面滾動時自動高亮對應的大綱項',
             // 頁面顯示設置
             pageDisplaySettings: '頁面顯示',
             // 其他設置
@@ -785,6 +792,7 @@
             outlineScrollTop: 'Scroll to top',
             outlineExpandAll: 'Expand all',
             outlineCollapseAll: 'Collapse all',
+            outlineLocateCurrent: 'Locate current position',
             outlineSearch: 'Search outline...',
             outlineSearchResult: 'result(s)',
             outlineLevelHint: 'headings',
@@ -814,6 +822,8 @@
             outlineShowUserQueriesTooltip: 'Show user queries',
             outlineOnlyUserQueries: 'Queries',
             outlineIntervalUpdated: 'Interval set to {val} seconds',
+            outlineSyncScrollLabel: 'Sync scroll',
+            outlineSyncScrollDesc: 'Auto-highlight outline item when page scrolls',
             // Page Display Settings
             pageDisplaySettings: 'Page Display',
             // Other Settings
@@ -942,6 +952,7 @@
         autoUpdate: true,
         updateInterval: 3,
         showUserQueries: false, // 展示用户提问，按对话轮次分组
+        syncScroll: true, // 页面滚动时自动高亮大纲项
     };
 
     // 语言检测函数（支持手动设置）
@@ -1234,17 +1245,24 @@
          * @returns {HTMLElement}
          */
         getScrollContainer() {
-            // 使用 DOMToolkit 查找滚动容器，传入站点特定选择器
-            return DOMToolkit.findScrollContainer({
-                selectors: [
-                    'infinite-scroller.chat-history', // Gemini 主对话滚动容器（精确匹配，避免与侧边栏混淆）
-                    '.chat-mode-scroller',
-                    'main',
-                    '[role="main"]',
-                    '.conversation-container',
-                    '.chat-container',
-                ],
-            });
+            // 精确匹配滚动容器，找不到就返回 null（不 fallback 到 body）
+            // 这对于同步滚动很重要：必须绑定到正确的容器
+            const selectors = [
+                'infinite-scroller.chat-history', // Gemini 主对话滚动容器
+                '.chat-mode-scroller',
+                'main',
+                '[role="main"]',
+                '.conversation-container',
+                '.chat-container',
+            ];
+            for (const selector of selectors) {
+                const container = document.querySelector(selector);
+                if (container && container.scrollHeight > container.clientHeight) {
+                    return container;
+                }
+            }
+            // 容器可能还未加载（SPA 动态渲染），返回 null 让调用者决定重试
+            return null;
         }
 
         /**
@@ -7227,6 +7245,7 @@
         constructor(config) {
             this.container = config.container;
             this.settings = config.settings;
+            this.siteAdapter = config.siteAdapter; // 用于获取滚动容器等
             this.onSettingsChange = config.onSettingsChange;
             this.onJumpBefore = config.onJumpBefore; // 跳转前回调，用于保存锚点
             this.t = config.i18n || ((k) => k);
@@ -7236,6 +7255,7 @@
                 treeKey: '',
                 minLevel: 1,
                 expandLevel: this.settings.outline?.maxLevel ?? 6,
+                includeUserQueries: this.settings.outline?.showUserQueries ?? false, // 是否展示用户提问
                 levelCounts: {},
                 isAllExpanded: false,
                 rawOutline: [],
@@ -7251,6 +7271,11 @@
             this.updateDebounceTimer = null;
             this.isActive = false; // 标记 Tab 是否激活
 
+            // 同步滚动相关
+            this.syncScrollHandler = null;
+            this.syncScrollThrottleTimer = null;
+            this.currentHighlightedItem = null;
+
             this.init();
         }
 
@@ -7262,6 +7287,7 @@
         setActive(active) {
             this.isActive = active;
             this.updateAutoUpdateState();
+            this.updateSyncScrollState();
         }
 
         updateAutoUpdateState() {
@@ -7272,6 +7298,160 @@
                 this.startObserver();
             } else {
                 this.stopObserver();
+            }
+        }
+
+        // ========== 同步滚动功能 ==========
+        updateSyncScrollState() {
+            const shouldEnable = this.settings.outline?.enabled && this.settings.outline?.syncScroll && this.isActive;
+            if (shouldEnable) {
+                this.startSyncScroll();
+            } else {
+                this.stopSyncScroll();
+            }
+        }
+
+        startSyncScroll(retryCount = 0) {
+            if (this.syncScrollHandler) return;
+            if (!this.siteAdapter) return;
+
+            const scrollContainer = this.siteAdapter.getScrollContainer();
+            if (!scrollContainer) {
+                // 滚动容器可能还没准备好，最多重试 10 次，每次间隔 300ms（共 3 秒）
+                if (retryCount < 10) {
+                    setTimeout(() => {
+                        if (this.settings.outline?.syncScroll && this.isActive && !this.syncScrollHandler) {
+                            this.startSyncScroll(retryCount + 1);
+                        }
+                    }, 300);
+                }
+                return;
+            }
+
+            this.syncScrollHandler = () => {
+                // 搜索模式下暂停同步
+                if (this.state.searchQuery) return;
+
+                // 节流：200ms
+                if (this.syncScrollThrottleTimer) return;
+                this.syncScrollThrottleTimer = setTimeout(() => {
+                    this.syncScrollThrottleTimer = null;
+                    this.handleSyncScroll();
+                }, 200);
+            };
+
+            scrollContainer.addEventListener('scroll', this.syncScrollHandler, { passive: true });
+        }
+
+        stopSyncScroll() {
+            if (!this.syncScrollHandler) return;
+            if (!this.siteAdapter) return;
+
+            const scrollContainer = this.siteAdapter.getScrollContainer();
+            if (scrollContainer) {
+                scrollContainer.removeEventListener('scroll', this.syncScrollHandler);
+            }
+            this.syncScrollHandler = null;
+
+            // 清除节流计时器
+            if (this.syncScrollThrottleTimer) {
+                clearTimeout(this.syncScrollThrottleTimer);
+                this.syncScrollThrottleTimer = null;
+            }
+
+            // 移除当前高亮
+            if (this.currentHighlightedItem) {
+                this.currentHighlightedItem.classList.remove('sync-highlight');
+                this.currentHighlightedItem = null;
+            }
+        }
+
+        handleSyncScroll() {
+            if (!this.state.tree || this.state.tree.length === 0) return;
+            if (!this.siteAdapter) return;
+
+            const scrollContainer = this.siteAdapter.getScrollContainer();
+            if (!scrollContainer) return;
+
+            // 展平树结构
+            const flattenTree = (items) => {
+                const result = [];
+                items.forEach((item) => {
+                    result.push(item);
+                    if (item.children && item.children.length > 0) {
+                        result.push(...flattenTree(item.children));
+                    }
+                });
+                return result;
+            };
+            const allItems = flattenTree(this.state.tree);
+
+            // 找到当前可视区域的第一个大纲元素
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const viewportTop = containerRect.top;
+            const viewportBottom = containerRect.bottom;
+
+            let currentItem = null;
+            for (const item of allItems) {
+                if (!item.element || !item.element.isConnected) continue;
+                const rect = item.element.getBoundingClientRect();
+                if (rect.top >= viewportTop && rect.top < viewportBottom) {
+                    currentItem = item;
+                    break;
+                }
+                if (rect.top < viewportTop && rect.bottom > viewportTop) {
+                    currentItem = item;
+                    break;
+                }
+            }
+
+            if (!currentItem) return;
+
+            // 移除旧高亮
+            if (this.currentHighlightedItem) {
+                this.currentHighlightedItem.classList.remove('sync-highlight');
+            }
+
+            // 找到大纲面板中对应的 DOM 元素
+            const outlineList = document.getElementById('outline-list');
+            if (!outlineList) return;
+
+            let outlineItem = outlineList.querySelector(`.outline-item[data-index="${currentItem.index}"]`);
+            if (!outlineItem) return;
+
+            // 如果目标项被隐藏（折叠），向上找可见的父级
+            if (outlineItem.classList.contains('outline-hidden')) {
+                let parent = outlineItem.previousElementSibling;
+                while (parent) {
+                    if (parent.classList.contains('outline-item') && !parent.classList.contains('outline-hidden')) {
+                        // 找到可见的父级，检查它的 data-level 是否比当前项小（确保是父级而非同级）
+                        const parentLevel = parseInt(parent.dataset.level, 10);
+                        const currentLevel = parseInt(outlineItem.dataset.level, 10);
+                        if (parentLevel < currentLevel) {
+                            outlineItem = parent;
+                            break;
+                        }
+                    }
+                    parent = parent.previousElementSibling;
+                }
+                // 如果还是隐藏的，放弃高亮
+                if (outlineItem.classList.contains('outline-hidden')) return;
+            }
+
+            // 添加高亮
+            outlineItem.classList.add('sync-highlight');
+            this.currentHighlightedItem = outlineItem;
+
+            // 轻微滚动大纲面板使高亮项可见（如果超出视口）
+            const wrapper = document.getElementById('outline-list-wrapper');
+            if (wrapper) {
+                const wrapperRect = wrapper.getBoundingClientRect();
+                const itemRect = outlineItem.getBoundingClientRect();
+                // 如果高亮项在可视区域外，滚动使其可见
+                if (itemRect.top < wrapperRect.top || itemRect.bottom > wrapperRect.bottom) {
+                    const scrollOffset = itemRect.top - wrapperRect.top - wrapperRect.height / 2 + itemRect.height / 2;
+                    wrapper.scrollBy({ top: scrollOffset, behavior: 'smooth' });
+                }
             }
         }
 
@@ -7359,7 +7539,7 @@
                     id: 'outline-group-btn',
                     title: this.t('outlineShowUserQueriesTooltip'),
                 },
-                '🗨️',
+                '🙋',
             );
             groupBtn.addEventListener('click', () => this.toggleGroupMode());
             row1.appendChild(groupBtn);
@@ -7376,6 +7556,19 @@
             );
             expandBtn.addEventListener('click', () => this.toggleExpandAll());
             row1.appendChild(expandBtn);
+
+            // 定位当前位置按钮
+            const locateBtn = createElement(
+                'button',
+                {
+                    className: 'outline-toolbar-btn',
+                    id: 'outline-locate-btn',
+                    title: this.t('outlineLocateCurrent'),
+                },
+                '◎',
+            );
+            locateBtn.addEventListener('click', () => this.locateCurrentPosition());
+            row1.appendChild(locateBtn);
 
             // 滚动按钮
             const scrollBtn = createElement(
@@ -7542,15 +7735,16 @@
             // 恢复折叠状态
             // 策略：先根据 displayLevel 初始化所有节点的折叠状态，再恢复用户手动操作的状态
             const displayLevel = this.state.expandLevel ?? 6;
-            const effectiveDisplayLevel = displayLevel > 0 && displayLevel < minLevel ? minLevel : displayLevel;
+            // 根据是否开启用户提问动态调整最小有效层级
+            const minDisplayLevel = this.state.includeUserQueries ? 0 : 1;
+            const effectiveDisplayLevel = displayLevel < minDisplayLevel ? minDisplayLevel : displayLevel;
 
             // 1. 先按默认规则初始化所有节点（包括新节点）
             this.initializeCollapsedState(tree, effectiveDisplayLevel);
 
             // 2. 再恢复用户之前的手动操作（只影响旧节点，新节点保持初始化状态）
-            // 注意：当 displayLevel=0 时，用户问题节点强制折叠，不恢复旧状态
             if (Object.keys(currentStateMap).length > 0) {
-                this.restoreTreeState(tree, currentStateMap, effectiveDisplayLevel);
+                this.restoreTreeState(tree, currentStateMap);
             }
 
             // 如果在搜索模式，需要重新应用搜索标记
@@ -7676,8 +7870,12 @@
                     displayLevel = this.state.expandLevel ?? 6;
                 }
 
-                if (displayLevel > 0 && displayLevel < this.state.minLevel) {
-                    displayLevel = this.state.minLevel;
+                // 根据是否开启用户提问动态调整最小有效层级
+                // - 开启用户提问时：displayLevel = 0 有意义（只显示用户提问）
+                // - 未开启用户提问时：displayLevel 最小为 1（因为 AI 标题最低为 H1）
+                const minDisplayLevel = this.state.includeUserQueries ? 0 : 1;
+                if (displayLevel < minDisplayLevel) {
+                    displayLevel = minDisplayLevel;
                 }
 
                 this.renderItems(listContainer, this.state.tree, this.state.minLevel, displayLevel);
@@ -7719,17 +7917,26 @@
         }
 
         // 渲染大纲项
+        // 注意：使用 relativeLevel 判断层级，与视觉层级保持一致
+        // - 用户提问节点 relativeLevel = 0
+        // - AI 标题节点 relativeLevel = 1, 2, 3...（已经过智能提升）
         renderItems(container, items, minLevel, displayLevel, parentCollapsed = false, parentForceExpanded = false) {
+            // 根据是否开启用户提问，确定根节点的 relativeLevel
+            // - 开启用户提问：根节点是用户提问节点，relativeLevel = 0
+            // - 不开启用户提问：根节点是最高级 AI 标题，relativeLevel = 1
+            const minRelativeLevel = this.state.includeUserQueries ? 0 : 1;
+
             items.forEach((item) => {
                 const hasChildren = item.children && item.children.length > 0;
-                const isTopLevel = item.level === minLevel;
+                // 使用 relativeLevel 判断是否为根节点（用户提问或顶层标题）
+                const isRootNode = item.relativeLevel === minRelativeLevel;
 
                 let shouldShow;
 
-                // 计算可见性
-                const isLevelAllowed = item.level <= displayLevel || parentForceExpanded;
+                // 计算可见性：使用 relativeLevel 与 displayLevel 比较
+                const isLevelAllowed = item.relativeLevel <= displayLevel || parentForceExpanded;
 
-                if (isTopLevel) {
+                if (isRootNode) {
                     // 顶层节点逻辑
                     if (this.state.searchQuery) {
                         // Fix: 搜索模式下严控顶层显示，无论是否有手动层级操作
@@ -7862,7 +8069,7 @@
                         }
                         // 传入 __bypassLock: true 以绕过 ScrollLockManager 的拦截
                         // 恢复 behavior: 'smooth'，因为我们已经处理了元素重新查找，应该可以兼容
-                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', __bypassLock: true });
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start', __bypassLock: true });
                         targetElement.classList.add('outline-highlight');
                         setTimeout(() => targetElement.classList.remove('outline-highlight'), 2000);
                     } else {
@@ -7884,10 +8091,12 @@
         }
 
         // 初始化树的折叠状态
+        // 使用 relativeLevel 判断，与视觉层级保持一致
         initializeCollapsedState(items, displayLevel) {
             items.forEach((item) => {
                 if (item.children && item.children.length > 0) {
-                    const allChildrenHidden = item.children.every((child) => child.level > displayLevel);
+                    // 使用 relativeLevel 判断所有子节点是否都超过显示层级
+                    const allChildrenHidden = item.children.every((child) => child.relativeLevel > displayLevel);
                     item.collapsed = allChildrenHidden;
                     this.initializeCollapsedState(item.children, displayLevel);
                 } else {
@@ -7914,6 +8123,126 @@
             }
         }
 
+        // 定位到当前页面位置对应的大纲项
+        locateCurrentPosition() {
+            if (!this.state.tree || this.state.tree.length === 0) return;
+            if (!this.siteAdapter) return;
+
+            // 0. 如果在搜索模式，先清除搜索（确保目标项能显示）
+            if (this.state.searchQuery) {
+                this.handleSearch('');
+                // 清除搜索框内容
+                const searchInput = document.querySelector('.outline-search-input');
+                const clearBtn = document.querySelector('.outline-search-clear');
+                if (searchInput) searchInput.value = '';
+                if (clearBtn) clearBtn.classList.add('hidden');
+            }
+
+            // 1. 获取页面滚动容器
+            const scrollContainer = this.siteAdapter.getScrollContainer();
+            if (!scrollContainer) return;
+
+            // 2. 收集所有大纲项的 element（展平树结构）
+            const flattenTree = (items) => {
+                const result = [];
+                items.forEach((item) => {
+                    result.push(item);
+                    if (item.children && item.children.length > 0) {
+                        result.push(...flattenTree(item.children));
+                    }
+                });
+                return result;
+            };
+            const allItems = flattenTree(this.state.tree);
+
+            // 3. 找到当前可视区域中的第一个大纲元素
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const viewportTop = containerRect.top;
+            const viewportBottom = containerRect.bottom;
+
+            let currentItem = null;
+            for (const item of allItems) {
+                if (!item.element || !item.element.isConnected) continue;
+
+                const rect = item.element.getBoundingClientRect();
+                // 判断元素是否在可视区域内（上边缘在视口内或元素跨越视口顶部）
+                if (rect.top >= viewportTop && rect.top < viewportBottom) {
+                    currentItem = item;
+                    break;
+                }
+                // 如果元素跨越视口顶部（元素底部在视口内，顶部在视口上方）
+                if (rect.top < viewportTop && rect.bottom > viewportTop) {
+                    currentItem = item;
+                    break;
+                }
+            }
+
+            if (!currentItem) {
+                // 如果没找到，尝试找最接近视口顶部的元素
+                let minDistance = Infinity;
+                for (const item of allItems) {
+                    if (!item.element || !item.element.isConnected) continue;
+                    const rect = item.element.getBoundingClientRect();
+                    const distance = Math.abs(rect.top - viewportTop);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        currentItem = item;
+                    }
+                }
+            }
+
+            if (!currentItem) return;
+
+            // 4. 展开目标项的所有父级节点（确保目标可见）
+            const expandParents = (items, targetIndex, parents = []) => {
+                for (const item of items) {
+                    if (item.index === targetIndex) {
+                        // 找到目标，展开所有父级
+                        parents.forEach((p) => {
+                            p.collapsed = false;
+                            p.forceExpanded = true;
+                        });
+                        return true;
+                    }
+                    if (item.children && item.children.length > 0) {
+                        if (expandParents(item.children, targetIndex, [...parents, item])) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+            expandParents(this.state.tree, currentItem.index);
+
+            // 5. 刷新显示（展开父级后需要重新渲染）
+            this.refreshCurrent();
+
+            // 6. 延迟执行滚动和高亮（等待 DOM 更新）
+            setTimeout(() => {
+                const outlineList = document.getElementById('outline-list');
+                if (!outlineList) return;
+
+                // 通过 data-index 找到对应的大纲项
+                const outlineItem = outlineList.querySelector(`.outline-item[data-index="${currentItem.index}"]`);
+                if (!outlineItem) return;
+
+                // 滚动大纲面板到该项
+                const wrapper = document.getElementById('outline-list-wrapper');
+                if (wrapper) {
+                    const wrapperRect = wrapper.getBoundingClientRect();
+                    const itemRect = outlineItem.getBoundingClientRect();
+
+                    // 计算需要滚动的距离，使目标元素居中
+                    const scrollOffset = itemRect.top - wrapperRect.top - wrapperRect.height / 2 + itemRect.height / 2;
+                    wrapper.scrollBy({ top: scrollOffset, behavior: 'smooth' });
+                }
+
+                // 高亮该大纲项
+                outlineItem.classList.add('highlight');
+                setTimeout(() => outlineItem.classList.remove('highlight'), 2000);
+            }, 50);
+        }
+
         // 展开/折叠全部
         toggleExpandAll() {
             const btn = document.getElementById('outline-expand-btn');
@@ -7937,6 +8266,8 @@
 
             // 切换设置
             this.settings.outline.showUserQueries = !this.settings.outline.showUserQueries;
+            // 同步到 state（用于 minDisplayLevel 计算）
+            this.state.includeUserQueries = this.settings.outline.showUserQueries;
 
             // 更新按钮状态
             if (btn) {
@@ -8044,25 +8375,38 @@
                 // 使用 level + text 作为 key
                 // 注意：如果有完全相同的标题在同一级，可能会冲突，但在当前场景下可以接受
                 const key = `${node.level}_${node.text}`;
+                const hasChildren = node.children && node.children.length > 0;
                 stateMap[key] = {
                     collapsed: node.collapsed,
                     forceExpanded: node.forceExpanded,
+                    hadChildren: hasChildren, // 记录当时是否有子节点，用于判断结构变化
                 };
 
-                if (node.children && node.children.length > 0) {
+                if (hasChildren) {
                     this.captureTreeState(node.children, stateMap);
                 }
             });
         }
 
         // 恢复树的状态
+        // 策略：只有当节点结构未发生「无子节点→有子节点」变化时才恢复折叠状态
+        // 这是为了避免：用户提问刚发出时无子节点(collapsed=false)，AI回复后有子节点
+        // 此时应该尊重 initializeCollapsedState 基于 displayLevel 计算的新值
         restoreTreeState(nodes, stateMap) {
             nodes.forEach((node) => {
                 const key = `${node.level}_${node.text}`;
                 const state = stateMap[key];
                 if (state) {
-                    node.collapsed = state.collapsed;
-                    // 只有当明确标记为 forceExpanded 时才恢复它
+                    const hasChildrenNow = node.children && node.children.length > 0;
+                    const hadChildrenBefore = state.hadChildren;
+
+                    // 只有当「之前有子节点 或 现在没有子节点」时才恢复 collapsed 状态
+                    // 即：如果从「无子节点」变为「有子节点」，不恢复（保持 initializeCollapsedState 的结果）
+                    if (hadChildrenBefore || !hasChildrenNow) {
+                        node.collapsed = state.collapsed;
+                    }
+
+                    // forceExpanded 可以无条件恢复（这是用户手动操作的标记）
                     if (state.forceExpanded !== undefined) {
                         node.forceExpanded = state.forceExpanded;
                     }
@@ -8396,10 +8740,37 @@
                 this.refreshOutline();
             });
 
-            // 如果初始 Tab 是大纲，立即刷新内容
+            // 如果初始 Tab 是大纲，尽快刷新内容（用户体验）
             if (this.currentTab === 'outline') {
-                // 稍微延迟一下，确保 DOM 已经就绪
                 setTimeout(() => this.refreshOutline(), 500);
+            }
+
+            // 延迟重新初始化当前 Tab 的功能，确保页面完全就绪后绑定到正确的滚动容器
+            // 注意：必须先 stopSyncScroll 清除旧 handler，否则 startSyncScroll 会短路返回
+            setTimeout(() => {
+                if (this.currentTab === 'outline' && this.outlineManager) {
+                    this.outlineManager.stopSyncScroll();
+                }
+                this.switchTab(this.currentTab);
+            }, 1500);
+
+            // SPA 导航监听：切换会话后重新初始化大纲和同步滚动
+            if (window.onurlchange === null) {
+                window.addEventListener('urlchange', (e) => {
+                    // 延迟执行，等待新页面 DOM 渲染完成
+                    setTimeout(() => {
+                        if (this.currentTab === 'outline' && this.outlineManager) {
+                            this.outlineManager.stopSyncScroll();
+                            this.refreshOutline();
+                            // 再次延迟启动同步滚动，确保大纲刷新完成
+                            setTimeout(() => {
+                                if (this.outlineManager && this.settings.outline?.syncScroll) {
+                                    this.outlineManager.startSyncScroll();
+                                }
+                            }, 500);
+                        }
+                    }, 1000);
+                });
             }
         }
 
@@ -8436,7 +8807,17 @@
                     --gh-tag-active-bg: ${colors.primary};
                     --gh-checkbox-bg: #4f46e5; /* Indigo 600 - Premium Light */
                     
-                    /* Folder Preset Colors */
+                    --gh-tag-active-bg: ${colors.primary};
+            --gh-checkbox-bg: #4f46e5; /* Indigo 600 - Premium Light */
+            
+            /* Outline Highlight Colors (Light Mode) */
+            --gh-outline-locate-bg: rgba(16, 185, 129, 0.25); /* Emerald 500 */
+            --gh-outline-locate-border: #10b981;
+            --gh-outline-locate-shadow: rgba(16, 185, 129, 0.5);
+            --gh-outline-sync-bg: rgba(52, 211, 153, 0.10); /* Emerald 400 - Soft */
+            --gh-outline-sync-border: #34d399;
+
+            /* Folder Preset Colors */
                     --gh-folder-bg-0: #fef9e7;
                     --gh-folder-bg-1: #fdf2f8;
                     --gh-folder-bg-2: #eff6ff;
@@ -8467,7 +8848,17 @@
                     --gh-tag-active-bg: rgba(66, 133, 244, 0.6);
                     --gh-checkbox-bg: #818cf8; /* Indigo 400 - Premium Dark */
 
-                    /* Folder Preset Colors (Dark Mode Translucent) */
+                    --gh-tag-active-bg: rgba(66, 133, 244, 0.6);
+            --gh-checkbox-bg: #818cf8; /* Indigo 400 - Premium Dark */
+
+            /* Outline Highlight Colors (Dark Mode) */
+            --gh-outline-locate-bg: rgba(52, 211, 153, 0.3); /* Emerald 400 */
+            --gh-outline-locate-border: #34d399;
+            --gh-outline-locate-shadow: rgba(52, 211, 153, 0.6);
+            --gh-outline-sync-bg: rgba(16, 185, 129, 0.15); /* Emerald 500 - Soft */
+            --gh-outline-sync-border: #10b981;
+
+            /* Folder Preset Colors (Dark Mode Translucent) */
                     --gh-folder-bg-0: rgba(253, 224, 71, 0.15);
                     --gh-folder-bg-1: rgba(244, 114, 182, 0.15);
                     --gh-folder-bg-2: rgba(96, 165, 250, 0.15);
@@ -9294,16 +9685,20 @@
                     flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;
                 }
                 .outline-toolbar-row {
-                    display: flex; align-items: center; gap: 8px;
+                    display: flex; align-items: center; gap: 4px;
                 }
                 .outline-toolbar-btn {
-                    width: 28px; height: 28px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
+                    width: 26px; height: 26px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     background: var(--gh-bg, white); color: var(--gh-text-secondary, #6b7280); cursor: pointer; display: flex;
                     align-items: center; justify-content: center; font-size: 14px;
                     transition: all 0.2s; flex-shrink: 0;
                 }
                 .outline-toolbar-btn:hover { border-color: var(--gh-border-active); color: var(--gh-border-active); background: var(--gh-folder-bg-default); }
                 .outline-toolbar-btn.active { border-color: var(--gh-tag-active-bg); color: white; background: var(--gh-tag-active-bg); }
+                /* 展开/折叠按钮使用更大字号，因为⊕/⊖符号比emoji渲染得小 */
+                #outline-expand-btn { font-size: 18px; }
+                /* 定位按钮使用更大字号，确保◎符号大小一致 */
+                #outline-locate-btn { font-size: 18px; }
                 .outline-search-input {
                     flex: 1; height: 28px; padding: 0 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     font-size: 13px; color: var(--gh-text, #374151); outline: none; transition: all 0.2s;
@@ -9389,7 +9784,22 @@
                     display: flex; align-items: center; position: relative;
                 }
                 .outline-item:hover { background: var(--gh-hover, #f3f4f6); }
-                .outline-item.highlight { background: var(--gh-folder-bg-expanded); border-color: var(--gh-border-active); }
+                .outline-item.highlight {
+                    background: var(--gh-outline-locate-bg) !important;
+                    border: 2px solid var(--gh-outline-locate-border) !important;
+                    box-shadow: 0 0 10px var(--gh-outline-locate-shadow);
+                    animation: outlineLocatePulse 0.6s ease-in-out 2;
+                }
+                @keyframes outlineLocatePulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.02); }
+                }
+                /* 同步滚动高亮（使用右边框，与用户问题左边框区分） */
+                .outline-item.sync-highlight {
+                    background: var(--gh-outline-sync-bg) !important;
+                    border-right: 3px solid var(--gh-outline-sync-border) !important;
+                    border-radius: 4px 0 0 4px;
+                }
 				.outline-item-toggle {
 					width: 24px; min-width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
 					color: #9ca3af; cursor: pointer; transition: all 0.2s ease;
@@ -9929,6 +10339,7 @@
             this.outlineManager = new OutlineManager({
                 container: outlineContent,
                 settings: this.settings,
+                siteAdapter: this.siteAdapter, // 传入 siteAdapter 用于定位功能
                 onSettingsChange: () => this.saveSettings(),
                 onJumpBefore: () => this.anchorManager.setAnchor(this.scrollManager.scrollTop),
                 i18n: (k) => this.t(k),
@@ -10819,6 +11230,27 @@
             updateIntervalItem.appendChild(updateIntervalInfo);
             updateIntervalItem.appendChild(updateIntervalControls);
             outlineSettingsContainer.appendChild(updateIntervalItem);
+
+            // 同步滚动开关
+            const syncScrollItem = createElement('div', { className: 'setting-item' });
+            const syncScrollInfo = createElement('div', { className: 'setting-item-info' });
+            syncScrollInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('outlineSyncScrollLabel')));
+            syncScrollInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('outlineSyncScrollDesc')));
+
+            const syncScrollToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.outline.syncScroll ? ' active' : ''),
+                id: 'toggle-outline-sync-scroll',
+            });
+            syncScrollToggle.addEventListener('click', () => {
+                this.settings.outline.syncScroll = !this.settings.outline.syncScroll;
+                syncScrollToggle.classList.toggle('active', this.settings.outline.syncScroll);
+                this.saveSettings();
+                if (this.outlineManager) this.outlineManager.updateSyncScrollState();
+                showToast(this.settings.outline.syncScroll ? this.t('settingOn') : this.t('settingOff'));
+            });
+            syncScrollItem.appendChild(syncScrollInfo);
+            syncScrollItem.appendChild(syncScrollToggle);
+            outlineSettingsContainer.appendChild(syncScrollItem);
 
             const outlineSettingsSection = this.createCollapsibleSection(this.t('outlineSettings'), outlineSettingsContainer, { defaultExpanded: false });
 

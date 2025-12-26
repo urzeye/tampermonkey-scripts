@@ -1,5 +1,43 @@
 # Changelog
 
+## 版本 1.10.1 (2025-12-26)
+
+### ✨ 新功能
+
+- **大纲定位同步**：新增 ◎ 按钮，点击后在大纲面板中定位到当前页面可视区域对应的大纲项并高亮显示。
+  - 支持用户提问和 AI 标题两种节点类型
+  - 自动滚动大纲列表并居中显示目标项
+  - 高亮效果持续 2 秒
+- **大纲同步滚动**：页面滚动时自动高亮对应的大纲项（绿色右边框标识）。
+  - 可在设置 → 大纲设置 中开关控制，默认开启
+  - 搜索模式下暂停同步
+  - 如果目标项被折叠隐藏，自动高亮其可见的父级节点
+
+### 🎨 UI 优化
+
+- **统一工具栏图标大小**：为展开/折叠按钮（⊕/⊖）和定位按钮（◎）设置更大字号，与 emoji 图标大小一致
+- **用户提问分组图标更新**：将 🗨️ 替换为 🙋，更直观地表示「用户提问」
+
+### 🐛 Bug 修复
+
+- **修复同步滚动初始化失败**：当大纲 Tab 位于第一个位置时，页面刷新后同步滚动功能不生效。
+  - **根因分析**：Gemini 是 SPA 动态渲染，初始化时 `infinite-scroller.chat-history` 可能还未创建，`getScrollContainer()` 会 fallback 到 `body`，导致滚动监听器绑定错误
+  - **修复方案**：修改 `getScrollContainer()` 只精确匹配聊天容器，找不到就返回 `null` 让调用者重试
+- **修复大纲展开层级异常**：开启「展示用户提问」且展开层级选择 0 级时，新增的提问-回复节点不再被错误展开。
+  - **根因分析**：当用户提问刚发出时节点无子节点（`collapsed=false`），AI 回复后 `restoreTreeState` 错误恢复了旧状态，覆盖了 `initializeCollapsedState` 根据 `displayLevel` 计算的正确折叠状态
+  - **修复方案**：在 `captureTreeState` 中记录 `hadChildren` 字段，`restoreTreeState` 中检测结构变化，对于「无子节点→有子节点」的过渡不恢复旧状态
+
+### 🔧 技术重构
+
+- **统一使用 `relativeLevel` 进行层级判断**：
+  - `renderItems` 中的 `isTopLevel` 改为 `isRootNode`，使用 `relativeLevel === minRelativeLevel` 判断
+  - `isLevelAllowed` 改为使用 `relativeLevel` 与 `displayLevel` 比较
+  - `initializeCollapsedState` 使用 `relativeLevel` 判断子节点是否超过显示层级
+- **引入 `minDisplayLevel` 动态计算**：
+  - 开启用户提问时 `minDisplayLevel = 0`，`displayLevel = 0` 表示「只显示用户提问」
+  - 未开启用户提问时 `minDisplayLevel = 1`，`displayLevel` 最小为 1（AI 标题最低为 H1）
+- **`state` 添加 `includeUserQueries` 字段**：缓存当前是否开启展示用户提问，用于层级判断
+
 ## 版本 1.10.0 (2025-12-25)
 
 ### ✨ 新功能
