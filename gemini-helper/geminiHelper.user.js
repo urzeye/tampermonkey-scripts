@@ -7854,6 +7854,26 @@
             }
         }
 
+        // 获取用户问题节点在所有用户问题中的序号（从1开始）
+        getUserQueryIndex(targetIndex) {
+            if (!this.state.tree) return 0;
+            let count = 0;
+            const countInTree = (items) => {
+                for (const item of items) {
+                    if (item.isUserQuery) {
+                        count++;
+                        if (item.index === targetIndex) return count;
+                    }
+                    if (item.children && item.children.length > 0) {
+                        const result = countInTree(item.children);
+                        if (result > 0) return result;
+                    }
+                }
+                return 0;
+            };
+            return countInTree(this.state.tree);
+        }
+
         // 内部刷新（用于交互更新）
         refreshCurrent() {
             const listContainer = document.getElementById('outline-list');
@@ -8007,10 +8027,15 @@
                 }
                 itemEl.appendChild(toggle);
 
-                // 用户提问节点添加前缀图标
+                // 用户提问节点添加序号徽章（图标+角标数字）
                 if (item.isUserQuery) {
-                    const icon = createElement('span', { className: 'user-query-icon' }, '💬');
-                    itemEl.appendChild(icon);
+                    const queryNumber = this.getUserQueryIndex(item.index);
+                    const badge = createElement('span', { className: 'user-query-badge' });
+                    const icon = createElement('span', { className: 'user-query-badge-icon' }, '💬');
+                    const number = createElement('span', { className: 'user-query-badge-number' }, `${queryNumber}`);
+                    badge.appendChild(icon);
+                    badge.appendChild(number);
+                    itemEl.appendChild(badge);
                 }
 
                 const textEl = createElement('span', { className: 'outline-item-text' });
@@ -9828,7 +9853,28 @@
                     border-radius: 4px;
                 }
                 .outline-item.user-query-node:first-child { margin-top: 0; }
-                .outline-item.user-query-node .user-query-icon { margin-right: 6px; font-size: 12px; }
+                /* 用户问题徽章：图标+角标数字 */
+                .outline-item.user-query-node .user-query-badge {
+                    position: relative; display: inline-flex; align-items: center; justify-content: center;
+                    width: 24px; height: 24px; margin-right: 4px; flex-shrink: 0;
+                }
+                .outline-item.user-query-node .user-query-badge-icon {
+                    font-size: 16px; line-height: 1;
+                }
+                .outline-item.user-query-node .user-query-badge-number {
+                    position: absolute; bottom: -3px; right: -5px;
+                    min-width: 14px; height: 14px; padding: 0 3px;
+                    font-size: 9px; font-weight: 700; line-height: 14px; text-align: center;
+                    color: #374151; background: #ffffff; 
+                    border: 1px solid #e5e7eb; border-radius: 7px;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                    z-index: 10;
+                }
+                /* Dark Mode 适配 */
+                body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-number {
+                    color: #e5e7eb; background: #374151; border-color: #4b5563;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                }
                 .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
                 /* 大纲高亮效果 */
