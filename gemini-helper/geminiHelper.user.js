@@ -1890,8 +1890,10 @@
                     let queryText = this.extractUserQueryText(element);
 
                     // 截断长文本（最多 80 字符）
+                    let isTruncated = false;
                     if (queryText.length > 80) {
                         queryText = queryText.substring(0, 80) + '...';
+                        isTruncated = true;
                     }
 
                     // 添加用户提问节点（即使没有后续标题也显示）
@@ -1900,6 +1902,7 @@
                         text: queryText,
                         element: element,
                         isUserQuery: true,
+                        isTruncated: isTruncated,
                     });
                 } else if (/^h[1-6]$/.test(tagName)) {
                     // 标题元素
@@ -2536,14 +2539,9 @@
                 return element.textContent?.trim() || '';
             }
 
-            // 在 Shadow DOM 中查找文本
-            // 结构: <div><div class="markdown-document"><p><span>文本</span></p></div></div>
-            const textSpan = markdown.shadowRoot.querySelector('span[data-markdown-start-index]');
-            if (textSpan) {
-                return textSpan.textContent?.trim() || '';
-            }
-
-            // 回退：获取 Shadow DOM 中的所有文本
+            // 在 Shadow DOM 中查找完整文本
+            // 结构: <div><div class="markdown-document"><p><span>文本</span></p>...</div></div>
+            // 注意：用户问题可能包含多个 <p> 段落，需要获取所有文本
             const markdownDoc = markdown.shadowRoot.querySelector('.markdown-document');
             if (markdownDoc) {
                 return markdownDoc.textContent?.trim() || '';
@@ -2594,14 +2592,17 @@
                 const questionBlock = turn.querySelector('.question-block');
                 if (questionBlock) {
                     let queryText = this.extractUserQueryText(questionBlock);
+                    let isTruncated = false;
                     if (queryText.length > 80) {
                         queryText = queryText.substring(0, 80) + '...';
+                        isTruncated = true;
                     }
                     outline.push({
                         level: 0,
                         text: queryText,
                         element: questionBlock,
                         isUserQuery: true,
+                        isTruncated: isTruncated,
                     });
                 }
 
@@ -7854,6 +7855,26 @@
             }
         }
 
+        // 获取用户问题节点在所有用户问题中的序号（从1开始）
+        getUserQueryIndex(targetIndex) {
+            if (!this.state.tree) return 0;
+            let count = 0;
+            const countInTree = (items) => {
+                for (const item of items) {
+                    if (item.isUserQuery) {
+                        count++;
+                        if (item.index === targetIndex) return count;
+                    }
+                    if (item.children && item.children.length > 0) {
+                        const result = countInTree(item.children);
+                        if (result > 0) return result;
+                    }
+                }
+                return 0;
+            };
+            return countInTree(this.state.tree);
+        }
+
         // 内部刷新（用于交互更新）
         refreshCurrent() {
             const listContainer = document.getElementById('outline-list');
@@ -8007,10 +8028,15 @@
                 }
                 itemEl.appendChild(toggle);
 
-                // 用户提问节点添加前缀图标
+                // 用户提问节点添加序号徽章（图标+角标数字）
                 if (item.isUserQuery) {
-                    const icon = createElement('span', { className: 'user-query-icon' }, '💬');
-                    itemEl.appendChild(icon);
+                    const queryNumber = this.getUserQueryIndex(item.index);
+                    const badge = createElement('span', { className: 'user-query-badge' });
+                    const icon = createElement('span', { className: 'user-query-badge-icon' }, '💬');
+                    const number = createElement('span', { className: 'user-query-badge-number' }, `${queryNumber}`);
+                    badge.appendChild(icon);
+                    badge.appendChild(number);
+                    itemEl.appendChild(badge);
                 }
 
                 const textEl = createElement('span', { className: 'outline-item-text' });
@@ -8039,11 +8065,84 @@
                         });
                     } catch (e) {
                         textEl.textContent = item.text;
+                        textEl.title = item.text; // Add tooltip
                     }
                 } else {
                     textEl.textContent = item.text;
+                    textEl.title = item.text; // Add tooltip
                 }
                 itemEl.appendChild(textEl);
+
+                // 用户提问添加复制按钮
+                if (item.isUserQuery) {
+                    const copyBtn = createElement('span', { className: 'outline-item-copy-btn' });
+                    copyBtn.title = 'Copy';
+
+                    // 使用 DOM API 创建 SVG（避免 innerHTML 的 CSP 问题）
+                    const createCopyIcon = () => {
+                        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        svg.setAttribute('viewBox', '0 0 24 24');
+                        svg.setAttribute('fill', 'none');
+                        svg.setAttribute('stroke', 'currentColor');
+                        svg.setAttribute('stroke-width', '2');
+                        svg.setAttribute('stroke-linecap', 'round');
+                        svg.setAttribute('stroke-linejoin', 'round');
+
+                        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        rect.setAttribute('x', '9');
+                        rect.setAttribute('y', '9');
+                        rect.setAttribute('width', '13');
+                        rect.setAttribute('height', '13');
+                        rect.setAttribute('rx', '2');
+                        rect.setAttribute('ry', '2');
+
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        path.setAttribute('d', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
+
+                        svg.appendChild(rect);
+                        svg.appendChild(path);
+                        return svg;
+                    };
+
+                    const createCheckIcon = () => {
+                        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        svg.setAttribute('viewBox', '0 0 24 24');
+                        svg.setAttribute('fill', 'none');
+                        svg.setAttribute('stroke', '#10b981');
+                        svg.setAttribute('stroke-width', '2');
+                        svg.setAttribute('stroke-linecap', 'round');
+                        svg.setAttribute('stroke-linejoin', 'round');
+
+                        const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                        polyline.setAttribute('points', '20 6 9 17 4 12');
+
+                        svg.appendChild(polyline);
+                        return svg;
+                    };
+
+                    copyBtn.appendChild(createCopyIcon());
+
+                    copyBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation(); // 阻止跳转
+                        try {
+                            // 智能获取文本：短文本直接用缓存，长文本（被截断）从 DOM 重新提取
+                            let textToCopy = item.text;
+                            if (item.isTruncated && item.element && item.element.isConnected) {
+                                // 文本被截断，从 DOM 提取完整文本
+                                textToCopy = this.siteAdapter.extractUserQueryText(item.element) || item.text;
+                            }
+                            await navigator.clipboard.writeText(textToCopy);
+                            // 临时变成对号反馈
+                            copyBtn.replaceChildren(createCheckIcon());
+                            setTimeout(() => {
+                                copyBtn.replaceChildren(createCopyIcon());
+                            }, 1500);
+                        } catch (err) {
+                            console.error('Failed to copy: ', err);
+                        }
+                    });
+                    itemEl.appendChild(copyBtn);
+                }
 
                 itemEl.addEventListener('click', () => {
                     let targetElement = item.element;
@@ -9824,11 +9923,57 @@
                     border-left: 3px solid var(--gh-border-active);
                     font-weight: 500;
                     padding-left: 8px !important;
+                    /* Add padding-right to accommodate copy button (20px button + margin) */
+                    padding-right: 32px !important; 
                     margin-top: 8px;
                     border-radius: 4px;
                 }
                 .outline-item.user-query-node:first-child { margin-top: 0; }
-                .outline-item.user-query-node .user-query-icon { margin-right: 6px; font-size: 12px; }
+                /* 用户问题徽章：图标+角标数字 */
+                .outline-item.user-query-node .user-query-badge {
+                    position: relative; display: inline-flex; align-items: center; justify-content: center;
+                    width: 24px; height: 24px; margin-right: 4px; flex-shrink: 0;
+                }
+                .outline-item.user-query-node .user-query-badge-icon {
+                    font-size: 15px; line-height: 1; color: #9ca3af; /* Gray 400 - Softer */
+                }
+                .outline-item.user-query-node .user-query-badge-number {
+                    position: absolute; bottom: -2px; right: -4px;
+                    /* Compact Pill Shape */
+                    min-width: 12px; height: 12px; padding: 0 2px;
+                    font-size: 8px; font-weight: 700; line-height: 12px; text-align: center;
+                    color: #4b5563; background: #ffffff; 
+                    border: 1px solid #e5e7eb; border-radius: 99px; /* Max radius for round/pill shape */
+                    /* Refined Faux Cutout */
+                    box-shadow: 0 0 0 1.5px #ffffff; 
+                    z-index: 10;
+                }
+                /* Dark Mode 适配 */
+                body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-icon {
+                    color: #6b7280; /* Gray 500 */
+                }
+                body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-number {
+                    color: #e5e7eb; background: #374151; border-color: #4b5563;
+                    box-shadow: 0 0 0 1.5px #1f2937;
+                }
+                /* 用户提问复制按钮 */
+                .outline-item-copy-btn {
+                    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+                    width: 20px; height: 20px;
+                    display: flex; align-items: center; justify-content: center;
+                    color: #9ca3af; cursor: pointer; border-radius: 4px;
+                    opacity: 0; transition: all 0.2s ease;
+                    background: rgba(255, 255, 255, 0.8); /* Slight bg for contrast */
+                }
+                .outline-item:hover .outline-item-copy-btn { opacity: 1; }
+                .outline-item-copy-btn:hover { color: var(--gh-border-active); background: rgba(0,0,0,0.05); }
+                .outline-item-copy-btn svg { width: 14px; height: 14px; }
+                
+                body[data-gh-mode="dark"] .outline-item-copy-btn {
+                    background: rgba(31, 41, 55, 0.8);
+                }
+                body[data-gh-mode="dark"] .outline-item-copy-btn:hover { background: rgba(255,255,255,0.1); }
+                
                 .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
                 /* 大纲高亮效果 */
