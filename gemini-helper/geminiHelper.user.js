@@ -1890,8 +1890,10 @@
                     let queryText = this.extractUserQueryText(element);
 
                     // 截断长文本（最多 80 字符）
+                    let isTruncated = false;
                     if (queryText.length > 80) {
                         queryText = queryText.substring(0, 80) + '...';
+                        isTruncated = true;
                     }
 
                     // 添加用户提问节点（即使没有后续标题也显示）
@@ -1900,6 +1902,7 @@
                         text: queryText,
                         element: element,
                         isUserQuery: true,
+                        isTruncated: isTruncated,
                     });
                 } else if (/^h[1-6]$/.test(tagName)) {
                     // 标题元素
@@ -2594,14 +2597,17 @@
                 const questionBlock = turn.querySelector('.question-block');
                 if (questionBlock) {
                     let queryText = this.extractUserQueryText(questionBlock);
+                    let isTruncated = false;
                     if (queryText.length > 80) {
                         queryText = queryText.substring(0, 80) + '...';
+                        isTruncated = true;
                     }
                     outline.push({
                         level: 0,
                         text: queryText,
                         element: questionBlock,
                         isUserQuery: true,
+                        isTruncated: isTruncated,
                     });
                 }
 
@@ -8124,7 +8130,13 @@
                     copyBtn.addEventListener('click', async (e) => {
                         e.stopPropagation(); // 阻止跳转
                         try {
-                            await navigator.clipboard.writeText(item.text);
+                            // 智能获取文本：短文本直接用缓存，长文本（被截断）从 DOM 重新提取
+                            let textToCopy = item.text;
+                            if (item.isTruncated && item.element && item.element.isConnected) {
+                                // 文本被截断，从 DOM 提取完整文本
+                                textToCopy = this.siteAdapter.extractUserQueryText(item.element) || item.text;
+                            }
+                            await navigator.clipboard.writeText(textToCopy);
                             // 临时变成对号反馈
                             copyBtn.replaceChildren(createCheckIcon());
                             setTimeout(() => {
