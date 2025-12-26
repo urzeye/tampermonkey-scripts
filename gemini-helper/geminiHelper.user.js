@@ -9859,26 +9859,26 @@
                     width: 24px; height: 24px; margin-right: 4px; flex-shrink: 0;
                 }
                 .outline-item.user-query-node .user-query-badge-icon {
-                    font-size: 15px; line-height: 1; color: #6b7280; /* Soft gray */
+                    font-size: 15px; line-height: 1; color: #9ca3af; /* Gray 400 - Softer */
                 }
                 .outline-item.user-query-node .user-query-badge-number {
-                    position: absolute; bottom: -3px; right: -5px;
-                    min-width: 14px; height: 14px; padding: 0 3px;
-                    font-size: 9px; font-weight: 700; line-height: 14px; text-align: center;
-                    color: #374151; background: #ffffff; 
-                    border: 1px solid #e5e7eb; border-radius: 7px;
-                    /* Faux cutout: white border shadow */
-                    box-shadow: 0 0 0 1.5px #ffffff, 0 1px 2px rgba(0,0,0,0.1); 
+                    position: absolute; bottom: -2px; right: -4px;
+                    /* Compact Pill Shape */
+                    min-width: 12px; height: 12px; padding: 0 2px;
+                    font-size: 8px; font-weight: 700; line-height: 12px; text-align: center;
+                    color: #4b5563; background: #ffffff; 
+                    border: 1px solid #e5e7eb; border-radius: 99px; /* Max radius for round/pill shape */
+                    /* Refined Faux Cutout */
+                    box-shadow: 0 0 0 1.5px #ffffff; 
                     z-index: 10;
                 }
                 /* Dark Mode 适配 */
                 body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-icon {
-                    color: #9ca3af; /* Lighter gray for dark mode */
+                    color: #6b7280; /* Gray 500 */
                 }
                 body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-number {
                     color: #e5e7eb; background: #374151; border-color: #4b5563;
-                    /* Faux cutout: dark border shadow */
-                    box-shadow: 0 0 0 1.5px #1f2937, 0 1px 2px rgba(0,0,0,0.3);
+                    box-shadow: 0 0 0 1.5px #1f2937;
                 }
                 .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
