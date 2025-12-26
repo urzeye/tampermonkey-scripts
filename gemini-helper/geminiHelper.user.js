@@ -9859,7 +9859,7 @@
                     width: 24px; height: 24px; margin-right: 4px; flex-shrink: 0;
                 }
                 .outline-item.user-query-node .user-query-badge-icon {
-                    font-size: 16px; line-height: 1;
+                    font-size: 15px; line-height: 1; color: #6b7280; /* Soft gray */
                 }
                 .outline-item.user-query-node .user-query-badge-number {
                     position: absolute; bottom: -3px; right: -5px;
@@ -9867,13 +9867,18 @@
                     font-size: 9px; font-weight: 700; line-height: 14px; text-align: center;
                     color: #374151; background: #ffffff; 
                     border: 1px solid #e5e7eb; border-radius: 7px;
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                    /* Faux cutout: white border shadow */
+                    box-shadow: 0 0 0 1.5px #ffffff, 0 1px 2px rgba(0,0,0,0.1); 
                     z-index: 10;
                 }
                 /* Dark Mode 适配 */
+                body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-icon {
+                    color: #9ca3af; /* Lighter gray for dark mode */
+                }
                 body[data-gh-mode="dark"] .outline-item.user-query-node .user-query-badge-number {
                     color: #e5e7eb; background: #374151; border-color: #4b5563;
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                    /* Faux cutout: dark border shadow */
+                    box-shadow: 0 0 0 1.5px #1f2937, 0 1px 2px rgba(0,0,0,0.3);
                 }
                 .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
