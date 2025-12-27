@@ -397,12 +397,13 @@
             exportNoContent: '未找到对话内容',
             exportNeedOpenFirst: '请先打开要导出的会话',
             exportUserLabel: '用户',
-            exportAILabel: 'AI',
             exportMetaTitle: '导出信息',
             exportMetaConvTitle: '会话标题',
             exportMetaTime: '导出时间',
             exportMetaSource: '来源',
             exportNotSupported: '当前站点不支持导出',
+            exportToTXT: 'TXT',
+            exportMetaUrl: '链接',
             conversationsRefresh: '刷新会话列表',
             conversationsSearchPlaceholder: '搜索会话...',
             conversationsSearchResult: '个结果',
@@ -672,12 +673,13 @@
             exportNoContent: '未找到對話內容',
             exportNeedOpenFirst: '請先打開要匯出的會話',
             exportUserLabel: '用戶',
-            exportAILabel: 'AI',
             exportMetaTitle: '匯出資訊',
             exportMetaConvTitle: '會話標題',
             exportMetaTime: '匯出時間',
             exportMetaSource: '來源',
             exportNotSupported: '目前站點不支援匯出',
+            exportToTXT: 'TXT',
+            exportMetaUrl: '連結',
             conversationsRefresh: '刷新會話列表',
             conversationsSearchPlaceholder: '搜尋會話...',
             conversationsSearchResult: '個結果',
@@ -946,12 +948,13 @@
             exportNoContent: 'No conversation content found',
             exportNeedOpenFirst: 'Please open the conversation first',
             exportUserLabel: 'User',
-            exportAILabel: 'AI',
             exportMetaTitle: 'Export Info',
             exportMetaConvTitle: 'Conversation Title',
             exportMetaTime: 'Export Time',
             exportMetaSource: 'Source',
             exportNotSupported: 'Export not supported for this site',
+            exportToTXT: 'TXT',
+            exportMetaUrl: 'URL',
             conversationsRefresh: 'Refresh List',
             conversationsSearchPlaceholder: 'Search conversations...',
             conversationsSearchResult: 'result(s)',
@@ -6446,6 +6449,17 @@
             });
             menu.appendChild(jsonBtn);
 
+            // TXT 选项
+            const txtBtn = createElement('button', {}, '📄 ' + (this.t('exportToTXT') || 'TXT'));
+            Object.assign(txtBtn.style, btnStyle);
+            txtBtn.addEventListener('mouseenter', () => (txtBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            txtBtn.addEventListener('mouseleave', () => (txtBtn.style.background = 'none'));
+            txtBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('txt');
+            });
+            menu.appendChild(txtBtn);
+
             // 定位菜单（相对于按钮向上弹出）
             const parentRect = this.container.getBoundingClientRect();
             const btnRect = anchorEl.getBoundingClientRect();
@@ -6526,10 +6540,14 @@
                     content = this.formatToMarkdown(conv, messages);
                     filename = `${safeTitle}.md`;
                     mimeType = 'text/markdown;charset=utf-8';
-                } else {
+                } else if (format === 'json') {
                     content = this.formatToJSON(conv, messages);
                     filename = `${safeTitle}.json`;
                     mimeType = 'application/json;charset=utf-8';
+                } else {
+                    content = this.formatToTXT(conv, messages);
+                    filename = `${safeTitle}.txt`;
+                    mimeType = 'text/plain;charset=utf-8';
                 }
 
                 this.downloadFile(content, filename, mimeType);
@@ -6652,7 +6670,6 @@
             const lines = [];
             const now = new Date().toLocaleString();
             const userLabel = this.t('exportUserLabel') || '用户';
-            const aiLabel = this.t('exportAILabel') || 'AI';
 
             // 元数据头
             lines.push('---');
@@ -6660,6 +6677,7 @@
             lines.push(`- **${this.t('exportMetaConvTitle') || '会话标题'}**: ${conv.title || '未命名'}`);
             lines.push(`- **${this.t('exportMetaTime') || '导出时间'}**: ${now}`);
             lines.push(`- **${this.t('exportMetaSource') || '来源'}**: ${this.siteAdapter.getName()}`);
+            lines.push(`- **${this.t('exportMetaUrl') || '链接'}**: ${window.location.href}`);
             lines.push('---');
             lines.push('');
 
@@ -6693,6 +6711,7 @@
                 metadata: {
                     title: conv.title || '未命名',
                     id: conv.id,
+                    url: window.location.href,
                     exportTime: new Date().toISOString(),
                     source: this.siteAdapter.getName(),
                 },
@@ -6702,6 +6721,39 @@
                 })),
             };
             return JSON.stringify(data, null, 2);
+        }
+
+        /**
+         * 格式化为 TXT（纯文本）
+         */
+        formatToTXT(conv, messages) {
+            const lines = [];
+            const now = new Date().toLocaleString();
+            const userLabel = this.t('exportUserLabel') || '用户';
+
+            // 元数据
+            lines.push(`${this.t('exportMetaConvTitle') || '会话标题'}: ${conv.title || '未命名'}`);
+            lines.push(`${this.t('exportMetaTime') || '导出时间'}: ${now}`);
+            lines.push(`${this.t('exportMetaSource') || '来源'}: ${this.siteAdapter.getName()}`);
+            lines.push(`${this.t('exportMetaUrl') || '链接'}: ${window.location.href}`);
+            lines.push('');
+            lines.push('='.repeat(50));
+            lines.push('');
+
+            // 对话内容
+            messages.forEach((msg) => {
+                if (msg.role === 'user') {
+                    lines.push(`[${userLabel}]`);
+                } else {
+                    lines.push(`[${this.siteAdapter.getName()}]`);
+                }
+                lines.push(msg.content);
+                lines.push('');
+                lines.push('-'.repeat(50));
+                lines.push('');
+            });
+
+            return lines.join('\n');
         }
 
         /**
