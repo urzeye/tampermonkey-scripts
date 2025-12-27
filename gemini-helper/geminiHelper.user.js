@@ -1889,10 +1889,10 @@
                     // 提取用户提问文本
                     let queryText = this.extractUserQueryText(element);
 
-                    // 截断长文本（最多 80 字符）
+                    // 截断长文本（最多 30 字符）
                     let isTruncated = false;
-                    if (queryText.length > 80) {
-                        queryText = queryText.substring(0, 80) + '...';
+                    if (queryText.length > 30) {
+                        queryText = queryText.substring(0, 30) + '...';
                         isTruncated = true;
                     }
 
@@ -2593,8 +2593,8 @@
                 if (questionBlock) {
                     let queryText = this.extractUserQueryText(questionBlock);
                     let isTruncated = false;
-                    if (queryText.length > 80) {
-                        queryText = queryText.substring(0, 80) + '...';
+                    if (queryText.length > 30) {
+                        queryText = queryText.substring(0, 30) + '...';
                         isTruncated = true;
                     }
                     outline.push({
@@ -7545,29 +7545,123 @@
             groupBtn.addEventListener('click', () => this.toggleGroupMode());
             row1.appendChild(groupBtn);
 
-            // 展开/折叠按钮
-            const expandBtn = createElement(
-                'button',
-                {
-                    className: 'outline-toolbar-btn',
-                    id: 'outline-expand-btn',
-                    title: this.t('outlineExpandAll'),
-                },
-                '⊕',
-            );
+            // 创建展开/折叠 SVG 图标的辅助函数
+            const createExpandIcon = () => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 16 16');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2');
+                svg.style.width = '14px';
+                svg.style.height = '14px';
+                // 圆圈
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', '8');
+                circle.setAttribute('cy', '8');
+                circle.setAttribute('r', '6.5');
+                svg.appendChild(circle);
+                // 横线
+                const h = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                h.setAttribute('x1', '4');
+                h.setAttribute('y1', '8');
+                h.setAttribute('x2', '12');
+                h.setAttribute('y2', '8');
+                svg.appendChild(h);
+                // 竖线 (⊕ 独有)
+                const v = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                v.setAttribute('x1', '8');
+                v.setAttribute('y1', '4');
+                v.setAttribute('x2', '8');
+                v.setAttribute('y2', '12');
+                svg.appendChild(v);
+                return svg;
+            };
+            const createCollapseIcon = () => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 16 16');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2');
+                svg.style.width = '14px';
+                svg.style.height = '14px';
+                // 圆圈
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', '8');
+                circle.setAttribute('cy', '8');
+                circle.setAttribute('r', '6.5');
+                svg.appendChild(circle);
+                // 横线
+                const h = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                h.setAttribute('x1', '4');
+                h.setAttribute('y1', '8');
+                h.setAttribute('x2', '12');
+                h.setAttribute('y2', '8');
+                svg.appendChild(h);
+                return svg;
+            };
+            // 保存到类实例以便后续切换使用
+            this._createExpandIcon = createExpandIcon;
+            this._createCollapseIcon = createCollapseIcon;
+
+            // 展开/折叠按钮 (使用 SVG 图标确保跨平台一致性)
+            const expandBtn = createElement('button', {
+                className: 'outline-toolbar-btn',
+                id: 'outline-expand-btn',
+                title: this.t('outlineExpandAll'),
+            });
+            expandBtn.appendChild(createExpandIcon());
             expandBtn.addEventListener('click', () => this.toggleExpandAll());
             row1.appendChild(expandBtn);
 
-            // 定位当前位置按钮
-            const locateBtn = createElement(
-                'button',
-                {
-                    className: 'outline-toolbar-btn',
-                    id: 'outline-locate-btn',
-                    title: this.t('outlineLocateCurrent'),
-                },
-                '◎',
-            );
+            // 定位当前位置按钮 (使用 SVG 图标确保跨平台一致性)
+            const locateBtn = createElement('button', {
+                className: 'outline-toolbar-btn',
+                id: 'outline-locate-btn',
+                title: this.t('outlineLocateCurrent'),
+            });
+            // 创建定位图标 SVG (crosshair/target 风格)
+            const locateSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            // 使用较小的 viewBox 让图形内容占据更大比例
+            locateSvg.setAttribute('viewBox', '0 0 18 18');
+            locateSvg.setAttribute('fill', 'none');
+            locateSvg.setAttribute('stroke', 'currentColor');
+            locateSvg.setAttribute('stroke-width', '2');
+            locateSvg.setAttribute('stroke-linecap', 'round');
+            locateSvg.setAttribute('stroke-linejoin', 'round');
+            locateSvg.style.width = '18px';
+            locateSvg.style.height = '18px';
+            // 圆圈 (中心9,9 半径4.5)
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '9');
+            circle.setAttribute('cy', '9');
+            circle.setAttribute('r', '4.5');
+            locateSvg.appendChild(circle);
+            // 十字准线 (从边缘到圆圈)
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '9');
+            line1.setAttribute('y1', '1');
+            line1.setAttribute('x2', '9');
+            line1.setAttribute('y2', '3.5');
+            locateSvg.appendChild(line1);
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '9');
+            line2.setAttribute('y1', '14.5');
+            line2.setAttribute('x2', '9');
+            line2.setAttribute('y2', '17');
+            locateSvg.appendChild(line2);
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '1');
+            line3.setAttribute('y1', '9');
+            line3.setAttribute('x2', '3.5');
+            line3.setAttribute('y2', '9');
+            locateSvg.appendChild(line3);
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', '14.5');
+            line4.setAttribute('y1', '9');
+            line4.setAttribute('x2', '17');
+            line4.setAttribute('y2', '9');
+            locateSvg.appendChild(line4);
+            locateBtn.appendChild(locateSvg);
             locateBtn.addEventListener('click', () => this.locateCurrentPosition());
             row1.appendChild(locateBtn);
 
@@ -8421,11 +8515,11 @@
             const maxActualLevel = Math.max(...Object.keys(this.state.levelCounts).map(Number), 1);
             if (btn) {
                 if (level >= maxActualLevel) {
-                    btn.textContent = '⊖';
+                    btn.replaceChildren(this._createCollapseIcon ? this._createCollapseIcon() : document.createTextNode('⊖'));
                     btn.title = this.t('outlineCollapseAll');
                     this.state.isAllExpanded = true;
                 } else {
-                    btn.textContent = '⊕';
+                    btn.replaceChildren(this._createExpandIcon ? this._createExpandIcon() : document.createTextNode('⊕'));
                     btn.title = this.t('outlineExpandAll');
                     this.state.isAllExpanded = false;
                 }
@@ -8897,7 +8991,7 @@
                     --gh-active-bg: #e5e7eb;
                     --gh-danger: #ef4444;
                     --gh-gradient: ${gradient};
-                    
+
                     /* Semantic Variables */
                     --gh-header-bg: ${gradient};
                     --gh-folder-bg-default: #e0f2fe;
@@ -8905,10 +8999,10 @@
                     --gh-border-active: #6366f1;
                     --gh-tag-active-bg: ${colors.primary};
                     --gh-checkbox-bg: #4f46e5; /* Indigo 600 - Premium Light */
-                    
+
                     --gh-tag-active-bg: ${colors.primary};
             --gh-checkbox-bg: #4f46e5; /* Indigo 600 - Premium Light */
-            
+
             /* Outline Highlight Colors (Light Mode) */
             --gh-outline-locate-bg: rgba(16, 185, 129, 0.25); /* Emerald 500 */
             --gh-outline-locate-border: #10b981;
@@ -9315,7 +9409,7 @@
                     border-radius: 0;
                     border-right: none;
                 }
-                
+
                 .conversations-search-input-group {
                     flex: 1;
                     position: relative;
@@ -9339,7 +9433,7 @@
                     z-index: 1;
                     position: relative;
                 }
-                
+
                 /* Pin Button */
                 .conversations-pin-filter-btn {
                     cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 14px;
@@ -9348,8 +9442,8 @@
                     background: var(--gh-bg, white); box-sizing: border-box; transition: all 0.2s;
                 }
                 .conversations-pin-filter-btn:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); }
-                .conversations-pin-filter-btn.active { 
-                    color: var(--gh-border-active); background: var(--gh-folder-bg-default); 
+                .conversations-pin-filter-btn.active {
+                    color: var(--gh-border-active); background: var(--gh-folder-bg-default);
                     box-shadow: inset 0 0 0 1px #818cf8;
                 }
 
@@ -9384,12 +9478,12 @@
                     background: var(--gh-bg, white); box-sizing: border-box; transition: all 0.2s;
                 }
                 .conversations-tag-search-btn:hover { background: var(--gh-hover, #f3f4f6); color: var(--gh-text, #374151); }
-                .conversations-tag-search-btn.active { 
-                    color: var(--gh-border-active); background: var(--gh-folder-bg-default); 
+                .conversations-tag-search-btn.active {
+                    color: var(--gh-border-active); background: var(--gh-folder-bg-default);
                     box-shadow: inset 0 0 0 1px #818cf8; /* Fix 7: Distinct active border/shadow */
                 }
                 .conversations-tag-search-btn.empty { opacity: 0.5; }
-                
+
                 /* Clear Button - Restyled at far right */
                 .conversations-search-clear {
                     cursor: pointer; width: 36px; height: 36px; color: #9ca3af; font-size: 18px;
@@ -9399,7 +9493,7 @@
                     user-select: none;
                 }
                 .conversations-search-clear:hover { background: #fef2f2; color: #ef4444; }
-                .conversations-search-clear.disabled { 
+                .conversations-search-clear.disabled {
                     opacity: 0.3; cursor: default; background: var(--gh-bg-secondary, #f9fafb); pointer-events: none;
                 }
 
@@ -9438,18 +9532,18 @@
                 }
                 .conversations-tag-filter-item:hover { background: var(--gh-hover, #f3f4f6); }
                 .conversations-tag-filter-item.selected { background: var(--gh-folder-bg-default); color: #2563eb; font-weight: 500; }
-                
+
                 /* Checkmark for selected */
                 .conversations-tag-filter-item.selected::after {
                     content: '✓'; margin-left: auto; font-size: 14px; font-weight: bold;
                 }
-                
+
                 /* Ensure dot doesn't stretch */
                 .conversations-tag-dot {
                     width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
                     border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
                 }
-                
+
                 .conversations-tag-filter-divider { height: 1px; background: #eee; margin: 4px 0; flex-shrink: 0; }
                 .conversations-tag-filter-action { color: var(--gh-border-active); font-weight: 500; justify-content: center; }
 
@@ -9794,10 +9888,6 @@
                 }
                 .outline-toolbar-btn:hover { border-color: var(--gh-border-active); color: var(--gh-border-active); background: var(--gh-folder-bg-default); }
                 .outline-toolbar-btn.active { border-color: var(--gh-tag-active-bg); color: white; background: var(--gh-tag-active-bg); }
-                /* 展开/折叠按钮使用更大字号，因为⊕/⊖符号比emoji渲染得小 */
-                #outline-expand-btn { font-size: 18px; }
-                /* 定位按钮使用更大字号，确保◎符号大小一致 */
-                #outline-locate-btn { font-size: 18px; }
                 .outline-search-input {
                     flex: 1; height: 28px; padding: 0 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     font-size: 13px; color: var(--gh-text, #374151); outline: none; transition: all 0.2s;
@@ -9923,8 +10013,7 @@
                     border-left: 3px solid var(--gh-border-active);
                     font-weight: 500;
                     padding-left: 8px !important;
-                    /* Add padding-right to accommodate copy button (20px button + margin) */
-                    padding-right: 32px !important; 
+                    /* 复制按钮使用绝对定位悬浮在文字上方，不需要预留空间 */
                     margin-top: 8px;
                     border-radius: 4px;
                 }
@@ -9942,10 +10031,10 @@
                     /* Compact Pill Shape */
                     min-width: 12px; height: 12px; padding: 0 2px;
                     font-size: 8px; font-weight: 700; line-height: 12px; text-align: center;
-                    color: #4b5563; background: #ffffff; 
+                    color: #4b5563; background: #ffffff;
                     border: 1px solid #e5e7eb; border-radius: 99px; /* Max radius for round/pill shape */
                     /* Refined Faux Cutout */
-                    box-shadow: 0 0 0 1.5px #ffffff; 
+                    box-shadow: 0 0 0 1.5px #ffffff;
                     z-index: 10;
                 }
                 /* Dark Mode 适配 */
@@ -9956,24 +10045,25 @@
                     color: #e5e7eb; background: #374151; border-color: #4b5563;
                     box-shadow: 0 0 0 1.5px #1f2937;
                 }
-                /* 用户提问复制按钮 */
+                /* 用户提问复制按钮 - 悬浮在文字上方 */
                 .outline-item-copy-btn {
-                    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-                    width: 20px; height: 20px;
+                    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+                    width: 24px; height: 24px;
                     display: flex; align-items: center; justify-content: center;
-                    color: #9ca3af; cursor: pointer; border-radius: 4px;
+                    color: #6b7280; cursor: pointer; border-radius: 4px;
                     opacity: 0; transition: all 0.2s ease;
-                    background: rgba(255, 255, 255, 0.8); /* Slight bg for contrast */
+                    background: var(--gh-bg, white); /* 不透明背景遮住文字 */
                 }
                 .outline-item:hover .outline-item-copy-btn { opacity: 1; }
-                .outline-item-copy-btn:hover { color: var(--gh-border-active); background: rgba(0,0,0,0.05); }
+                .outline-item-copy-btn:hover { color: var(--gh-border-active); background: var(--gh-hover, #f3f4f6); }
                 .outline-item-copy-btn svg { width: 14px; height: 14px; }
-                
+
                 body[data-gh-mode="dark"] .outline-item-copy-btn {
-                    background: rgba(31, 41, 55, 0.8);
+                    background: var(--gh-bg, #1f2937);
+                    color: #9ca3af;
                 }
-                body[data-gh-mode="dark"] .outline-item-copy-btn:hover { background: rgba(255,255,255,0.1); }
-                
+                body[data-gh-mode="dark"] .outline-item-copy-btn:hover { background: var(--gh-hover, #374151); }
+
                 .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
                 /* 大纲高亮效果 */
