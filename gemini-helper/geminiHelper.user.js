@@ -388,6 +388,21 @@
             batchMove: '移动',
             batchDelete: '删除',
             batchExit: '退出',
+            batchExport: '导出',
+            exportToMarkdown: 'Markdown',
+            exportToJSON: 'JSON',
+            exportLoading: '正在加载对话历史...',
+            exportSuccess: '导出成功',
+            exportFailed: '导出失败',
+            exportNoContent: '未找到对话内容',
+            exportNeedOpenFirst: '请先打开要导出的会话',
+            exportUserLabel: '用户',
+            exportAILabel: 'AI',
+            exportMetaTitle: '导出信息',
+            exportMetaConvTitle: '会话标题',
+            exportMetaTime: '导出时间',
+            exportMetaSource: '来源',
+            exportNotSupported: '当前站点不支持导出',
             conversationsRefresh: '刷新会话列表',
             conversationsSearchPlaceholder: '搜索会话...',
             conversationsSearchResult: '个结果',
@@ -648,6 +663,21 @@
             batchMove: '移動',
             batchDelete: '刪除',
             batchExit: '退出',
+            batchExport: '匯出',
+            exportToMarkdown: 'Markdown',
+            exportToJSON: 'JSON',
+            exportLoading: '正在載入對話歷史...',
+            exportSuccess: '匯出成功',
+            exportFailed: '匯出失敗',
+            exportNoContent: '未找到對話內容',
+            exportNeedOpenFirst: '請先打開要匯出的會話',
+            exportUserLabel: '用戶',
+            exportAILabel: 'AI',
+            exportMetaTitle: '匯出資訊',
+            exportMetaConvTitle: '會話標題',
+            exportMetaTime: '匯出時間',
+            exportMetaSource: '來源',
+            exportNotSupported: '目前站點不支援匯出',
             conversationsRefresh: '刷新會話列表',
             conversationsSearchPlaceholder: '搜尋會話...',
             conversationsSearchResult: '個結果',
@@ -907,6 +937,21 @@
             batchMove: 'Move',
             batchDelete: 'Delete',
             batchExit: 'Exit',
+            batchExport: 'Export',
+            exportToMarkdown: 'Markdown',
+            exportToJSON: 'JSON',
+            exportLoading: 'Loading conversation history...',
+            exportSuccess: 'Export successful',
+            exportFailed: 'Export failed',
+            exportNoContent: 'No conversation content found',
+            exportNeedOpenFirst: 'Please open the conversation first',
+            exportUserLabel: 'User',
+            exportAILabel: 'AI',
+            exportMetaTitle: 'Export Info',
+            exportMetaConvTitle: 'Conversation Title',
+            exportMetaTime: 'Export Time',
+            exportMetaSource: 'Source',
+            exportNotSupported: 'Export not supported for this site',
             conversationsRefresh: 'Refresh List',
             conversationsSearchPlaceholder: 'Search conversations...',
             conversationsSearchResult: 'result(s)',
@@ -1456,6 +1501,20 @@
             return false; // 默认不支持，除非子类明确声明
         }
 
+        /**
+         * 获取导出配置（用于会话导出功能）
+         * 子类应覆盖此方法提供站点特定的配置
+         * @returns {{
+         *   userQuerySelector: string,      // 用户提问元素选择器
+         *   assistantResponseSelector: string, // AI回复元素选择器
+         *   turnSelector: string|null,      // 对话轮次容器选择器（可选）
+         *   useShadowDOM: boolean           // 是否需要穿透 Shadow DOM
+         * }|null} 返回 null 表示不支持导出
+         */
+        getExportConfig() {
+            return null;
+        }
+
         // ============= 新对话监听 =============
 
         /**
@@ -1855,6 +1914,15 @@
                 return queryText.textContent?.trim() || '';
             }
             return element.textContent?.trim() || '';
+        }
+
+        getExportConfig() {
+            return {
+                userQuerySelector: 'user-query',
+                assistantResponseSelector: 'model-response, .model-response-container .markdown',
+                turnSelector: '.conversation-turn',
+                useShadowDOM: false,
+            };
         }
 
         extractOutline(maxLevel = 6, includeUserQueries = false) {
@@ -5352,7 +5420,16 @@
                 batchDeleteBtn.addEventListener('click', () => this.batchDelete());
                 batchBtns.appendChild(batchDeleteBtn);
 
-                const batchCancelBtn = createElement('button', { className: 'conversations-batch-btn cancel' }, this.t('batchExit') || '退出');
+                // 导出按钮
+                const batchExportBtn = createElement('button', { className: 'conversations-batch-btn', title: this.t('batchExport') || '导出', style: 'padding: 4px 6px; min-width: auto;' }, '📤');
+                batchExportBtn.addEventListener('click', (e) => this.showExportMenu(e.target));
+                batchBtns.appendChild(batchExportBtn);
+
+                const batchCancelBtn = createElement(
+                    'button',
+                    { className: 'conversations-batch-btn cancel', title: this.t('batchExit') || '退出', style: 'padding: 4px 6px; min-width: auto;' },
+                    '❌',
+                );
                 batchCancelBtn.addEventListener('click', () => this.clearSelection());
                 batchBtns.appendChild(batchCancelBtn);
 
@@ -6310,6 +6387,336 @@
                 this.clearSelection();
                 this.createUI();
             });
+        }
+
+        /**
+         * 显示导出格式选择菜单
+         * @param {HTMLElement} anchorEl 锚点元素
+         */
+        showExportMenu(anchorEl) {
+            // 移除已有菜单
+            document.querySelectorAll('.conversations-export-menu').forEach((m) => m.remove());
+
+            const menu = createElement('div', { className: 'conversations-export-menu' });
+            // 菜单样式
+            Object.assign(menu.style, {
+                position: 'absolute',
+                background: 'var(--gh-bg, white)',
+                border: '1px solid var(--gh-border, #e5e7eb)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                padding: '4px',
+                minWidth: '140px',
+                zIndex: '100',
+            });
+
+            // 按钮通用样式
+            const btnStyle = {
+                display: 'block',
+                width: '100%',
+                padding: '8px 12px',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: 'var(--gh-text, #374151)',
+            };
+
+            // Markdown 选项
+            const mdBtn = createElement('button', {}, '📝 ' + (this.t('exportToMarkdown') || 'Markdown'));
+            Object.assign(mdBtn.style, btnStyle);
+            mdBtn.addEventListener('mouseenter', () => (mdBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            mdBtn.addEventListener('mouseleave', () => (mdBtn.style.background = 'none'));
+            mdBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('markdown');
+            });
+            menu.appendChild(mdBtn);
+
+            // JSON 选项
+            const jsonBtn = createElement('button', {}, '📋 ' + (this.t('exportToJSON') || 'JSON'));
+            Object.assign(jsonBtn.style, btnStyle);
+            jsonBtn.addEventListener('mouseenter', () => (jsonBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            jsonBtn.addEventListener('mouseleave', () => (jsonBtn.style.background = 'none'));
+            jsonBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('json');
+            });
+            menu.appendChild(jsonBtn);
+
+            // 定位菜单（相对于按钮向上弹出）
+            const parentRect = this.container.getBoundingClientRect();
+            const btnRect = anchorEl.getBoundingClientRect();
+            menu.style.bottom = `${parentRect.bottom - btnRect.top + 4}px`;
+            menu.style.left = `${btnRect.left - parentRect.left}px`;
+
+            this.container.appendChild(menu);
+
+            // 点击外部关闭
+            const closeHandler = (e) => {
+                if (!menu.contains(e.target) && e.target !== anchorEl) {
+                    menu.remove();
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+
+        /**
+         * 导出选中的会话
+         * @param {'markdown'|'json'} format 导出格式
+         */
+        async exportConversations(format) {
+            if (this.selectedIds.size === 0) return;
+
+            // 目前只支持单个会话导出
+            const convId = [...this.selectedIds][0];
+            const conv = this.data.conversations[convId];
+            if (!conv) {
+                showToast(this.t('exportNoContent') || '未找到对话内容');
+                return;
+            }
+
+            // 检查是否为当前会话
+            const currentSessionId = this.siteAdapter.getSessionId();
+            if (currentSessionId !== convId) {
+                showToast(this.t('exportNeedOpenFirst') || '请先打开要导出的会话');
+                return;
+            }
+
+            try {
+                showToast(this.t('exportLoading') || '正在加载对话历史...');
+
+                // 加载完整历史（滚动到顶部触发加载）
+                const scrollContainer = this.siteAdapter.getScrollContainer?.();
+                if (scrollContainer) {
+                    let prevHeight = 0;
+                    let retries = 0;
+                    const maxRetries = 50;
+
+                    while (retries < maxRetries) {
+                        scrollContainer.scrollTop = 0;
+                        await new Promise((resolve) => setTimeout(resolve, 500));
+
+                        const currentHeight = scrollContainer.scrollHeight;
+                        if (currentHeight === prevHeight) {
+                            retries++;
+                            if (retries >= 3) break;
+                        } else {
+                            retries = 0;
+                            prevHeight = currentHeight;
+                        }
+                    }
+                }
+
+                // 提取对话内容
+                const messages = this.extractConversationMessages();
+                if (messages.length === 0) {
+                    showToast(this.t('exportNoContent') || '未找到对话内容');
+                    return;
+                }
+
+                // 格式化并下载
+                let content, filename, mimeType;
+                const safeTitle = (conv.title || 'conversation').replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
+
+                if (format === 'markdown') {
+                    content = this.formatToMarkdown(conv, messages);
+                    filename = `${safeTitle}.md`;
+                    mimeType = 'text/markdown;charset=utf-8';
+                } else {
+                    content = this.formatToJSON(conv, messages);
+                    filename = `${safeTitle}.json`;
+                    mimeType = 'application/json;charset=utf-8';
+                }
+
+                this.downloadFile(content, filename, mimeType);
+                showToast(this.t('exportSuccess') || '导出成功');
+            } catch (error) {
+                console.error('[ConversationManager] Export failed:', error);
+                showToast(this.t('exportFailed') || '导出失败');
+            }
+        }
+
+        /**
+         * 提取当前页面的对话消息
+         * @returns {Array<{role: 'user'|'assistant', content: string}>}
+         */
+        extractConversationMessages() {
+            const messages = [];
+
+            // 从 siteAdapter 获取配置
+            const config = this.siteAdapter.getExportConfig?.();
+            if (!config) {
+                console.warn('[ConversationManager] Export config not available for this site');
+                return messages;
+            }
+
+            const { userQuerySelector, assistantResponseSelector, turnSelector, useShadowDOM } = config;
+            const queryOpts = { all: true, shadow: useShadowDOM };
+
+            // 方案：分别提取用户和 AI 消息
+            const userMessages = DOMToolkit.query(userQuerySelector, queryOpts) || [];
+            const aiMessages = DOMToolkit.query(assistantResponseSelector, queryOpts) || [];
+
+            const maxLen = Math.max(userMessages.length, aiMessages.length);
+            for (let i = 0; i < maxLen; i++) {
+                if (userMessages[i]) {
+                    messages.push({ role: 'user', content: userMessages[i].innerText?.trim() || '' });
+                }
+                if (aiMessages[i]) {
+                    messages.push({
+                        role: 'assistant',
+                        content: this.htmlToMarkdown(aiMessages[i]) || aiMessages[i].innerText?.trim() || '',
+                    });
+                }
+            }
+
+            return messages;
+        }
+
+        /**
+         * HTML 转 Markdown
+         * @param {HTMLElement} el
+         * @returns {string}
+         */
+        htmlToMarkdown(el) {
+            if (!el) return '';
+
+            const processNode = (node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent;
+                }
+
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    return '';
+                }
+
+                const tag = node.tagName.toLowerCase();
+                const children = Array.from(node.childNodes).map(processNode).join('');
+
+                switch (tag) {
+                    case 'pre': {
+                        const code = node.querySelector('code');
+                        const lang = code?.className.match(/language-(\w+)/)?.[1] || '';
+                        const text = code?.textContent || node.textContent;
+                        return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
+                    }
+                    case 'code':
+                        // 如果父元素是 pre，跳过（已在 pre 中处理）
+                        if (node.parentElement?.tagName.toLowerCase() === 'pre') return '';
+                        return `\`${node.textContent}\``;
+                    case 'h1':
+                        return `\n# ${children}\n`;
+                    case 'h2':
+                        return `\n## ${children}\n`;
+                    case 'h3':
+                        return `\n### ${children}\n`;
+                    case 'h4':
+                        return `\n#### ${children}\n`;
+                    case 'h5':
+                        return `\n##### ${children}\n`;
+                    case 'h6':
+                        return `\n###### ${children}\n`;
+                    case 'strong':
+                    case 'b':
+                        return `**${children}**`;
+                    case 'em':
+                    case 'i':
+                        return `*${children}*`;
+                    case 'a':
+                        return `[${children}](${node.href || ''})`;
+                    case 'li':
+                        return `- ${children}\n`;
+                    case 'p':
+                        return `${children}\n\n`;
+                    case 'br':
+                        return '\n';
+                    case 'ul':
+                    case 'ol':
+                        return `\n${children}`;
+                    default:
+                        return children;
+                }
+            };
+
+            return processNode(el).trim();
+        }
+
+        /**
+         * 格式化为 Markdown
+         */
+        formatToMarkdown(conv, messages) {
+            const lines = [];
+            const now = new Date().toLocaleString();
+            const userLabel = this.t('exportUserLabel') || '用户';
+            const aiLabel = this.t('exportAILabel') || 'AI';
+
+            // 元数据头
+            lines.push('---');
+            lines.push(`# 📤 ${this.t('exportMetaTitle') || '导出信息'}`);
+            lines.push(`- **${this.t('exportMetaConvTitle') || '会话标题'}**: ${conv.title || '未命名'}`);
+            lines.push(`- **${this.t('exportMetaTime') || '导出时间'}**: ${now}`);
+            lines.push(`- **${this.t('exportMetaSource') || '来源'}**: ${this.siteAdapter.getName()}`);
+            lines.push('---');
+            lines.push('');
+
+            // 对话内容
+            messages.forEach((msg) => {
+                if (msg.role === 'user') {
+                    lines.push(`## 🙋 ${userLabel}`);
+                    lines.push('');
+                    lines.push(msg.content);
+                    lines.push('');
+                    lines.push('---');
+                    lines.push('');
+                } else {
+                    lines.push(`## 🤖 ${this.siteAdapter.getName()}`);
+                    lines.push('');
+                    lines.push(msg.content);
+                    lines.push('');
+                    lines.push('---');
+                    lines.push('');
+                }
+            });
+
+            return lines.join('\n');
+        }
+
+        /**
+         * 格式化为 JSON
+         */
+        formatToJSON(conv, messages) {
+            const data = {
+                metadata: {
+                    title: conv.title || '未命名',
+                    id: conv.id,
+                    exportTime: new Date().toISOString(),
+                    source: this.siteAdapter.getName(),
+                },
+                messages: messages.map((msg) => ({
+                    role: msg.role,
+                    content: msg.content,
+                })),
+            };
+            return JSON.stringify(data, null, 2);
+        }
+
+        /**
+         * 下载文件
+         */
+        downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         /**
