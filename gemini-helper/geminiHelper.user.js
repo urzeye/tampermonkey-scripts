@@ -405,6 +405,7 @@
             exportNotSupported: '当前站点不支持导出',
             exportToTXT: 'TXT',
             exportMetaUrl: '链接',
+            exportToClipboard: '复制 Markdown',
             conversationsRefresh: '刷新会话列表',
             conversationsSearchPlaceholder: '搜索会话...',
             conversationsSearchResult: '个结果',
@@ -697,6 +698,7 @@
             exportNotSupported: '目前站點不支援匯出',
             exportToTXT: 'TXT',
             exportMetaUrl: '連結',
+            exportToClipboard: '複製 Markdown',
             conversationsRefresh: '刷新會話列表',
             conversationsSearchPlaceholder: '搜尋會話...',
             conversationsSearchResult: '個結果',
@@ -988,6 +990,7 @@
             exportNotSupported: 'Export not supported for this site',
             exportToTXT: 'TXT',
             exportMetaUrl: 'URL',
+            exportToClipboard: 'Copy Markdown',
             conversationsRefresh: 'Refresh List',
             conversationsSearchPlaceholder: 'Search conversations...',
             conversationsSearchResult: 'result(s)',
@@ -6748,7 +6751,25 @@
                 cursor: 'pointer',
                 fontSize: '13px',
                 color: 'var(--gh-text, #374151)',
+                color: 'var(--gh-text, #374151)',
             };
+
+            // 复制 Markdown 选项
+            const copyBtn = createElement('button', {}, '📋 ' + (this.t('exportToClipboard') || 'Copy Markdown'));
+            Object.assign(copyBtn.style, btnStyle);
+            copyBtn.addEventListener('mouseenter', () => (copyBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            copyBtn.addEventListener('mouseleave', () => (copyBtn.style.background = 'none'));
+            copyBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('clipboard');
+            });
+            menu.appendChild(copyBtn);
+
+            // 分割线
+            const divider = createElement('div');
+            divider.style.borderTop = '1px solid var(--gh-border, #e5e7eb)';
+            divider.style.margin = '4px 0';
+            menu.appendChild(divider);
 
             // Markdown 选项
             const mdBtn = createElement('button', {}, '📝 ' + (this.t('exportToMarkdown') || 'Markdown'));
@@ -6859,7 +6880,12 @@
                 let content, filename, mimeType;
                 const safeTitle = (conv.title || 'conversation').replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
 
-                if (format === 'markdown') {
+                if (format === 'clipboard') {
+                    content = this.formatToMarkdown(conv, messages);
+                    await navigator.clipboard.writeText(content);
+                    showToast(this.t('exportSuccess') || '导出成功');
+                    return;
+                } else if (format === 'markdown') {
                     content = this.formatToMarkdown(conv, messages);
                     filename = `${safeTitle}.md`;
                     mimeType = 'text/markdown;charset=utf-8';
