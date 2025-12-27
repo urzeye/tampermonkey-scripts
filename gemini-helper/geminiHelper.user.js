@@ -1889,10 +1889,10 @@
                     // 提取用户提问文本
                     let queryText = this.extractUserQueryText(element);
 
-                    // 截断长文本（最多 80 字符）
+                    // 截断长文本（最多 30 字符）
                     let isTruncated = false;
-                    if (queryText.length > 80) {
-                        queryText = queryText.substring(0, 80) + '...';
+                    if (queryText.length > 30) {
+                        queryText = queryText.substring(0, 30) + '...';
                         isTruncated = true;
                     }
 
@@ -2593,8 +2593,8 @@
                 if (questionBlock) {
                     let queryText = this.extractUserQueryText(questionBlock);
                     let isTruncated = false;
-                    if (queryText.length > 80) {
-                        queryText = queryText.substring(0, 80) + '...';
+                    if (queryText.length > 30) {
+                        queryText = queryText.substring(0, 30) + '...';
                         isTruncated = true;
                     }
                     outline.push({
@@ -10013,8 +10013,7 @@
                     border-left: 3px solid var(--gh-border-active);
                     font-weight: 500;
                     padding-left: 8px !important;
-                    /* Add padding-right to accommodate copy button (20px button + margin) */
-                    padding-right: 32px !important; 
+                    /* 复制按钮使用绝对定位悬浮在文字上方，不需要预留空间 */
                     margin-top: 8px;
                     border-radius: 4px;
                 }
@@ -10046,23 +10045,24 @@
                     color: #e5e7eb; background: #374151; border-color: #4b5563;
                     box-shadow: 0 0 0 1.5px #1f2937;
                 }
-                /* 用户提问复制按钮 */
+                /* 用户提问复制按钮 - 悬浮在文字上方 */
                 .outline-item-copy-btn {
-                    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-                    width: 20px; height: 20px;
+                    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+                    width: 24px; height: 24px;
                     display: flex; align-items: center; justify-content: center;
-                    color: #9ca3af; cursor: pointer; border-radius: 4px;
+                    color: #6b7280; cursor: pointer; border-radius: 4px;
                     opacity: 0; transition: all 0.2s ease;
-                    background: rgba(255, 255, 255, 0.8); /* Slight bg for contrast */
+                    background: var(--gh-bg, white); /* 不透明背景遮住文字 */
                 }
                 .outline-item:hover .outline-item-copy-btn { opacity: 1; }
-                .outline-item-copy-btn:hover { color: var(--gh-border-active); background: rgba(0,0,0,0.05); }
+                .outline-item-copy-btn:hover { color: var(--gh-border-active); background: var(--gh-hover, #f3f4f6); }
                 .outline-item-copy-btn svg { width: 14px; height: 14px; }
                 
                 body[data-gh-mode="dark"] .outline-item-copy-btn {
-                    background: rgba(31, 41, 55, 0.8);
+                    background: var(--gh-bg, #1f2937);
+                    color: #9ca3af;
                 }
-                body[data-gh-mode="dark"] .outline-item-copy-btn:hover { background: rgba(255,255,255,0.1); }
+                body[data-gh-mode="dark"] .outline-item-copy-btn:hover { background: var(--gh-hover, #374151); }
                 
                 .outline-item.user-query-node:hover { background: var(--user-query-hover-bg, rgba(66, 133, 244, 0.15)); }
                 .outline-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 14px; }
