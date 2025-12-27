@@ -6938,6 +6938,18 @@
                 const tag = node.tagName.toLowerCase();
                 const children = Array.from(node.childNodes).map(processNode).join('');
 
+                // 处理数学公式块（从 data-math 属性提取 LaTeX 源码）
+                if (node.classList?.contains('math-block')) {
+                    const latex = node.getAttribute('data-math');
+                    if (latex) return `\n$$${latex}$$\n`;
+                }
+
+                // 处理行内数学公式
+                if (node.classList?.contains('math-inline')) {
+                    const latex = node.getAttribute('data-math');
+                    if (latex) return `$${latex}$`;
+                }
+
                 switch (tag) {
                     case 'pre': {
                         const code = node.querySelector('code');
