@@ -7545,29 +7545,123 @@
             groupBtn.addEventListener('click', () => this.toggleGroupMode());
             row1.appendChild(groupBtn);
 
-            // 展开/折叠按钮
-            const expandBtn = createElement(
-                'button',
-                {
-                    className: 'outline-toolbar-btn',
-                    id: 'outline-expand-btn',
-                    title: this.t('outlineExpandAll'),
-                },
-                '⊕',
-            );
+            // 创建展开/折叠 SVG 图标的辅助函数
+            const createExpandIcon = () => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 16 16');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2');
+                svg.style.width = '14px';
+                svg.style.height = '14px';
+                // 圆圈
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', '8');
+                circle.setAttribute('cy', '8');
+                circle.setAttribute('r', '6.5');
+                svg.appendChild(circle);
+                // 横线
+                const h = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                h.setAttribute('x1', '4');
+                h.setAttribute('y1', '8');
+                h.setAttribute('x2', '12');
+                h.setAttribute('y2', '8');
+                svg.appendChild(h);
+                // 竖线 (⊕ 独有)
+                const v = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                v.setAttribute('x1', '8');
+                v.setAttribute('y1', '4');
+                v.setAttribute('x2', '8');
+                v.setAttribute('y2', '12');
+                svg.appendChild(v);
+                return svg;
+            };
+            const createCollapseIcon = () => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 16 16');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2');
+                svg.style.width = '14px';
+                svg.style.height = '14px';
+                // 圆圈
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', '8');
+                circle.setAttribute('cy', '8');
+                circle.setAttribute('r', '6.5');
+                svg.appendChild(circle);
+                // 横线
+                const h = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                h.setAttribute('x1', '4');
+                h.setAttribute('y1', '8');
+                h.setAttribute('x2', '12');
+                h.setAttribute('y2', '8');
+                svg.appendChild(h);
+                return svg;
+            };
+            // 保存到类实例以便后续切换使用
+            this._createExpandIcon = createExpandIcon;
+            this._createCollapseIcon = createCollapseIcon;
+
+            // 展开/折叠按钮 (使用 SVG 图标确保跨平台一致性)
+            const expandBtn = createElement('button', {
+                className: 'outline-toolbar-btn',
+                id: 'outline-expand-btn',
+                title: this.t('outlineExpandAll'),
+            });
+            expandBtn.appendChild(createExpandIcon());
             expandBtn.addEventListener('click', () => this.toggleExpandAll());
             row1.appendChild(expandBtn);
 
-            // 定位当前位置按钮
-            const locateBtn = createElement(
-                'button',
-                {
-                    className: 'outline-toolbar-btn',
-                    id: 'outline-locate-btn',
-                    title: this.t('outlineLocateCurrent'),
-                },
-                '◎',
-            );
+            // 定位当前位置按钮 (使用 SVG 图标确保跨平台一致性)
+            const locateBtn = createElement('button', {
+                className: 'outline-toolbar-btn',
+                id: 'outline-locate-btn',
+                title: this.t('outlineLocateCurrent'),
+            });
+            // 创建定位图标 SVG (crosshair/target 风格)
+            const locateSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            // 使用较小的 viewBox 让图形内容占据更大比例
+            locateSvg.setAttribute('viewBox', '0 0 18 18');
+            locateSvg.setAttribute('fill', 'none');
+            locateSvg.setAttribute('stroke', 'currentColor');
+            locateSvg.setAttribute('stroke-width', '2');
+            locateSvg.setAttribute('stroke-linecap', 'round');
+            locateSvg.setAttribute('stroke-linejoin', 'round');
+            locateSvg.style.width = '18px';
+            locateSvg.style.height = '18px';
+            // 圆圈 (中心9,9 半径4.5)
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '9');
+            circle.setAttribute('cy', '9');
+            circle.setAttribute('r', '4.5');
+            locateSvg.appendChild(circle);
+            // 十字准线 (从边缘到圆圈)
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '9');
+            line1.setAttribute('y1', '1');
+            line1.setAttribute('x2', '9');
+            line1.setAttribute('y2', '3.5');
+            locateSvg.appendChild(line1);
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '9');
+            line2.setAttribute('y1', '14.5');
+            line2.setAttribute('x2', '9');
+            line2.setAttribute('y2', '17');
+            locateSvg.appendChild(line2);
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '1');
+            line3.setAttribute('y1', '9');
+            line3.setAttribute('x2', '3.5');
+            line3.setAttribute('y2', '9');
+            locateSvg.appendChild(line3);
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', '14.5');
+            line4.setAttribute('y1', '9');
+            line4.setAttribute('x2', '17');
+            line4.setAttribute('y2', '9');
+            locateSvg.appendChild(line4);
+            locateBtn.appendChild(locateSvg);
             locateBtn.addEventListener('click', () => this.locateCurrentPosition());
             row1.appendChild(locateBtn);
 
@@ -8421,11 +8515,11 @@
             const maxActualLevel = Math.max(...Object.keys(this.state.levelCounts).map(Number), 1);
             if (btn) {
                 if (level >= maxActualLevel) {
-                    btn.textContent = '⊖';
+                    btn.replaceChildren(this._createCollapseIcon ? this._createCollapseIcon() : document.createTextNode('⊖'));
                     btn.title = this.t('outlineCollapseAll');
                     this.state.isAllExpanded = true;
                 } else {
-                    btn.textContent = '⊕';
+                    btn.replaceChildren(this._createExpandIcon ? this._createExpandIcon() : document.createTextNode('⊕'));
                     btn.title = this.t('outlineExpandAll');
                     this.state.isAllExpanded = false;
                 }
@@ -9794,10 +9888,6 @@
                 }
                 .outline-toolbar-btn:hover { border-color: var(--gh-border-active); color: var(--gh-border-active); background: var(--gh-folder-bg-default); }
                 .outline-toolbar-btn.active { border-color: var(--gh-tag-active-bg); color: white; background: var(--gh-tag-active-bg); }
-                /* 展开/折叠按钮使用更大字号，因为⊕/⊖符号比emoji渲染得小 */
-                #outline-expand-btn { font-size: 18px; }
-                /* 定位按钮使用更大字号，确保◎符号大小一致 */
-                #outline-locate-btn { font-size: 18px; }
                 .outline-search-input {
                     flex: 1; height: 28px; padding: 0 10px; border: 1px solid var(--gh-input-border, #d1d5db); border-radius: 6px;
                     font-size: 13px; color: var(--gh-text, #374151); outline: none; transition: all 0.2s;
