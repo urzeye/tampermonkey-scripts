@@ -6935,8 +6935,10 @@
                     return '';
                 }
 
-                const tag = node.tagName.toLowerCase();
-                const children = Array.from(node.childNodes).map(processNode).join('');
+                // ============================================================
+                // 1. 优先处理特殊标签：这些标签不需要递归处理子节点
+                //    或者需要完全自定义子节点的处理方式
+                // ============================================================
 
                 // 处理数学公式块（从 data-math 属性提取 LaTeX 源码）
                 if (node.classList?.contains('math-block')) {
@@ -6950,74 +6952,120 @@
                     if (latex) return `$${latex}$`;
                 }
 
-                switch (tag) {
-                    case 'pre': {
-                        const code = node.querySelector('code');
-                        // 尝试多种方式获取语言：1) code.className 2) 前面的 .code-block-decoration span
-                        let lang = code?.className.match(/language-(\w+)/)?.[1] || '';
-                        if (!lang) {
-                            const decoration = node.previousElementSibling;
-                            if (decoration?.classList?.contains('code-block-decoration')) {
-                                lang = decoration.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
-                            }
-                        }
-                        const text = code?.textContent || node.textContent;
-                        return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
-                    }
-                    case 'code':
-                        // 如果父元素是 pre，跳过（已在 pre 中处理）
-                        if (node.parentElement?.tagName.toLowerCase() === 'pre') return '';
-                        return `\`${node.textContent}\``;
-                    case 'img': {
-                        const alt = node.alt || node.getAttribute('alt') || '图片';
-                        const src = node.src || node.getAttribute('src') || '';
-                        return `![${alt}](${src})`;
-                    }
-                    case 'table': {
-                        // 处理表格：生成 Markdown 表格
-                        const rows = [];
-                        const thead = node.querySelector('thead');
-                        const tbody = node.querySelector('tbody');
+                const tag = node.tagName.toLowerCase();
 
-                        // 处理表头
-                        if (thead) {
-                            const headerRow = thead.querySelector('tr');
-                            if (headerRow) {
-                                const headers = Array.from(headerRow.querySelectorAll('td, th')).map((cell) => {
-                                    return this.htmlToMarkdown(cell).replace(/\n/g, ' ').trim();
-                                });
-                                rows.push('| ' + headers.join(' | ') + ' |');
-                                rows.push('| ' + headers.map(() => '---').join(' | ') + ' |');
-                            }
-                        }
+                // 图片：直接生成 Markdown，不需要子节点
+                if (tag === 'img') {
+                    const alt = node.alt || node.getAttribute('alt') || '图片';
+                    const src = node.src || node.getAttribute('src') || '';
+                    return `![${alt}](${src})`;
+                }
 
-                        // 处理表体
-                        if (tbody) {
-                            const bodyRows = tbody.querySelectorAll('tr');
-                            bodyRows.forEach((tr) => {
-                                const cells = Array.from(tr.querySelectorAll('td, th')).map((cell) => {
-                                    return this.htmlToMarkdown(cell).replace(/\n/g, ' ').trim();
-                                });
-                                rows.push('| ' + cells.join(' | ') + ' |');
+                // 代码块容器 (Gemini 特有)：手动提取语言和内容，忽略内部结构（避免输出 "Copy" 按钮文本）
+                if (tag === 'code-block') {
+                    const decoration = node.querySelector('.code-block-decoration');
+                    const lang = decoration?.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                    const codeEl = node.querySelector('pre code');
+                    const text = codeEl?.textContent || node.querySelector('pre')?.textContent || '';
+                    return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
+                }
+
+                // 预格式化块：手动提取 code 内容，忽略子节点递归结果（code-block内的pre会被上面的逻辑拦截，这里处理独立的pre）
+                if (tag === 'pre') {
+                    const code = node.querySelector('code');
+                    // 尝试多种方式获取语言
+                    let lang = code?.className.match(/language-(\w+)/)?.[1] || '';
+
+                    if (!lang) {
+                        // 方式2: 向上遍历兄弟元素查找 .code-block-decoration
+                        let sibling = node.previousElementSibling;
+                        while (sibling && !lang) {
+                            if (sibling.classList?.contains('code-block-decoration')) {
+                                lang = sibling.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                                break;
+                            }
+                            sibling = sibling.previousElementSibling;
+                        }
+                    }
+
+                    if (!lang) {
+                        // 方式3: 在父容器中查找 .code-block-decoration
+                        const parent = node.parentElement;
+                        const decoration = parent?.querySelector('.code-block-decoration');
+                        if (decoration) {
+                            lang = decoration.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                        }
+                    }
+
+                    const text = code?.textContent || node.textContent;
+                    return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
+                }
+
+                // 内联代码：简单包裹，忽略子元素（通常没子元素，或者是高亮span）
+                if (tag === 'code') {
+                    // 如果父元素是 pre，返回空字符串（因为内容已被 pre 处理，且我们即将返回 children 拼接结果）
+                    // 但这里我们在计算 children 之前就拦截了。
+                    // 修正逻辑：如果父元素是 pre，则该 code 节点不需要再输出（因为父 pre 已经提取了它的 textContent）
+                    if (node.parentElement?.tagName.toLowerCase() === 'pre') return '';
+                    return `\`${node.textContent}\``;
+                }
+
+                // 表格：完全自定义子节点处理逻辑
+                if (tag === 'table') {
+                    const rows = [];
+                    const thead = node.querySelector('thead');
+                    const tbody = node.querySelector('tbody');
+
+                    // 处理表头
+                    if (thead) {
+                        const headerRow = thead.querySelector('tr');
+                        if (headerRow) {
+                            const headers = Array.from(headerRow.querySelectorAll('td, th')).map((cell) => {
+                                // 递归调用以处理单元格内的格式（如加粗、数学公式）
+                                return this.htmlToMarkdown(cell).replace(/\n/g, ' ').trim();
                             });
+                            rows.push('| ' + headers.join(' | ') + ' |');
+                            rows.push('| ' + headers.map(() => '---').join(' | ') + ' |');
                         }
-
-                        return '\n' + rows.join('\n') + '\n';
                     }
-                    case 'table-block':
-                        // table-block 是 Gemini 的表格容器，查找内部 table
-                        const innerTable = node.querySelector('table');
-                        if (innerTable) {
-                            return processNode(innerTable);
-                        }
-                        return children;
-                    case 'thead':
-                    case 'tbody':
-                    case 'tr':
-                    case 'td':
-                    case 'th':
-                        // 这些标签在 table 处理中已处理，直接返回children
-                        return children;
+
+                    // 处理表体
+                    if (tbody) {
+                        const bodyRows = tbody.querySelectorAll('tr');
+                        bodyRows.forEach((tr) => {
+                            const cells = Array.from(tr.querySelectorAll('td, th')).map((cell) => {
+                                return this.htmlToMarkdown(cell).replace(/\n/g, ' ').trim();
+                            });
+                            rows.push('| ' + cells.join(' | ') + ' |');
+                        });
+                    }
+                    return '\n' + rows.join('\n') + '\n';
+                }
+
+                // Gemini 表格容器：直接处理内部表格，忽略其他可能的装饰元素
+                if (tag === 'table-block') {
+                    const innerTable = node.querySelector('table');
+                    if (innerTable) {
+                        return processNode(innerTable);
+                    }
+                    // 如果没找到 table，则退化为处理所有子节点
+                }
+
+                // 表格内部标签：由于 table 已经手动处理了 thead/tbody/tr/td，
+                // 如果递归遍历到了这些标签（例如 table-block 没有拦截住，或者非标准结构的表格），
+                // 我们应该只返回子节点内容，或者什么都不做以免破坏表格结构。
+                // 暂时按返回子节点内容处理。
+                if (['thead', 'tbody', 'tr', 'td', 'th'].includes(tag)) {
+                    // 这些通常在 table 的处理逻辑中被 htmlToMarkdown(cell) 调用
+                    // 这里只需要返回 children 拼接结果即可（保留内部格式如 b/i）
+                }
+
+                // ============================================================
+                // 2. 常规标签：递归处理子节点，然后包裹格式
+                // ============================================================
+                const children = Array.from(node.childNodes).map(processNode).join('');
+
+                switch (tag) {
                     case 'h1':
                         return `\n# ${children}\n`;
                     case 'h2':
@@ -7047,6 +7095,7 @@
                     case 'ul':
                     case 'ol':
                         return `\n${children}`;
+                    // 对于不匹配的标签（如 div, span, table-block 等），直接返回内容
                     default:
                         return children;
                 }
