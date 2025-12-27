@@ -6953,7 +6953,14 @@
                 switch (tag) {
                     case 'pre': {
                         const code = node.querySelector('code');
-                        const lang = code?.className.match(/language-(\w+)/)?.[1] || '';
+                        // 尝试多种方式获取语言：1) code.className 2) 前面的 .code-block-decoration span
+                        let lang = code?.className.match(/language-(\w+)/)?.[1] || '';
+                        if (!lang) {
+                            const decoration = node.previousElementSibling;
+                            if (decoration?.classList?.contains('code-block-decoration')) {
+                                lang = decoration.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                            }
+                        }
                         const text = code?.textContent || node.textContent;
                         return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
                     }
@@ -6961,6 +6968,56 @@
                         // 如果父元素是 pre，跳过（已在 pre 中处理）
                         if (node.parentElement?.tagName.toLowerCase() === 'pre') return '';
                         return `\`${node.textContent}\``;
+                    case 'img': {
+                        const alt = node.alt || node.getAttribute('alt') || '图片';
+                        const src = node.src || node.getAttribute('src') || '';
+                        return `![${alt}](${src})`;
+                    }
+                    case 'table': {
+                        // 处理表格：生成 Markdown 表格
+                        const rows = [];
+                        const thead = node.querySelector('thead');
+                        const tbody = node.querySelector('tbody');
+
+                        // 处理表头
+                        if (thead) {
+                            const headerRow = thead.querySelector('tr');
+                            if (headerRow) {
+                                const headers = Array.from(headerRow.querySelectorAll('td, th')).map((cell) => {
+                                    return this.htmlToMarkdown(cell).replace(/\n/g, ' ').trim();
+                                });
+                                rows.push('| ' + headers.join(' | ') + ' |');
+                                rows.push('| ' + headers.map(() => '---').join(' | ') + ' |');
+                            }
+                        }
+
+                        // 处理表体
+                        if (tbody) {
+                            const bodyRows = tbody.querySelectorAll('tr');
+                            bodyRows.forEach((tr) => {
+                                const cells = Array.from(tr.querySelectorAll('td, th')).map((cell) => {
+                                    return this.htmlToMarkdown(cell).replace(/\n/g, ' ').trim();
+                                });
+                                rows.push('| ' + cells.join(' | ') + ' |');
+                            });
+                        }
+
+                        return '\n' + rows.join('\n') + '\n';
+                    }
+                    case 'table-block':
+                        // table-block 是 Gemini 的表格容器，查找内部 table
+                        const innerTable = node.querySelector('table');
+                        if (innerTable) {
+                            return processNode(innerTable);
+                        }
+                        return children;
+                    case 'thead':
+                    case 'tbody':
+                    case 'tr':
+                    case 'td':
+                    case 'th':
+                        // 这些标签在 table 处理中已处理，直接返回children
+                        return children;
                     case 'h1':
                         return `\n# ${children}\n`;
                     case 'h2':
