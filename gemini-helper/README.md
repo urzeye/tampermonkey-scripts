@@ -1,8 +1,11 @@
 # Gemini-helper
 
-> Gemini 助手：支持会话管理、对话大纲、提示词管理、模型锁定、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
+> Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配
+> Gemini 标准版/企业版）
 
-> Gemini Helper: Supports conversation management, outline navigation, prompt management, model locking, Markdown bold fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini Standard/Enterprise
+> Gemini Helper: Conversation management & export, outline navigation, prompt management, tab enhancements (
+> status/privacy/notification), reading history & restore, bidirectional/manual anchor, image watermark removal, bold fix,
+> formula/table copy, model lock, page beautification, theme toggle, smart dark mode (Gemini/Gemini Enterprise)
 
 ## ✨ 功能特性
 
@@ -15,12 +18,13 @@
 -   **复制功能**：一键复制提示词内容到剪贴板
 -   **拖动排序**：自由调整提示词显示顺序
 
-### 📁 会话管理
+### ⁠ 📁 会话管理
 
 -   **文件夹归档**：创建自定义文件夹，将历史会话有序整理
 -   **多色标签**：内置 30+ 种中国传统色标签，支持自定义颜色与多标签管理
 -   **实时搜索**：按标题快速筛选会话，支持标签组合过滤
 -   **批量操作**：支持多选会话进行批量删除、移动、归档
+- **会话导出**：支持导出为 Markdown/JSON/TXT 格式，图片可转 Base64 嵌入
 -   **无缝同步**：自动同步 Gemini 侧边栏最新数据（兼容标准版/企业版）
 
 ### 📑 对话大纲
@@ -84,7 +88,15 @@
 -   **智能检测**：实时跟随系统/网页切换亮/暗模式
 -   **全局适配**：精心调配的深色主题配色，保护眼睛
 
-## 📸 功能预览
+### � 内容辅助
+
+- **公式双击复制**：双击数学公式可复制 LaTeX 源码，支持自动添加分隔符
+- **表格 Markdown 复制**：在表格右上角添加复制按钮，直接复制 Markdown 格式
+- **水印移除**：自动移除 Gemini AI 生成图片中的 NanoBanana 水印，感谢 @Entropy-Xu 贡献
+- **边缘吸附隐藏**：拖动面板到屏幕边缘时自动隐藏，悬停恢复，感谢 @Entropy-Xu 贡献
+- **手动锚点**：快捷工具栏一键设置/返回/清除锚点位置，感谢 @Entropy-Xu 贡献
+
+## �📸 功能预览
 
 -   右侧悬浮面板，支持拖拽移动（优化拖动体验，不会误选文本）
 -   渐变色主题，美观大方
@@ -115,10 +127,17 @@
 
 ## 📋 [更新日志](./changelog.md)
 
-### v1.10.3
+### v1.11.0
 
--   🐛 **Bug 修复**：**悬浮条位置优化** - 修复提示词悬浮条遮挡输入框的问题，现在悬浮条会自动定位到输入区域上方
--   🐛 **Bug 修复**：切换会话时自动清除悬浮条和输入框内容，保持状态一致
+- ✨ **新功能**：**会话导出** - 支持导出为 Markdown/JSON/TXT 格式，图片可转 Base64 嵌入
+- ✨ **新功能**：**边缘吸附隐藏** - 拖动面板到屏幕边缘时自动隐藏，悬停恢复
+- ✨ **新功能**：**手动锚点** - 快捷工具栏新增设置/返回/清除锚点按钮
+- ✨ **新功能**：**水印移除** - 自动移除 Gemini AI 生成图片中的 NanoBanana 水印
+- ✨ **新功能**：**公式双击复制** - 双击数学公式可复制 LaTeX 源码
+- ✨ **新功能**：**表格复制 Markdown** - 表格右上角添加复制按钮
+- 🎨 **UI 优化**：**统一侧边按钮组** - 蓝色渐变风格，垂直居中显示
+
+### v1.10.3
 
 ### v1.10.2
 

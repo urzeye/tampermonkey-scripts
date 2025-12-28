@@ -11,6 +11,7 @@
 3. [用户看完生成结果后切换页面仍收到通知](#3-用户看完生成结果后切换页面仍收到通知)
 4. [面板拖拽跳动问题](#4-面板拖拽跳动问题)
 5. [同步滚动初始化失败](#5-同步滚动初始化失败)
+6. [Shadow DOM 内动态元素监听失效](#6-shadow-dom-内动态元素监听失效)
 
 ---
 
@@ -119,7 +120,7 @@ restartRecording() {
 
 ```javascript
 // restoreReadingProgress 中
-this.readingProgressManager.restartRecording();  // 原为 startRecording()
+this.readingProgressManager.restartRecording(); // 原为 startRecording()
 ```
 
 ### 经验总结
@@ -179,18 +180,18 @@ T+3s: NetworkMonitor 确认完成，触发 _onAiComplete()
 通过监听 `visibilitychange` 事件，追踪用户是否在前台看到过生成完成：
 
 ```javascript
-constructor()
+constructor();
 {
     this._userSawCompletion = false;
     this._boundVisibilityHandler = this._onVisibilityChange.bind(this);
 }
 
-start()
+start();
 {
     document.addEventListener('visibilitychange', this._boundVisibilityHandler);
 }
 
-_onVisibilityChange()
+_onVisibilityChange();
 {
     // 用户切换页面时，检查 DOM 状态
     // 如果正在生成但 DOM 显示已完成，说明用户看到了完成状态
@@ -199,16 +200,16 @@ _onVisibilityChange()
     }
 }
 
-_onAiComplete()
+_onAiComplete();
 {
     // 只有用户没看到过完成状态时才发通知
     if (wasGenerating && document.hidden && !this._userSawCompletion) {
         this._sendCompletionNotification();
     }
-    this._userSawCompletion = false;  // 重置
+    this._userSawCompletion = false; // 重置
 }
 
-stop()
+stop();
 {
     document.removeEventListener('visibilitychange', this._boundVisibilityHandler);
 }
@@ -245,7 +246,7 @@ CSS 初始定位：
     position: fixed;
     top: 50%;
     right: 20px;
-    transform: translateY(-50%);  /* 关键：居中 */
+    transform: translateY(-50%); /* 关键：居中 */
     transition: all 0.3s ease;
 }
 ```
@@ -253,26 +254,27 @@ CSS 初始定位：
 拖拽逻辑（旧）：
 
 ```javascript
-let xOffset = 0, yOffset = 0;
+let xOffset = 0,
+    yOffset = 0;
 
 // mousedown
-initialX = e.clientX - xOffset;  // = clientX - 0
-initialY = e.clientY - yOffset;  // = clientY - 0
+initialX = e.clientX - xOffset; // = clientX - 0
+initialY = e.clientY - yOffset; // = clientY - 0
 
 // mousemove
-panel.style.transform = `translate(${currentX}px, ${currentY}px)`;  // 覆盖了 translateY(-50%)
+panel.style.transform = `translate(${currentX}px, ${currentY}px)`; // 覆盖了 translateY(-50%)
 ```
 
 ### 根因
 
 **问题 1：首次拖拽跳动半屏**
 
-| 阶段 | 状态 |
-|------|------|
-| 初始 | CSS `top: 50%` + `translateY(-50%)` = 真正的垂直居中 |
-| 拖拽开始 | `xOffset = 0, yOffset = 0`，oldTransform 被覆盖 |
-| 拖拽中 | `translate(0, 0)` 覆盖了 `translateY(-50%)` |
-| 结果 | 面板从「垂直居中」变成「顶部边缘在屏幕中间」= 向下跳半屏 |
+| 阶段   | 状态                                            |
+|------|-----------------------------------------------|
+| 初始   | CSS `top: 50%` + `translateY(-50%)` = 真正的垂直居中 |
+| 拖拽开始 | `xOffset = 0, yOffset = 0`，oldTransform 被覆盖   |
+| 拖拽中  | `translate(0, 0)` 覆盖了 `translateY(-50%)`      |
+| 结果   | 面板从「垂直居中」变成「顶部边缘在屏幕中间」= 向下跳半屏                 |
 
 **问题 2：首次拖拽微小抖动**
 
@@ -290,11 +292,11 @@ panel.style.transform = `translate(${currentX}px, ${currentY}px)`;  // 覆盖了
 header.addEventListener('mousedown', (e) => {
     // 读取面板当前的实际位置
     const rect = panel.getBoundingClientRect();
-    
+
     // 计算鼠标相对于面板左上角的偏移
     offsetX = e.clientX - rect.left;
     offsetY = e.clientY - rect.top;
-    
+
     // 切换为 left/top 定位
     panel.style.left = rect.left + 'px';
     panel.style.top = rect.top + 'px';
@@ -304,8 +306,8 @@ header.addEventListener('mousedown', (e) => {
 
 document.addEventListener('mousemove', (e) => {
     if (isDragging) {
-        panel.style.left = (e.clientX - offsetX) + 'px';
-        panel.style.top = (e.clientY - offsetY) + 'px';
+        panel.style.left = e.clientX - offsetX + 'px';
+        panel.style.top = e.clientY - offsetY + 'px';
     }
 });
 ```
@@ -328,18 +330,19 @@ let hasDragged = false;
 const clampToViewport = () => {
     // 跳过：未拖拽过 或 面板已收起
     if (!hasDragged || panel.classList.contains('collapsed')) return;
-    
+
     const rect = panel.getBoundingClientRect();
-    const vw = window.innerWidth, vh = window.innerHeight;
-    
+    const vw = window.innerWidth,
+        vh = window.innerHeight;
+
     let newLeft = parseFloat(panel.style.left);
     let newTop = parseFloat(panel.style.top);
-    
+
     if (rect.right > vw) newLeft = vw - rect.width - 10;
     if (rect.bottom > vh) newTop = vh - rect.height - 10;
     if (rect.left < 0) newLeft = 10;
     if (rect.top < 0) newTop = 10;
-    
+
     panel.style.left = newLeft + 'px';
     panel.style.top = newTop + 'px';
 };
@@ -349,12 +352,12 @@ window.addEventListener('resize', clampToViewport);
 
 ### 经验总结
 
-| 教训 | 说明 |
-|------|------|
-| **CSS 定位方式切换** | 拖拽场景中，`transform` 和 `top/right` 混用容易产生冲突，应在拖拽开始时统一为一种方式 |
-| **transition: all 的副作用** | 会影响所有属性变化，包括定位属性，导致意外的过渡动画 |
-| **SPA 中的 resize 处理** | 用户可能在任意时刻调整窗口，需要考虑边界情况 |
-| **状态标记的价值** | `hasDragged` 可以区分「从未拖拽」和「已拖拽过」，避免不必要的边界检测 |
+| 教训                       | 说明                                                      |
+|--------------------------|---------------------------------------------------------|
+| **CSS 定位方式切换**           | 拖拽场景中，`transform` 和 `top/right` 混用容易产生冲突，应在拖拽开始时统一为一种方式 |
+| **transition: all 的副作用** | 会影响所有属性变化，包括定位属性，导致意外的过渡动画                              |
+| **SPA 中的 resize 处理**     | 用户可能在任意时刻调整窗口，需要考虑边界情况                                  |
+| **状态标记的价值**              | `hasDragged` 可以区分「从未拖拽」和「已拖拽过」，避免不必要的边界检测               |
 
 ---
 
@@ -451,13 +454,13 @@ handleSyncScroll() {
 
 **检查所有调用点**：
 
-| 调用点 | 位置 | 是否处理 null |
-|--------|------|---------------|
-| `startSyncScroll` | OutlineManager | ✅ 重试机制 |
-| `stopSyncScroll` | OutlineManager | ✅ `if (scrollContainer)` |
-| `handleSyncScroll` | OutlineManager | ✅ `if (!scrollContainer) return` |
-| `getVisibleAnchorElement` | SiteAdapter | ✅ `if (!container) return null` |
-| `ScrollManager.container` getter | ScrollManager | ✅ 所有使用点都有 `if (this.container)` |
+| 调用点                              | 位置             | 是否处理 null                        |
+|----------------------------------|----------------|----------------------------------|
+| `startSyncScroll`                | OutlineManager | ✅ 重试机制                           |
+| `stopSyncScroll`                 | OutlineManager | ✅ `if (scrollContainer)`         |
+| `handleSyncScroll`               | OutlineManager | ✅ `if (!scrollContainer) return` |
+| `getVisibleAnchorElement`        | SiteAdapter    | ✅ `if (!container) return null`  |
+| `ScrollManager.container` getter | ScrollManager  | ✅ 所有使用点都有 `if (this.container)`  |
 
 **结论**：所有调用点都已正确处理 `null`，修改安全。
 
@@ -511,14 +514,130 @@ getScrollContainer() {
 
 ### 经验总结
 
-| 教训 | 说明 |
-|------|------|
-| **日志是最可靠的调试手段** | 前 3 轮假设都是错的，添加日志后立即发现真正问题 |
-| **SPA 动态渲染注意时序** | 初始化时 DOM 可能不完整，需要考虑元素尚未创建的情况 |
-| **Fallback 要谨慎** | `findScrollContainer` 的 body fallback 在这个场景下是有害的 |
-| **返回 null 比返回错误值更安全** | 让调用者决定如何处理「未找到」的情况 |
-| **修改公共方法前检查所有调用点** | `getScrollContainer` 被多处使用，需确保所有调用点都正确处理 null |
-| **保留 fallback 选择器** | 不要因为修复一个问题而删除可能在其他场景需要的代码 |
+| 教训                    | 说明                                               |
+|-----------------------|--------------------------------------------------|
+| **日志是最可靠的调试手段**       | 前 3 轮假设都是错的，添加日志后立即发现真正问题                        |
+| **SPA 动态渲染注意时序**      | 初始化时 DOM 可能不完整，需要考虑元素尚未创建的情况                     |
+| **Fallback 要谨慎**      | `findScrollContainer` 的 body fallback 在这个场景下是有害的 |
+| **返回 null 比返回错误值更安全** | 让调用者决定如何处理「未找到」的情况                               |
+| **修改公共方法前检查所有调用点**    | `getScrollContainer` 被多处使用，需确保所有调用点都正确处理 null    |
+| **保留 fallback 选择器**   | 不要因为修复一个问题而删除可能在其他场景需要的代码                        |
+
+---
+
+## 6. Shadow DOM 内动态元素监听失效
+
+**日期**: 2025-12-28
+
+### 症状
+
+- Gemini Business 中表格的"复制 Markdown"按钮不显示
+- 重新开关"Markdown 表格复制"设置后按钮才出现
+- 普通 Gemini 无此问题
+
+### 背景
+
+表格复制功能使用 `DOMToolkit.each('table', callback, { shadow: true })` 持续监听表格元素。
+
+`each()` 的实现分为两部分：
+
+1. **初始查询**：使用 `query()` 穿透 Shadow DOM 查找已存在的元素
+2. **持续监听**：使用 `MutationObserver` 监听 `document` 的变化
+
+### 根因
+
+`MutationObserver` 对 `document` 的监听**无法捕获已存在的 Shadow DOM 内部的后续变化**。
+
+```
+时序问题：
+T+0s: 脚本初始化，调用 each('table', callback)
+      → 初始查询：Shadow DOM 尚未渲染 table，未找到
+      → 持续监听：只监听 document
+T+1s: Gemini Business 在已存在的 Shadow DOM 内部渲染 table
+      → document 的 MutationObserver 无法感知
+      → 表格从未被处理，按钮不显示
+```
+
+重新开关设置能修复的原因：
+
+- 关闭时调用 `destroyTableCopy()` 停止监听
+- 开启时调用 `initTableCopy()` 重新执行初始查询
+- 此时 table 已存在于 Shadow DOM 中，被正确找到并处理
+
+### 修复方案
+
+扩展 `DOMToolkit.each()` 方法，在 `shadow: true` 时为所有已存在的 Shadow Root 也创建 `MutationObserver`：
+
+```javascript
+each(selector, callback, options = {}) {
+    // ...existing code...
+
+    // 新增：Shadow DOM 监听相关
+    const watchedRoots = new WeakSet();
+    const shadowObserverHandles = [];
+
+    // 为 Shadow Root 创建监听的辅助函数
+    const watchShadowRoot = (root) => {
+        if (!root || !active || watchedRoots.has(root)) return;
+        watchedRoots.add(root);
+
+        const handle = this.#observerManager.getSharedObserver(root);
+        handle.addCallback(observerCallback);
+        shadowObserverHandles.push(handle);
+    };
+
+    // 递归收集并监听所有已存在的 Shadow Root
+    const collectShadowRoots = (root, depth = 0) => {
+        if (depth > CONFIG.MAX_DEPTH) return;
+
+        const elements = root.querySelectorAll?.('*') || [];
+        for (const el of elements) {
+            if (el.shadowRoot) {
+                watchShadowRoot(el.shadowRoot);
+                collectShadowRoots(el.shadowRoot, depth + 1);
+            }
+        }
+    };
+
+    // 如果启用 Shadow DOM，监听所有已存在的 Shadow Root
+    if (shadow) {
+        collectShadowRoots(parent);
+    }
+
+    // 在 observerCallback 中也要检测新增节点的 Shadow Root
+    const observerCallback = (addedNode) => {
+        // ...existing code...
+
+        if (shadow) {
+            if (addedNode.shadowRoot) {
+                watchShadowRoot(addedNode.shadowRoot);
+            }
+            // 递归检查子节点
+            addedNode.querySelectorAll?.('*').forEach(el => {
+                if (el.shadowRoot) watchShadowRoot(el.shadowRoot);
+            });
+        }
+    };
+
+    const stop = () => {
+        // ...existing code...
+
+        // 清理所有 Shadow Root 的监听
+        shadowObserverHandles.forEach((handle) => {
+            handle.removeCallback(observerCallback);
+        });
+    };
+}
+```
+
+### 经验总结
+
+| 教训                                  | 说明                                                                   |
+|-------------------------------------|----------------------------------------------------------------------|
+| **MutationObserver 不穿透 Shadow DOM** | 对 document 的监听无法捕获 Shadow DOM 内部变化，需要为每个 Shadow Root 单独创建 Observer   |
+| **API 语义一致性**                       | `each(selector, { shadow: true })` 应该在整个生命周期都穿透 Shadow DOM，而不仅仅是初始查询 |
+| **复用共享 Observer 管理器**               | `SharedObserverManager` 可以复用，以 Shadow Root 作为 rootNode               |
+| **简单验证法**                           | "重新开关设置能修复" 说明问题出在持续监听而非初始查询                                         |
 
 ---
 

@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.10.3
-// @description  Gemini 助手：支持会话管理（分类/搜索/标签）、对话大纲、提示词管理、模型锁定、面板状态控制、主题一键切换、标签页增强、Markdown 加粗修复、阅读历史恢复、双向锚点、自动加宽页面、中文输入修复、智能暗色模式适配，适配 Gemini 标准版/企业版
-// @description:en Gemini Helper: Supports conversation management (folders/search/tags), outline navigation, prompt management, model locking, Markdown bold fix, tab enhancements (status display/privacy mode/completion notification), reading history, bidirectional anchor, auto page width, Chinese input fix, smart dark mode, adaptation for Gemini/Gemini Enterprise
+// @version      1.11.0
+// @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
+// @description:en Gemini Helper: Conversation management & export, outline navigation, prompt management, tab enhancements (status/privacy/notification), reading history & restore, bidirectional/manual anchor, image watermark removal, bold fix, formula/table copy, model lock, page beautification, theme toggle, smart dark mode (Gemini/Gemini Enterprise)
 // @author       urzeye
 // @homepage     https://github.com/urzeye
 // @note         参考 https://linux.do/t/topic/925110 的代码与UI布局拓展实现
@@ -23,7 +23,7 @@
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
-// @require      https://update.greasyfork.org/scripts/559176/1718116/domToolkit.js
+// @require      https://update.greasyfork.org/scripts/559176/1722655/domToolkit.js
 // @license      MIT
 // @downloadURL https://update.greasyfork.org/scripts/558318/gemini-helper.user.js
 // @updateURL https://update.greasyfork.org/scripts/558318/gemini-helper.meta.js
@@ -59,7 +59,7 @@
         MARKDOWN_FIX: 'gemini_markdown_fix',
     };
 
-    // 默认 Tab 顺序（settings 已移到 header 按钮，不参与排序）
+    // 默认 Tab 顺序
     const DEFAULT_TAB_ORDER = ['prompts', 'outline', 'conversations'];
     const DEFAULT_PROMPTS_SETTINGS = { enabled: true };
     const DEFAULT_READING_HISTORY_SETTINGS = {
@@ -389,6 +389,24 @@
             batchMove: '移动',
             batchDelete: '删除',
             batchExit: '退出',
+            batchExport: '导出',
+            exportToMarkdown: 'Markdown',
+            exportToJSON: 'JSON',
+            exportLoading: '正在加载对话历史...',
+            exportSuccess: '导出成功',
+            exportFailed: '导出失败',
+            exportNoContent: '未找到对话内容',
+            copySuccess: '已复制到剪贴板',
+            exportNeedOpenFirst: '请先打开要导出的会话',
+            exportUserLabel: '用户',
+            exportMetaTitle: '导出信息',
+            exportMetaConvTitle: '会话标题',
+            exportMetaTime: '导出时间',
+            exportMetaSource: '来源',
+            exportNotSupported: '当前站点不支持导出',
+            exportToTXT: 'TXT',
+            exportMetaUrl: '链接',
+            exportToClipboard: '复制 Markdown',
             conversationsRefresh: '刷新会话列表',
             conversationsSearchPlaceholder: '搜索会话...',
             conversationsSearchResult: '个结果',
@@ -428,12 +446,26 @@
             noAnchor: '暂无锚点',
             clearAnchor: '清除锚点',
             clearAnchorToast: '已清除锚点',
+            manualAnchorLabel: '手动锚点',
+            manualAnchorDesc: '在快捷工具栏显示手动锚点按钮',
             // 水印移除
             watermarkRemovalLabel: '移除图片水印',
             watermarkRemovalDesc: '自动移除 Gemini AI 生成图像中的 NanoBanana 水印',
             watermarkProcessing: '正在处理图片...',
             watermarkProcessed: '水印已移除',
             watermarkFailed: '处理失败',
+            // 内容设置
+            contentExportSettingsTitle: '内容设置',
+            exportImagesToBase64Label: '导出时图片转 Base64',
+            exportImagesToBase64Desc: '将对话中的图片转换为 Base64 编码嵌入 Markdown，方便离线查看',
+            formulaCopyLabel: '双击复制公式',
+            formulaCopyDesc: '双击数学公式可复制 LaTeX 源码（仅 Gemini 标准版）',
+            formulaCopied: '公式已复制',
+            formulaDelimiterLabel: '复制时添加分隔符',
+            formulaDelimiterDesc: '根据公式类型自动添加 $ 或 $$ 分隔符',
+            tableCopyLabel: '表格复制 Markdown',
+            tableCopyDesc: '在表格右上角添加复制按钮，直接复制 Markdown 格式',
+            tableCopied: '表格已复制',
         },
         'zh-TW': {
             panelTitle: 'Gemini 助手',
@@ -665,6 +697,24 @@
             batchMove: '移動',
             batchDelete: '刪除',
             batchExit: '退出',
+            batchExport: '匯出',
+            exportToMarkdown: 'Markdown',
+            exportToJSON: 'JSON',
+            exportLoading: '正在載入對話歷史...',
+            exportSuccess: '匯出成功',
+            exportFailed: '匯出失敗',
+            exportNoContent: '未找到對話內容',
+            copySuccess: '已複製到剪貼簿',
+            exportNeedOpenFirst: '請先打開要匯出的會話',
+            exportUserLabel: '用戶',
+            exportMetaTitle: '匯出資訊',
+            exportMetaConvTitle: '會話標題',
+            exportMetaTime: '匯出時間',
+            exportMetaSource: '來源',
+            exportNotSupported: '目前站點不支援匯出',
+            exportToTXT: 'TXT',
+            exportMetaUrl: '連結',
+            exportToClipboard: '複製 Markdown',
             conversationsRefresh: '刷新會話列表',
             conversationsSearchPlaceholder: '搜尋會話...',
             conversationsSearchResult: '個結果',
@@ -704,12 +754,26 @@
             noAnchor: '暫無錨點',
             clearAnchor: '清除錨點',
             clearAnchorToast: '已清除錨點',
+            manualAnchorLabel: '手動錨點',
+            manualAnchorDesc: '在快捷工具欄顯示手動錨點按鈕',
             // 浮水印移除
             watermarkRemovalLabel: '移除圖片浮水印',
             watermarkRemovalDesc: '自動移除 Gemini AI 生成圖像中的 NanoBanana 浮水印',
             watermarkProcessing: '正在處理圖片...',
             watermarkProcessed: '浮水印已移除',
             watermarkFailed: '處理失敗',
+            // 內容設置
+            contentExportSettingsTitle: '內容設置',
+            exportImagesToBase64Label: '匯出時圖片轉 Base64',
+            exportImagesToBase64Desc: '將對話中的圖片轉換為 Base64 編碼嵌入 Markdown，方便離線查看',
+            formulaCopyLabel: '雙擊複製公式',
+            formulaCopyDesc: '雙擊數學公式可複製 LaTeX 原始碼（僅 Gemini 標準版）',
+            formulaCopied: '公式已複製',
+            formulaDelimiterLabel: '複製時添加分隔符',
+            formulaDelimiterDesc: '根據公式類型自動添加 $ 或 $$ 分隔符',
+            tableCopyLabel: '表格複製 Markdown',
+            tableCopyDesc: '在表格右上角添加複製按鈕，直接複製 Markdown 格式',
+            tableCopied: '表格已複製',
         },
         en: {
             panelTitle: 'Gemini Helper',
@@ -940,6 +1004,24 @@
             batchMove: 'Move',
             batchDelete: 'Delete',
             batchExit: 'Exit',
+            batchExport: 'Export',
+            exportToMarkdown: 'Markdown',
+            exportToJSON: 'JSON',
+            exportLoading: 'Loading conversation history...',
+            exportSuccess: 'Export successful',
+            exportFailed: 'Export failed',
+            exportNoContent: 'No conversation content found',
+            copySuccess: 'Copied to clipboard',
+            exportNeedOpenFirst: 'Please open the conversation first',
+            exportUserLabel: 'User',
+            exportMetaTitle: 'Export Info',
+            exportMetaConvTitle: 'Conversation Title',
+            exportMetaTime: 'Export Time',
+            exportMetaSource: 'Source',
+            exportNotSupported: 'Export not supported for this site',
+            exportToTXT: 'TXT',
+            exportMetaUrl: 'URL',
+            exportToClipboard: 'Copy Markdown',
             conversationsRefresh: 'Refresh List',
             conversationsSearchPlaceholder: 'Search conversations...',
             conversationsSearchResult: 'result(s)',
@@ -978,12 +1060,26 @@
             noAnchor: 'No anchor',
             clearAnchor: 'Clear Anchor',
             clearAnchorToast: 'Anchor cleared',
+            manualAnchorLabel: 'Manual Anchor',
+            manualAnchorDesc: 'Show manual anchor buttons in quick toolbar',
             // Watermark Removal
             watermarkRemovalLabel: 'Remove Image Watermark',
             watermarkRemovalDesc: 'Automatically remove NanoBanana watermark from Gemini AI generated images',
             watermarkProcessing: 'Processing image...',
             watermarkProcessed: 'Watermark removed',
             watermarkFailed: 'Processing failed',
+            // Content Settings
+            contentExportSettingsTitle: 'Content',
+            exportImagesToBase64Label: 'Export Images as Base64',
+            exportImagesToBase64Desc: 'Convert images to Base64 in exported Markdown for offline viewing',
+            formulaCopyLabel: 'Double-Click Copy Formula',
+            formulaCopyDesc: 'Copy LaTeX source on double-click (Gemini Standard only)',
+            formulaCopied: 'Formula copied',
+            formulaDelimiterLabel: 'Add Delimiters on Copy',
+            formulaDelimiterDesc: 'Automatically add $ or $$ delimiters based on formula type',
+            tableCopyLabel: 'Table Copy Markdown',
+            tableCopyDesc: 'Add copy button to tables for direct Markdown copy',
+            tableCopied: 'Table copied',
         },
     };
 
@@ -1019,6 +1115,7 @@
         syncScroll: true, // 页面滚动时自动高亮大纲项
     };
 
+    // ================ i18n方法 ==================
     // 语言检测函数（支持手动设置）
     function detectLanguage() {
         // 优先使用用户手动设置的语言
@@ -1035,6 +1132,22 @@
             return 'zh-CN';
         }
         return 'en';
+    }
+
+    // 全局 i18n 翻译函数
+    // 缓存语言检测结果，避免每次调用都重新检测
+    let _cachedLang = null;
+
+    function t(key) {
+        if (!_cachedLang) {
+            _cachedLang = detectLanguage();
+        }
+        return I18N[_cachedLang]?.[key] || I18N['en']?.[key] || key;
+    }
+
+    // 语言变更时需要调用此函数清除缓存
+    function resetLanguageCache() {
+        _cachedLang = null;
     }
 
     // ==================== 站点适配器模式 (Site Adapter Pattern) ====================
@@ -1505,6 +1618,20 @@
             return false; // 默认不支持，除非子类明确声明
         }
 
+        /**
+         * 获取导出配置（用于会话导出功能）
+         * 子类应覆盖此方法提供站点特定的配置
+         * @returns {{
+         *   userQuerySelector: string,      // 用户提问元素选择器
+         *   assistantResponseSelector: string, // AI回复元素选择器
+         *   turnSelector: string|null,      // 对话轮次容器选择器（可选）
+         *   useShadowDOM: boolean           // 是否需要穿透 Shadow DOM
+         * }|null} 返回 null 表示不支持导出
+         */
+        getExportConfig() {
+            return null;
+        }
+
         // ============= 新对话监听 =============
 
         /**
@@ -1588,10 +1715,6 @@
          * @param {string} keyword - 目标模型关键字
          * @param {Function} onSuccess 成功后的回调（可选）
          */
-        lockModel(keyword, onSuccess = null) {
-            // ... (existing code)
-        }
-
         lockModel(keyword, onSuccess = null) {
             const config = this.getModelSwitcherConfig(keyword);
             if (!config) return;
@@ -1906,6 +2029,15 @@
             return element.textContent?.trim() || '';
         }
 
+        getExportConfig() {
+            return {
+                userQuerySelector: 'user-query',
+                assistantResponseSelector: 'model-response, .model-response-container .markdown',
+                turnSelector: '.conversation-turn',
+                useShadowDOM: false,
+            };
+        }
+
         extractOutline(maxLevel = 6, includeUserQueries = false) {
             const outline = [];
             const container = document.querySelector(this.getResponseContainerSelector());
@@ -1992,10 +2124,7 @@
         isGenerating() {
             // 检查是否存在 fonticon="stop" 的 mat-icon（停止按钮）
             const stopIcon = document.querySelector('mat-icon[fonticon="stop"]');
-            if (stopIcon && stopIcon.offsetParent !== null) {
-                return true;
-            }
-            return false;
+            return stopIcon && stopIcon.offsetParent !== null;
         }
 
         /**
@@ -2276,8 +2405,7 @@
 
         // 排除侧边栏 (mat-sidenav, mat-drawer) 中的 Shadow DOM
         shouldInjectIntoShadow(host) {
-            if (host.closest('mat-sidenav') || host.closest('mat-drawer') || host.closest('[class*="bg-sidebar"]')) return false;
-            return true;
+            return !(host.closest('mat-sidenav') || host.closest('mat-drawer') || host.closest('[class*="bg-sidebar"]'));
         }
 
         getNewChatButtonSelectors() {
@@ -2580,6 +2708,58 @@
                 'ucs-conversation-message', // 企业版特定
                 '.conversation-message',
             ];
+        }
+
+        /**
+         * 获取导出配置
+         * Gemini Business 使用 Shadow DOM，需要特殊处理
+         */
+        getExportConfig() {
+            return {
+                userQuerySelector: '.question-block',
+                assistantResponseSelector: 'ucs-summary',
+                turnSelector: '.turn',
+                useShadowDOM: true,
+                // 自定义提取函数（因为 Shadow DOM 嵌套结构复杂）
+                extractUserText: (el) => this.extractUserQueryText(el),
+                extractAssistantContent: (el) => this.extractSummaryContent(el),
+            };
+        }
+
+        /**
+         * 从 ucs-summary 元素中提取可用于 htmlToMarkdown 的 DOM 元素
+         * Gemini Business 使用多层 Shadow DOM，需要递归查找
+         * @param {Element} ucsSummary - ucs-summary 元素
+         * @returns {Element|null} - 可用于 htmlToMarkdown 的 DOM 元素
+         */
+        extractSummaryContent(ucsSummary) {
+            // 递归在 Shadow DOM 中查找 .markdown-document
+            const findMarkdownDocument = (root, depth = 0) => {
+                if (depth > 10 || !root) return null;
+
+                // 如果 root 本身有 shadowRoot，先进入它
+                const shadowRoot = root.shadowRoot || (root.nodeType === 11 ? root : null);
+                const searchRoot = shadowRoot || root;
+
+                // 在当前层级查找 .markdown-document
+                if (searchRoot.querySelector) {
+                    const markdownDoc = searchRoot.querySelector('.markdown-document');
+                    if (markdownDoc) return markdownDoc;
+                }
+
+                // 递归搜索子元素的 Shadow DOM
+                const elements = searchRoot.querySelectorAll?.('*') || [];
+                for (const el of elements) {
+                    if (el.shadowRoot) {
+                        const found = findMarkdownDocument(el.shadowRoot, depth + 1);
+                        if (found) return found;
+                    }
+                }
+
+                return null;
+            };
+
+            return findMarkdownDocument(ucsSummary);
         }
 
         /**
@@ -3574,10 +3754,12 @@
      */
     class WatermarkRemover {
         // 水印背景图片 Base64 (48x48)
-        static BG_48 = 'data:image/png;base64,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';
+        static BG_48 =
+            'data:image/png;base64,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';
 
         // 水印背景图片 Base64 (96x96)
-        static BG_96 = 'data:image/png;base64,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';
+        static BG_96 =
+            'data:image/png;base64,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';
 
         static ALPHA_THRESHOLD = 0.002;
         static MAX_ALPHA = 0.99;
@@ -3743,7 +3925,7 @@
          */
         findGeminiImages() {
             return [...document.querySelectorAll('img[src*="googleusercontent.com"]')].filter(
-                (img) => this.isValidGeminiImage(img) && img.dataset.watermarkProcessed !== 'true' && img.dataset.watermarkProcessed !== 'processing'
+                (img) => this.isValidGeminiImage(img) && img.dataset.watermarkProcessed !== 'true' && img.dataset.watermarkProcessed !== 'processing',
             );
         }
 
@@ -3756,6 +3938,10 @@
                     method: 'GET',
                     url,
                     responseType: 'blob',
+                    headers: {
+                        Referer: 'https://gemini.google.com/',
+                        Origin: 'https://gemini.google.com',
+                    },
                     onload: (response) => resolve(response.response),
                     onerror: reject,
                 });
@@ -5317,6 +5503,54 @@
             const container = this.container;
             clearElement(container);
 
+            // 注入样式修复
+            const fixStyle = createElement('style');
+            fixStyle.textContent = `
+                .conversations-folder-item.expanded {
+                    border-bottom-left-radius: 0 !important;
+                    border-bottom-right-radius: 0 !important;
+                    border-bottom: none !important;
+                }
+                .conversations-list {
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    margin: 0 !important;
+                    border-top-left-radius: 0 !important;
+                    border-top-right-radius: 0 !important;
+                    border-top: none !important;
+                }
+
+                /* 统一工具栏按钮风格 (Ghost Button - 仿大纲 Tab) */
+                .conversations-toolbar-btn {
+                    background: transparent !important;
+                    border: 1px solid transparent !important;
+                    box-shadow: none !important;
+                    color: var(--gh-text-secondary, #6b7280) !important;
+                    border-radius: 6px !important;
+                    transition: all 0.2s ease !important;
+                    min-width: 28px !important; /* 更紧凑的尺寸 */
+                    height: 28px !important;
+                    margin: 0 !important; /* 移除额外间距 */
+                    padding: 0 !important;
+                }
+                .conversations-toolbar-btn:hover {
+                    background: rgba(127, 127, 127, 0.15) !important; /* 通用半透明背景，适配深浅色 */
+                    color: var(--gh-text, #374151) !important;
+                }
+                .conversations-toolbar-btn.active {
+                    background: var(--gh-primary, #3b82f6) !important;
+                    color: white !important;
+                    border-color: var(--gh-primary, #3b82f6) !important;
+                }
+                /* 修复 SVG 颜色 */
+                .conversations-toolbar-btn svg {
+                    fill: currentColor !important;
+                    width: 16px !important; /* 稍微调小图标以适配紧凑按钮 */
+                    height: 16px !important;
+                }
+            `;
+            container.appendChild(fixStyle);
+
             const content = createElement('div', { className: 'conversations-content' });
 
             // 工具栏
@@ -5364,18 +5598,7 @@
                 'M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z';
             const ADD_FOLDER_PATH = 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z';
 
-            // 2. 定位当前对话按钮
-            const locateBtn = createElement('button', {
-                className: 'conversations-toolbar-btn locate',
-                id: 'conversations-locate-btn',
-                title: this.t('conversationsLocate'),
-                style: 'display: flex; align-items: center; justify-content: center;',
-            });
-            locateBtn.appendChild(createSVG(LOCATE_PATH));
-            locateBtn.addEventListener('click', () => this.locateCurrentConversation());
-            toolbar.appendChild(locateBtn);
-
-            // 3. 同步按钮
+            // 2. 同步按钮
             const syncBtn = createElement('button', {
                 className: 'conversations-toolbar-btn sync',
                 id: 'conversations-sync-btn',
@@ -5397,17 +5620,18 @@
             });
             toolbar.appendChild(syncBtn);
 
-            // 4. 新建文件夹按钮
-            const addFolderBtn = createElement('button', {
-                className: 'conversations-toolbar-btn add-folder',
-                title: this.t('conversationsAddFolder') || 'New Folder',
+            // 3. 定位当前对话按钮
+            const locateBtn = createElement('button', {
+                className: 'conversations-toolbar-btn locate',
+                id: 'conversations-locate-btn',
+                title: this.t('conversationsLocate'),
                 style: 'display: flex; align-items: center; justify-content: center;',
             });
-            addFolderBtn.appendChild(createSVG(ADD_FOLDER_PATH));
-            addFolderBtn.addEventListener('click', () => this.showCreateFolderDialog());
-            toolbar.appendChild(addFolderBtn);
+            locateBtn.appendChild(createSVG(LOCATE_PATH));
+            locateBtn.addEventListener('click', () => this.locateCurrentConversation());
+            toolbar.appendChild(locateBtn);
 
-            // 5. 批量模式按钮
+            // 4. 批量模式按钮
             const batchModeBtn = createElement('button', {
                 className: 'conversations-toolbar-btn batch-mode' + (this.batchMode ? ' active' : ''),
                 title: this.t('conversationsBatchMode') || '批量操作',
@@ -5417,6 +5641,16 @@
             batchModeBtn.appendChild(createSVG(CHECK_BOX_PATH));
             batchModeBtn.addEventListener('click', () => this.toggleBatchMode());
             toolbar.appendChild(batchModeBtn);
+
+            // 5. 新建文件夹按钮
+            const addFolderBtn = createElement('button', {
+                className: 'conversations-toolbar-btn add-folder',
+                title: this.t('conversationsAddFolder') || 'New Folder',
+                style: 'display: flex; align-items: center; justify-content: center;',
+            });
+            addFolderBtn.appendChild(createSVG(ADD_FOLDER_PATH));
+            addFolderBtn.addEventListener('click', () => this.showCreateFolderDialog());
+            toolbar.appendChild(addFolderBtn);
 
             content.appendChild(toolbar);
 
@@ -5667,15 +5901,71 @@
 
                 const batchBtns = createElement('div', { className: 'conversations-batch-btns' });
 
-                const batchMoveBtn = createElement('button', { className: 'conversations-batch-btn' }, '📂 ' + (this.t('batchMove') || '移动'));
+                // 统一的图标按钮样式
+                const iconBtnStyle = 'padding: 4px 6px; min-width: auto; margin-left: 4px;';
+
+                // 1. 复制 Markdown (高频、安全)
+                const batchCopyBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-batch-btn',
+                        title: this.t('exportToClipboard') || '复制 Markdown',
+                        style: iconBtnStyle,
+                    },
+                    '📋',
+                );
+                batchCopyBtn.addEventListener('click', () => this.exportConversations('clipboard'));
+                batchBtns.appendChild(batchCopyBtn);
+
+                // 2. 导出菜单 (高频、安全)
+                const batchExportBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-batch-btn',
+                        title: this.t('batchExport') || '导出',
+                        style: iconBtnStyle,
+                    },
+                    '📤',
+                );
+                batchExportBtn.addEventListener('click', (e) => this.showExportMenu(e.target));
+                batchBtns.appendChild(batchExportBtn);
+
+                // 3. 移动 (管理)
+                const batchMoveBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-batch-btn',
+                        title: this.t('batchMove') || '移动',
+                        style: iconBtnStyle,
+                    },
+                    '📂',
+                );
                 batchMoveBtn.addEventListener('click', () => this.batchMove());
                 batchBtns.appendChild(batchMoveBtn);
 
-                const batchDeleteBtn = createElement('button', { className: 'conversations-batch-btn danger' }, '🗑️ ' + (this.t('batchDelete') || '删除'));
+                // 4. 删除
+                const batchDeleteBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-batch-btn danger',
+                        title: this.t('batchDelete') || '删除',
+                        style: iconBtnStyle,
+                    },
+                    '🗑️',
+                );
                 batchDeleteBtn.addEventListener('click', () => this.batchDelete());
                 batchBtns.appendChild(batchDeleteBtn);
 
-                const batchCancelBtn = createElement('button', { className: 'conversations-batch-btn cancel' }, this.t('batchExit') || '退出');
+                // 退出按钮
+                const batchCancelBtn = createElement(
+                    'button',
+                    {
+                        className: 'conversations-batch-btn cancel',
+                        title: this.t('batchExit') || '退出',
+                        style: iconBtnStyle,
+                    },
+                    '❌',
+                );
                 batchCancelBtn.addEventListener('click', () => this.clearSelection());
                 batchBtns.appendChild(batchCancelBtn);
 
@@ -6633,6 +6923,675 @@
                 this.clearSelection();
                 this.createUI();
             });
+        }
+
+        /**
+         * 显示导出格式选择菜单
+         * @param {HTMLElement} anchorEl 锚点元素
+         */
+        showExportMenu(anchorEl) {
+            // 移除已有菜单
+            document.querySelectorAll('.conversations-export-menu').forEach((m) => m.remove());
+
+            const menu = createElement('div', { className: 'conversations-export-menu' });
+            // 菜单样式
+            Object.assign(menu.style, {
+                position: 'absolute',
+                background: 'var(--gh-bg, white)',
+                border: '1px solid var(--gh-border, #e5e7eb)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                padding: '4px',
+                minWidth: '140px',
+                zIndex: '100',
+            });
+
+            // 按钮通用样式
+            const btnStyle = {
+                display: 'block',
+                width: '100%',
+                padding: '8px 12px',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: 'var(--gh-text, #374151)',
+            };
+
+            // Markdown 选项
+            const mdBtn = createElement('button', {}, '📝 ' + (this.t('exportToMarkdown') || 'Markdown'));
+            Object.assign(mdBtn.style, btnStyle);
+            mdBtn.addEventListener('mouseenter', () => (mdBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            mdBtn.addEventListener('mouseleave', () => (mdBtn.style.background = 'none'));
+            mdBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('markdown');
+            });
+            menu.appendChild(mdBtn);
+
+            // JSON 选项
+            const jsonBtn = createElement('button', {}, '📋 ' + (this.t('exportToJSON') || 'JSON'));
+            Object.assign(jsonBtn.style, btnStyle);
+            jsonBtn.addEventListener('mouseenter', () => (jsonBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            jsonBtn.addEventListener('mouseleave', () => (jsonBtn.style.background = 'none'));
+            jsonBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('json');
+            });
+            menu.appendChild(jsonBtn);
+
+            // TXT 选项
+            const txtBtn = createElement('button', {}, '📄 ' + (this.t('exportToTXT') || 'TXT'));
+            Object.assign(txtBtn.style, btnStyle);
+            txtBtn.addEventListener('mouseenter', () => (txtBtn.style.background = 'var(--gh-bg-hover, #f3f4f6)'));
+            txtBtn.addEventListener('mouseleave', () => (txtBtn.style.background = 'none'));
+            txtBtn.addEventListener('click', async () => {
+                menu.remove();
+                await this.exportConversations('txt');
+            });
+            menu.appendChild(txtBtn);
+
+            // 定位菜单（相对于按钮向上弹出）
+            const parentRect = this.container.getBoundingClientRect();
+            const btnRect = anchorEl.getBoundingClientRect();
+            menu.style.bottom = `${parentRect.bottom - btnRect.top + 4}px`;
+            menu.style.left = `${btnRect.left - parentRect.left}px`;
+
+            this.container.appendChild(menu);
+
+            // 点击外部关闭
+            const closeHandler = (e) => {
+                if (!menu.contains(e.target) && e.target !== anchorEl) {
+                    menu.remove();
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+
+        /**
+         * 导出选中的会话
+         * @param {'markdown'|'json'} format 导出格式
+         */
+        async exportConversations(format) {
+            if (this.selectedIds.size === 0) return;
+
+            // 目前只支持单个会话导出
+            const convId = [...this.selectedIds][0];
+            const conv = this.data.conversations[convId];
+            if (!conv) {
+                showToast(this.t('exportNoContent') || '未找到对话内容');
+                return;
+            }
+
+            // 检查是否为当前会话
+            const currentSessionId = this.siteAdapter.getSessionId();
+            if (currentSessionId !== convId) {
+                showToast(this.t('exportNeedOpenFirst') || '请先打开要导出的会话');
+                return;
+            }
+
+            try {
+                showToast(this.t('exportLoading') || '正在加载对话历史...');
+
+                // 加载完整历史（滚动到顶部触发加载）
+                const scrollContainer = this.siteAdapter.getScrollContainer?.();
+                if (scrollContainer) {
+                    let prevHeight = 0;
+                    let retries = 0;
+                    const maxRetries = 50;
+
+                    while (retries < maxRetries) {
+                        scrollContainer.scrollTop = 0;
+                        await new Promise((resolve) => setTimeout(resolve, 500));
+
+                        const currentHeight = scrollContainer.scrollHeight;
+                        if (currentHeight === prevHeight) {
+                            retries++;
+                            if (retries >= 3) break;
+                        } else {
+                            retries = 0;
+                            prevHeight = currentHeight;
+                        }
+                    }
+                }
+
+                // 提取对话内容
+                const messages = this.extractConversationMessages();
+                if (messages.length === 0) {
+                    showToast(this.t('exportNoContent') || '未找到对话内容');
+                    return;
+                }
+
+                // 格式化并下载
+                let content, filename, mimeType;
+                const safeTitle = (conv.title || 'conversation').replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
+
+                if (format === 'clipboard') {
+                    content = this.formatToMarkdown(conv, messages);
+                    // 处理 blob 图片 (复制时也需要转换为 Base64)
+                    if (content.includes('](blob:')) {
+                        try {
+                            showToast(this.t('exportProcessingImages') || '正在处理图片...');
+                            content = await this.processMarkdownImages(content);
+                        } catch (e) {
+                            console.error('Base64 image processing failed:', e);
+                        }
+                    }
+                    await navigator.clipboard.writeText(content);
+                    showToast(this.t('copySuccess') || '已复制到剪贴板');
+                    return;
+                } else if (format === 'markdown') {
+                    content = this.formatToMarkdown(conv, messages);
+
+                    // 处理 Base64 图片导出 (如果设置开启，或者检测到 blob 图片)
+                    if (this.settings.conversations?.exportImagesToBase64 || content.includes('](blob:')) {
+                        try {
+                            showToast(this.t('exportProcessingImages') || '正在处理图片...');
+                            content = await this.processMarkdownImages(content);
+                        } catch (e) {
+                            console.error('Base64 image processing failed:', e);
+                            showToast('图片处理失败，将使用原始链接导出');
+                        }
+                    }
+
+                    filename = `${safeTitle}.md`;
+                    mimeType = 'text/markdown;charset=utf-8';
+                } else if (format === 'json') {
+                    content = this.formatToJSON(conv, messages);
+                    filename = `${safeTitle}.json`;
+                    mimeType = 'application/json;charset=utf-8';
+                } else {
+                    content = this.formatToTXT(conv, messages);
+                    filename = `${safeTitle}.txt`;
+                    mimeType = 'text/plain;charset=utf-8';
+                }
+
+                this.downloadFile(content, filename, mimeType);
+                showToast(this.t('exportSuccess') || '导出成功');
+            } catch (error) {
+                console.error('[ConversationManager] Export failed:', error);
+                showToast(this.t('exportFailed') || '导出失败');
+            }
+        }
+
+        /**
+         * 提取当前页面的对话消息
+         * @returns {Array<{role: 'user'|'assistant', content: string}>}
+         */
+        extractConversationMessages() {
+            const messages = [];
+
+            // 从 siteAdapter 获取配置
+            const config = this.siteAdapter.getExportConfig?.();
+            if (!config) {
+                console.warn('[ConversationManager] Export config not available for this site');
+                return messages;
+            }
+
+            const {
+                userQuerySelector,
+                assistantResponseSelector,
+                useShadowDOM,
+                extractUserText,
+                extractAssistantContent,
+            } = config;
+            const queryOpts = { all: true, shadow: useShadowDOM };
+
+            // 方案：分别提取用户和 AI 消息
+            const userMessages = DOMToolkit.query(userQuerySelector, queryOpts) || [];
+            const aiMessages = DOMToolkit.query(assistantResponseSelector, queryOpts) || [];
+
+            const maxLen = Math.max(userMessages.length, aiMessages.length);
+            for (let i = 0; i < maxLen; i++) {
+                if (userMessages[i]) {
+                    // 使用自定义提取函数（如果有），否则使用 textContent
+                    const userContent = extractUserText ? extractUserText(userMessages[i]) : userMessages[i].textContent?.trim() || '';
+                    messages.push({ role: 'user', content: userContent });
+                }
+                if (aiMessages[i]) {
+                    // 使用自定义提取函数获取目标元素（如果有）
+                    let targetEl = aiMessages[i];
+                    if (extractAssistantContent) {
+                        targetEl = extractAssistantContent(aiMessages[i]) || aiMessages[i];
+                    }
+                    messages.push({
+                        role: 'assistant',
+                        content: this.htmlToMarkdown(targetEl) || targetEl.textContent?.trim() || '',
+                    });
+                }
+            }
+
+            return messages;
+        }
+
+        /**
+         * HTML 转 Markdown
+         * @param {HTMLElement} el
+         * @returns {string}
+         */
+        htmlToMarkdown(el) {
+            if (!el) return '';
+
+            const processNode = (node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent;
+                }
+
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    return '';
+                }
+
+                // ============================================================
+                // 1. 优先处理特殊标签：这些标签不需要递归处理子节点
+                //    或者需要完全自定义子节点的处理方式
+                // ============================================================
+
+                // 处理数学公式块（从 data-math 属性提取 LaTeX 源码）
+                if (node.classList?.contains('math-block')) {
+                    const latex = node.getAttribute('data-math');
+                    if (latex) return `\n$$${latex}$$\n`;
+                }
+
+                // 处理行内数学公式
+                if (node.classList?.contains('math-inline')) {
+                    const latex = node.getAttribute('data-math');
+                    if (latex) return `$${latex}$`;
+                }
+
+                const tag = node.tagName.toLowerCase();
+
+                // 图片：直接生成 Markdown，不需要子节点
+                if (tag === 'img') {
+                    const alt = node.alt || node.getAttribute('alt') || '图片';
+                    const src = node.src || node.getAttribute('src') || '';
+                    return `![${alt}](${src})`;
+                }
+
+                // 代码块容器 (Gemini 特有)：手动提取语言和内容，忽略内部结构（避免输出 "Copy" 按钮文本）
+                if (tag === 'code-block') {
+                    const decoration = node.querySelector('.code-block-decoration');
+                    const lang = decoration?.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                    const codeEl = node.querySelector('pre code');
+                    const text = codeEl?.textContent || node.querySelector('pre')?.textContent || '';
+                    return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
+                }
+
+                // 预格式化块：手动提取 code 内容，忽略子节点递归结果（code-block内的pre会被上面的逻辑拦截，这里处理独立的pre）
+                if (tag === 'pre') {
+                    const code = node.querySelector('code');
+                    // 尝试多种方式获取语言
+                    let lang = code?.className.match(/language-(\w+)/)?.[1] || '';
+
+                    if (!lang) {
+                        // 方式2: 向上遍历兄弟元素查找 .code-block-decoration
+                        let sibling = node.previousElementSibling;
+                        while (sibling && !lang) {
+                            if (sibling.classList?.contains('code-block-decoration')) {
+                                lang = sibling.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                                break;
+                            }
+                            sibling = sibling.previousElementSibling;
+                        }
+                    }
+
+                    if (!lang) {
+                        // 方式3: 在父容器中查找 .code-block-decoration
+                        const parent = node.parentElement;
+                        const decoration = parent?.querySelector('.code-block-decoration');
+                        if (decoration) {
+                            lang = decoration.querySelector('span')?.textContent?.trim()?.toLowerCase() || '';
+                        }
+                    }
+
+                    const text = code?.textContent || node.textContent;
+                    return `\n\`\`\`${lang}\n${text}\n\`\`\`\n`;
+                }
+
+                // 内联代码：简单包裹，忽略子元素（通常没子元素，或者是高亮span）
+                if (tag === 'code') {
+                    // 如果父元素是 pre，返回空字符串（因为内容已被 pre 处理，且我们即将返回 children 拼接结果）
+                    // 但这里我们在计算 children 之前就拦截了。
+                    // 修正逻辑：如果父元素是 pre，则该 code 节点不需要再输出（因为父 pre 已经提取了它的 textContent）
+                    if (node.parentElement?.tagName.toLowerCase() === 'pre') return '';
+                    return `\`${node.textContent}\``;
+                }
+
+                // 表格：完全自定义子节点处理逻辑
+                if (tag === 'table') {
+                    const rows = [];
+                    const thead = node.querySelector('thead');
+                    const tbody = node.querySelector('tbody');
+
+                    // 辅助函数：从单元格提取内容（处理 Shadow DOM）
+                    const getCellContent = (cell) => {
+                        // 如果单元格有 Shadow DOM，递归处理
+                        if (cell.shadowRoot) {
+                            return Array.from(cell.shadowRoot.childNodes).map(processNode).join('').replace(/\n/g, ' ').trim();
+                        }
+                        // 尝试用 htmlToMarkdown 处理
+                        const md = this.htmlToMarkdown(cell);
+                        if (md && md.trim()) {
+                            return md.replace(/\n/g, ' ').trim();
+                        }
+                        // 回退：使用 textContent
+                        return cell.textContent?.trim() || '';
+                    };
+
+                    // 处理表头
+                    if (thead) {
+                        const headerRow = thead.querySelector('tr');
+                        if (headerRow) {
+                            const headers = Array.from(headerRow.querySelectorAll('td, th')).map(getCellContent);
+                            if (headers.some((h) => h)) {
+                                rows.push('| ' + headers.join(' | ') + ' |');
+                                rows.push('| ' + headers.map(() => '---').join(' | ') + ' |');
+                            }
+                        }
+                    }
+
+                    // 处理表体
+                    if (tbody) {
+                        const bodyRows = tbody.querySelectorAll('tr');
+                        bodyRows.forEach((tr) => {
+                            const cells = Array.from(tr.querySelectorAll('td, th')).map(getCellContent);
+                            if (cells.some((c) => c)) {
+                                rows.push('| ' + cells.join(' | ') + ' |');
+                            }
+                        });
+                    }
+
+                    // 如果没有 thead/tbody，直接遍历所有 tr
+                    if (!thead && !tbody) {
+                        const allRows = node.querySelectorAll('tr');
+                        let isFirst = true;
+                        allRows.forEach((tr) => {
+                            const cells = Array.from(tr.querySelectorAll('td, th')).map(getCellContent);
+                            if (cells.some((c) => c)) {
+                                rows.push('| ' + cells.join(' | ') + ' |');
+                                if (isFirst) {
+                                    rows.push('| ' + cells.map(() => '---').join(' | ') + ' |');
+                                    isFirst = false;
+                                }
+                            }
+                        });
+                    }
+
+                    return rows.length > 0 ? '\n' + rows.join('\n') + '\n' : '';
+                }
+
+                // Gemini 表格容器：直接处理内部表格，忽略其他可能的装饰元素
+                if (tag === 'table-block') {
+                    const innerTable = node.querySelector('table');
+                    if (innerTable) {
+                        return processNode(innerTable);
+                    }
+                    // 如果没找到 table，则退化为处理所有子节点
+                }
+
+                // Gemini Business 表格容器
+                if (tag === 'ucs-markdown-table') {
+                    const innerTable = node.querySelector('table');
+                    if (innerTable) {
+                        return processNode(innerTable);
+                    }
+                    // 如果没找到 table，则退化为处理所有子节点
+                }
+
+                // 表格内部标签：由于 table 已经手动处理了 thead/tbody/tr/td，
+                // 如果递归遍历到了这些标签（例如 table-block 没有拦截住，或者非标准结构的表格），
+                // 我们应该只返回子节点内容，或者什么都不做以免破坏表格结构。
+                // 暂时按返回子节点内容处理。
+                if (['thead', 'tbody', 'tr', 'td', 'th'].includes(tag)) {
+                    // 这些通常在 table 的处理逻辑中被 htmlToMarkdown(cell) 调用
+                    // 这里只需要返回 children 拼接结果即可（保留内部格式如 b/i）
+                }
+
+                // ============================================================
+                // 2. 常规标签：递归处理子节点，然后包裹格式
+                // ============================================================
+                const children = Array.from(node.childNodes).map(processNode).join('');
+
+                switch (tag) {
+                    case 'h1':
+                        return `\n# ${children}\n`;
+                    case 'h2':
+                        return `\n## ${children}\n`;
+                    case 'h3':
+                        return `\n### ${children}\n`;
+                    case 'h4':
+                        return `\n#### ${children}\n`;
+                    case 'h5':
+                        return `\n##### ${children}\n`;
+                    case 'h6':
+                        return `\n###### ${children}\n`;
+                    case 'strong':
+                    case 'b':
+                        return `**${children}**`;
+                    case 'em':
+                    case 'i':
+                        return `*${children}*`;
+                    case 'a':
+                        return `[${children}](${node.href || ''})`;
+                    case 'img':
+                        return `![${node.alt || 'image'}](${node.src || ''})`;
+                    case 'li':
+                        return `- ${children}\n`;
+                    case 'p':
+                        return `${children}\n\n`;
+                    case 'br':
+                        return '\n';
+                    case 'ul':
+                    case 'ol':
+                        return `\n${children}`;
+                    default:
+                        // 处理带 Shadow DOM 的自定义元素（如 Gemini Business 的 ucs-* 组件）
+                        if (node.shadowRoot) {
+                            return Array.from(node.shadowRoot.childNodes).map(processNode).join('');
+                        }
+                        // 对于不匹配的标签（如 div, span, table-block 等），直接返回内容
+                        return children;
+                }
+            };
+
+            return processNode(el).trim();
+        }
+
+        /**
+         * 格式化为 Markdown
+         */
+        formatToMarkdown(conv, messages) {
+            const lines = [];
+            const now = new Date().toLocaleString();
+            const userLabel = this.t('exportUserLabel') || '用户';
+
+            // 元数据头
+            lines.push('---');
+            lines.push(`# 📤 ${this.t('exportMetaTitle') || '导出信息'}`);
+            lines.push(`- **${this.t('exportMetaConvTitle') || '会话标题'}**: ${conv.title || '未命名'}`);
+            lines.push(`- **${this.t('exportMetaTime') || '导出时间'}**: ${now}`);
+            lines.push(`- **${this.t('exportMetaSource') || '来源'}**: ${this.siteAdapter.getName()}`);
+            lines.push(`- **${this.t('exportMetaUrl') || '链接'}**: ${window.location.href}`);
+            lines.push('---');
+            lines.push('');
+
+            // 对话内容
+            messages.forEach((msg) => {
+                if (msg.role === 'user') {
+                    lines.push(`## 🙋 ${userLabel}`);
+                    lines.push('');
+                    lines.push(msg.content);
+                    lines.push('');
+                    lines.push('---');
+                    lines.push('');
+                } else {
+                    lines.push(`## 🤖 ${this.siteAdapter.getName()}`);
+                    lines.push('');
+                    lines.push(msg.content);
+                    lines.push('');
+                    lines.push('---');
+                    lines.push('');
+                }
+            });
+
+            return lines.join('\n');
+        }
+
+        /**
+         * 格式化为 JSON
+         */
+        formatToJSON(conv, messages) {
+            const data = {
+                metadata: {
+                    title: conv.title || '未命名',
+                    id: conv.id,
+                    url: window.location.href,
+                    exportTime: new Date().toISOString(),
+                    source: this.siteAdapter.getName(),
+                },
+                messages: messages.map((msg) => ({
+                    role: msg.role,
+                    content: msg.content,
+                })),
+            };
+            return JSON.stringify(data, null, 2);
+        }
+
+        /**
+         * 格式化为 TXT（纯文本）
+         */
+        formatToTXT(conv, messages) {
+            const lines = [];
+            const now = new Date().toLocaleString();
+            const userLabel = this.t('exportUserLabel') || '用户';
+
+            // 元数据
+            lines.push(`${this.t('exportMetaConvTitle') || '会话标题'}: ${conv.title || '未命名'}`);
+            lines.push(`${this.t('exportMetaTime') || '导出时间'}: ${now}`);
+            lines.push(`${this.t('exportMetaSource') || '来源'}: ${this.siteAdapter.getName()}`);
+            lines.push(`${this.t('exportMetaUrl') || '链接'}: ${window.location.href}`);
+            lines.push('');
+            lines.push('='.repeat(50));
+            lines.push('');
+
+            // 对话内容
+            messages.forEach((msg) => {
+                if (msg.role === 'user') {
+                    lines.push(`[${userLabel}]`);
+                } else {
+                    lines.push(`[${this.siteAdapter.getName()}]`);
+                }
+                lines.push(msg.content);
+                lines.push('');
+                lines.push('-'.repeat(50));
+                lines.push('');
+            });
+
+            return lines.join('\n');
+        }
+
+        /**
+         * 处理 Markdown 中的图片链接，转换为 Base64
+         * @param {string} markdownContent
+         * @returns {Promise<string>}
+         */
+        async processMarkdownImages(markdownContent) {
+            const imgRegex = /!\[(.*?)\]\((.*?)\)/g;
+            const matches = [...markdownContent.matchAll(imgRegex)];
+
+            if (matches.length === 0) return markdownContent;
+
+            let newContent = markdownContent;
+
+            // 使用并行处理加快速度
+            const processingPromises = matches.map(async (match) => {
+                const [fullMatch, alt, url] = match;
+
+                // 跳过已经是 Base64 的图片
+                if (url.startsWith('data:image')) return { fullMatch, base64: null };
+
+                const isBlob = url.startsWith('blob:');
+
+                // 如果不是 blob 且未开启 Base64 导出，则跳过
+                if (!isBlob && !this.settings.conversations?.exportImagesToBase64) {
+                    return { fullMatch, base64: null };
+                }
+
+                try {
+                    let blob;
+                    if (isBlob) {
+                        // Blob URL: 从 DOM 中找到已加载的图片，用 canvas 提取数据
+                        const imgEl = document.querySelector(`img[src="${url}"]`);
+                        if (!imgEl || !imgEl.complete || imgEl.naturalWidth === 0) {
+                            console.warn(`Image not found or not loaded: ${url}`);
+                            return { fullMatch, base64: null };
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = imgEl.naturalWidth;
+                        canvas.height = imgEl.naturalHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(imgEl, 0, 0);
+                        const base64 = canvas.toDataURL('image/png');
+                        return { fullMatch, base64, alt };
+                    } else {
+                        // 远程 URL: 使用 GM_xmlhttpRequest 跨域获取图片
+                        const response = await new Promise((resolve, reject) => {
+                            GM_xmlhttpRequest({
+                                method: 'GET',
+                                url: url,
+                                responseType: 'blob',
+                                onload: (res) => {
+                                    if (res.status === 200) resolve(res.response);
+                                    else reject(new Error(`HTTP ${res.status}`));
+                                },
+                                onerror: (err) => reject(err),
+                            });
+                        });
+                        blob = response;
+                    }
+
+                    // Blob 转 Base64
+                    const base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+
+                    return { fullMatch, base64, alt };
+                } catch (error) {
+                    // console.warn(`Failed to convert image ${url}:`, error);
+                    return { fullMatch, base64: null };
+                }
+            });
+
+            const results = await Promise.all(processingPromises);
+
+            // 替换内容
+            results.forEach(({ fullMatch, base64, alt }) => {
+                if (base64) {
+                    // 使用 split/join 替换所有相同的匹配项（处理同一图片多次引用）
+                    newContent = newContent.split(fullMatch).join(`![${alt}](${base64})`);
+                }
+            });
+
+            return newContent;
+        }
+
+        /**
+         * 下载文件
+         */
+        downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         /**
@@ -9229,6 +10188,313 @@
     }
 
     /**
+     * 复制管理器
+     * 负责公式双击复制、表格 Markdown 复制等功能
+     */
+    class CopyManager {
+        #settings;
+        #formulaCopyInitialized = false;
+        #tableCopyInitialized = false;
+        #formulaDblClickHandler = null;
+        #stopTableWatch = null; // DOMToolkit.each 返回的停止函数
+        #injectTableButton = null;
+
+        constructor(settings) {
+            this.#settings = settings;
+        }
+
+        // ==================== Formula Copy ====================
+
+        /**
+         * 初始化公式双击复制功能
+         * 禁用公式文字选择，双击复制 LaTeX 源码
+         */
+        initFormulaCopy() {
+            if (this.#formulaCopyInitialized) return;
+            this.#formulaCopyInitialized = true;
+
+            // 注入 CSS
+            const styleId = 'gh-formula-copy-style';
+            if (!document.getElementById(styleId)) {
+                const style = document.createElement('style');
+                style.id = styleId;
+                style.textContent = `
+                    .math-block, .math-inline {
+                        user-select: none !important;
+                        cursor: pointer !important;
+                    }
+                    .math-block:hover, .math-inline:hover {
+                        outline: 2px solid var(--gh-primary, #4285f4);
+                        outline-offset: 2px;
+                        border-radius: 4px;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            // 双击事件委托处理
+            this.#formulaDblClickHandler = (e) => {
+                const mathEl = e.target.closest('.math-block, .math-inline');
+                if (!mathEl) return;
+
+                const latex = mathEl.getAttribute('data-math');
+                if (!latex) {
+                    console.warn('[FormulaCopy] No data-math attribute found');
+                    return;
+                }
+
+                let copyText = latex;
+                if (this.#settings.formulaDelimiterEnabled) {
+                    const isBlock = mathEl.classList.contains('math-block');
+                    copyText = isBlock ? `$$${latex}$$` : `$${latex}$`;
+                }
+
+                navigator.clipboard
+                    .writeText(copyText)
+                    .then(() => showToast(t('formulaCopied') || '公式已复制'))
+                    .catch((err) => {
+                        console.error('[FormulaCopy] Copy failed:', err);
+                        showToast('复制失败');
+                    });
+
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            document.addEventListener('dblclick', this.#formulaDblClickHandler, true);
+        }
+
+        /**
+         * 销毁公式双击复制功能
+         */
+        destroyFormulaCopy() {
+            this.#formulaCopyInitialized = false;
+
+            const style = document.getElementById('gh-formula-copy-style');
+            if (style) style.remove();
+
+            if (this.#formulaDblClickHandler) {
+                document.removeEventListener('dblclick', this.#formulaDblClickHandler, true);
+                this.#formulaDblClickHandler = null;
+            }
+        }
+
+        // ==================== Table Copy ====================
+
+        /**
+         * 初始化表格 Markdown 复制功能
+         */
+        initTableCopy() {
+            if (this.#tableCopyInitialized) return;
+            this.#tableCopyInitialized = true;
+
+            // 注入 CSS
+            const styleId = 'gh-table-copy-style';
+            if (!document.getElementById(styleId)) {
+                const style = document.createElement('style');
+                style.id = styleId;
+                style.textContent = `
+                    .gh-table-copy-btn {
+                        position: absolute;
+                        top: 4px;
+                        right: 4px;
+                        width: 28px;
+                        height: 28px;
+                        border: none;
+                        border-radius: 6px;
+                        background: var(--gh-bg-secondary, rgba(255,255,255,0.9));
+                        color: var(--gh-text, #374151);
+                        cursor: pointer;
+                        font-size: 14px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        opacity: 0.7;
+                        transition: opacity 0.2s, background 0.2s;
+                        z-index: 10;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    }
+                    .gh-table-container:hover .gh-table-copy-btn,
+                    table-block:hover .gh-table-copy-btn {
+                        opacity: 1;
+                    }
+                    .gh-table-copy-btn:hover {
+                        background: var(--gh-primary, #4285f4);
+                        color: white;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            // 按钮注入函数
+            this.#injectTableButton = (table) => {
+                if (table.dataset.ghTableCopy) return;
+                table.dataset.ghTableCopy = 'true';
+
+                try {
+                    // 尝试找到原生表格容器：
+                    // - Gemini 普通版: table-block
+                    // - Gemini Business: ucs-markdown-table (在 Shadow DOM 内部，closest 可能找不到)
+                    // 如果都没有，使用 table 的父元素（不创建 wrapper 以避免破坏流式渲染）
+                    let container = table.closest('table-block, ucs-markdown-table');
+                    if (!container) {
+                        container = table.parentNode;
+                        if (!container) return;
+                        // 添加标记类以便 CSS 选择器可以匹配
+                        container.classList.add('gh-table-container');
+                    }
+                    container.style.position = 'relative';
+
+                    const btn = document.createElement('button');
+                    btn.className = 'gh-table-copy-btn';
+                    btn.textContent = '📋';
+                    btn.title = t('tableCopyLabel') || 'Copy Markdown';
+                    // 检测是否在 Gemini Business 容器中（有原生按钮），调整位置避免遮挡
+                    const isGeminiBusiness =
+                        container.tagName?.toLowerCase() === 'ucs-markdown-table' || container.closest?.('ucs-markdown-table') || container.classList?.contains('gh-table-container');
+                    const rightOffset = isGeminiBusiness ? '80px' : '4px';
+                    // 使用内联样式确保定位正确（CSS 可能无法穿透 Shadow DOM）
+                    Object.assign(btn.style, {
+                        position: 'absolute',
+                        top: '4px',
+                        right: rightOffset,
+                        width: '28px',
+                        height: '28px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: '0.6',
+                        transition: 'opacity 0.2s, transform 0.2s',
+                        zIndex: '10',
+                    });
+                    // hover 效果
+                    btn.addEventListener('mouseenter', () => {
+                        btn.style.opacity = '1';
+                        btn.style.transform = 'scale(1.1)';
+                    });
+                    btn.addEventListener('mouseleave', () => {
+                        btn.style.opacity = '0.6';
+                        btn.style.transform = 'scale(1)';
+                    });
+
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const markdown = this.tableToMarkdown(table);
+                        navigator.clipboard
+                            .writeText(markdown)
+                            .then(() => {
+                                showToast(t('tableCopied') || '表格已复制');
+                                btn.textContent = '✓';
+                                setTimeout(() => {
+                                    btn.textContent = '📋';
+                                }, 1000);
+                            })
+                            .catch((err) => {
+                                console.error('[TableCopy] Copy failed:', err);
+                                showToast('复制失败');
+                            });
+                    });
+
+                    container.appendChild(btn);
+                } catch (err) {
+                    console.error('[TableCopy] Error injecting button:', err);
+                }
+            };
+
+            // 使用 DOMToolkit.each 持续监听表格（支持 Shadow DOM 穿透）
+            // 这比 MutationObserver 更适合 Gemini Business 的深层 Shadow DOM 结构
+            this.#stopTableWatch = DOMToolkit.each(
+                'table',
+                (table) => {
+                    this.#injectTableButton(table);
+                },
+                { shadow: true },
+            );
+        }
+
+        /**
+         * 表格转 Markdown
+         */
+        tableToMarkdown(table) {
+            const rows = table.querySelectorAll('tr');
+            if (rows.length === 0) return '';
+
+            const lines = [];
+            let headerProcessed = false;
+
+            const getCellContent = (cell) => {
+                if (this.#settings.formulaCopyEnabled) {
+                    const clone = cell.cloneNode(true);
+                    clone.querySelectorAll('.math-block, .math-inline').forEach((mathEl) => {
+                        const latex = mathEl.getAttribute('data-math');
+                        if (latex) {
+                            const isBlock = mathEl.classList.contains('math-block');
+                            let replacement;
+                            if (this.#settings.formulaDelimiterEnabled) {
+                                replacement = isBlock ? `$$${latex}$$` : `$${latex}$`;
+                            } else {
+                                replacement = latex;
+                            }
+                            mathEl.replaceWith(document.createTextNode(replacement));
+                        }
+                    });
+                    return clone.innerText?.trim().replace(/\|/g, '\\|').replace(/\n/g, ' ') || '';
+                }
+                return cell.innerText?.trim().replace(/\|/g, '\\|').replace(/\n/g, ' ') || '';
+            };
+
+            rows.forEach((row, rowIndex) => {
+                const cells = row.querySelectorAll('th, td');
+                const cellTexts = Array.from(cells).map(getCellContent);
+                lines.push('| ' + cellTexts.join(' | ') + ' |');
+
+                if (!headerProcessed && (row.querySelector('th') || rowIndex === 0)) {
+                    const alignments = Array.from(cells).map((cell) => {
+                        return cell.classList.contains('align-center') ? ':---:' : cell.classList.contains('align-right') ? '---:' : '---';
+                    });
+                    lines.push('| ' + alignments.join(' | ') + ' |');
+                    headerProcessed = true;
+                }
+            });
+
+            return lines.join('\n');
+        }
+
+        /**
+         * 销毁表格复制功能
+         */
+        destroyTableCopy() {
+            this.#tableCopyInitialized = false;
+
+            // 停止 DOMToolkit.each 的监听
+            if (this.#stopTableWatch) {
+                this.#stopTableWatch();
+                this.#stopTableWatch = null;
+            }
+
+            const style = document.getElementById('gh-table-copy-style');
+            if (style) style.remove();
+
+            // 使用 DOMToolkit 清理 Shadow DOM 中的元素
+            DOMToolkit.query('.gh-table-copy-btn', { all: true, shadow: true })?.forEach((btn) => btn.remove());
+            DOMToolkit.query('[data-gh-table-copy]', { all: true, shadow: true })?.forEach((el) => {
+                delete el.dataset.ghTableCopy;
+            });
+            // 清理添加的容器类名
+            DOMToolkit.query('.gh-table-container', { all: true, shadow: true })?.forEach((el) => {
+                el.classList.remove('gh-table-container');
+            });
+        }
+    }
+
+    /**
      * Gemini 助手核心类
      * 管理提示词、设置和 UI 界面
      */
@@ -9240,11 +10506,11 @@
             this.siteAdapter = siteRegistry.getCurrent();
             this.selectedPrompt = null;
             this.isScrolling = false; // 滚动状态锁
-            this.anchorScrollTop = null; // 阅读锚点位置
             this.lang = detectLanguage(); // 当前语言
             this.i18n = I18N[this.lang]; // 当前语言文本
             this.settingsManager = new SettingsManager();
             this.settings = this.loadSettings(); // 加载设置
+            this.copyManager = new CopyManager(this.settings); // 复制管理器
 
             // Restore saved theme preference if exists
             if (this.settings.themeMode) {
@@ -9295,7 +10561,7 @@
             this.savedAnchorTop = null;
             // 水印移除器
             this.watermarkRemover = new WatermarkRemover();
-            if (this.settings.watermarkRemoval) {
+            if (this.settings.watermarkRemoval && this.siteAdapter instanceof GeminiAdapter) {
                 this.watermarkRemover.start();
             }
             this.init();
@@ -9424,6 +10690,32 @@
             if (isStandardGemini && mdFixSettings.enabled) {
                 this.markdownFixer = new MarkdownFixer();
                 this.markdownFixer.start();
+            }
+
+            // 初始化公式双击复制功能（仅 Gemini 普通版，且设置已开启）
+            // 默认开启（首次使用时）
+            if (isStandardGemini) {
+                if (this.settings.formulaCopyEnabled === undefined) {
+                    this.settings.formulaCopyEnabled = true;
+                    this.saveSettings();
+                }
+                if (this.settings.formulaDelimiterEnabled === undefined) {
+                    this.settings.formulaDelimiterEnabled = true;
+                    this.saveSettings();
+                }
+                if (this.settings.formulaCopyEnabled) {
+                    this.copyManager.initFormulaCopy();
+                }
+            }
+
+            // 初始化表格复制功能（通用功能，两个版本都支持）
+            // 默认开启（首次使用时）
+            if (this.settings.tableCopyEnabled === undefined) {
+                this.settings.tableCopyEnabled = true;
+                this.saveSettings();
+            }
+            if (this.settings.tableCopyEnabled) {
+                this.copyManager.initTableCopy();
             }
 
             // 监听自定义大纲自动刷新事件
@@ -11285,7 +12577,7 @@
             const panelOnlyButtons = {};
 
             // 面板按钮
-            const panelBtnConfig = btnOrder.find(b => b.id === 'panel');
+            const panelBtnConfig = btnOrder.find((b) => b.id === 'panel');
             if (panelBtnConfig) {
                 const panelBtn = createQuickButton('quick-panel-btn', '✨', this.t('panelTitle'), 'panel-only');
                 panelBtn.addEventListener('click', () => this.togglePanel());
@@ -11294,7 +12586,7 @@
             }
 
             // 自动锚点按钮
-            const anchorBtnConfig = btnOrder.find(b => b.id === 'anchor');
+            const anchorBtnConfig = btnOrder.find((b) => b.id === 'anchor');
             if (anchorBtnConfig) {
                 const anchorBtnClass = 'panel-only' + (anchorBtnConfig.enabled ? '' : ' btn-disabled');
                 const anchorBtn = createQuickButton('quick-anchor-btn', '⚓', this.t('noAnchor'), anchorBtnClass);
@@ -11306,7 +12598,7 @@
             }
 
             // 主题按钮
-            const themeBtnConfig = btnOrder.find(b => b.id === 'theme');
+            const themeBtnConfig = btnOrder.find((b) => b.id === 'theme');
             if (themeBtnConfig) {
                 const themeBtnClass = 'panel-only' + (themeBtnConfig.enabled ? '' : ' btn-disabled');
                 const themeBtn = createQuickButton('quick-theme-btn', '☀', this.t('showCollapsedThemeLabel'), themeBtnClass);
@@ -11321,29 +12613,31 @@
             // 分隔线
             quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
 
-            // 3. 手动锚点按钮（始终显示）
-            const setAnchorBtn = createQuickButton('manual-anchor-set-btn', '📍', this.t('setAnchor'), 'manual-anchor-btn set-btn');
-            setAnchorBtn.addEventListener('click', () => this.setAnchorManually());
-            quickBtnGroup.appendChild(setAnchorBtn);
+            // 3. 手动锚点按钮（根据设置显示）
+            if (this.settings.manualAnchorEnabled !== false) {
+                const setAnchorBtn = createQuickButton('manual-anchor-set-btn', '📍', this.t('setAnchor'), 'manual-anchor-btn set-btn');
+                setAnchorBtn.addEventListener('click', () => this.setAnchorManually());
+                quickBtnGroup.appendChild(setAnchorBtn);
 
-            const backAnchorBtn = createQuickButton('manual-anchor-back-btn', '↩', this.t('noAnchor'), 'manual-anchor-btn back-btn');
-            backAnchorBtn.addEventListener('click', () => {
-                if (this.savedAnchorTop !== null) {
-                    this.backToManualAnchor();
-                }
-            });
-            quickBtnGroup.appendChild(backAnchorBtn);
+                const backAnchorBtn = createQuickButton('manual-anchor-back-btn', '↩', this.t('noAnchor'), 'manual-anchor-btn back-btn');
+                backAnchorBtn.addEventListener('click', () => {
+                    if (this.savedAnchorTop !== null) {
+                        this.backToManualAnchor();
+                    }
+                });
+                quickBtnGroup.appendChild(backAnchorBtn);
 
-            const clearAnchorBtn = createQuickButton('manual-anchor-clear-btn', '✕', this.t('clearAnchor'), 'manual-anchor-btn clear-btn');
-            clearAnchorBtn.addEventListener('click', () => {
-                if (this.savedAnchorTop !== null) {
-                    this.clearAnchorManually();
-                }
-            });
-            quickBtnGroup.appendChild(clearAnchorBtn);
+                const clearAnchorBtn = createQuickButton('manual-anchor-clear-btn', '✕', this.t('clearAnchor'), 'manual-anchor-btn clear-btn');
+                clearAnchorBtn.addEventListener('click', () => {
+                    if (this.savedAnchorTop !== null) {
+                        this.clearAnchorManually();
+                    }
+                });
+                quickBtnGroup.appendChild(clearAnchorBtn);
 
-            // 分隔线
-            quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
+                // 分隔线
+                quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
+            }
 
             // 4. 底部滚动按钮
             const scrollBottomBtn = createQuickButton('quick-scroll-bottom', '⬇', this.t('scrollBottom'));
@@ -11542,6 +12836,7 @@
             });
             langSelect.addEventListener('change', () => {
                 GM_setValue(SETTING_KEYS.LANGUAGE, langSelect.value);
+                resetLanguageCache(); // 清除全局 t() 的语言缓存
                 this.lang = detectLanguage();
                 this.i18n = I18N[this.lang];
                 this.createStyles();
@@ -12215,33 +13510,28 @@
             edgeSnapHideItem.appendChild(edgeSnapHideToggle);
             panelSettingsContainer.appendChild(edgeSnapHideItem);
 
-            // 5.5.4 水印移除开关
-            const watermarkRemovalItem = createElement('div', { className: 'setting-item' });
-            const watermarkRemovalInfo = createElement('div', { className: 'setting-item-info' });
-            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('watermarkRemovalLabel')));
-            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('watermarkRemovalDesc')));
+            // 5.5.4 手动锚点开关
+            const manualAnchorItem = createElement('div', { className: 'setting-item' });
+            const manualAnchorInfo = createElement('div', { className: 'setting-item-info' });
+            manualAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('manualAnchorLabel')));
+            manualAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('manualAnchorDesc')));
 
-            const watermarkRemovalToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.watermarkRemoval ? ' active' : ''),
-                id: 'toggle-watermark-removal',
+            const manualAnchorToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.manualAnchorEnabled !== false ? ' active' : ''),
+                id: 'toggle-manual-anchor',
             });
-            watermarkRemovalToggle.addEventListener('click', () => {
-                this.settings.watermarkRemoval = !this.settings.watermarkRemoval;
-                watermarkRemovalToggle.classList.toggle('active', this.settings.watermarkRemoval);
+            manualAnchorToggle.addEventListener('click', () => {
+                this.settings.manualAnchorEnabled = this.settings.manualAnchorEnabled === false;
+                manualAnchorToggle.classList.toggle('active', this.settings.manualAnchorEnabled);
                 this.saveSettings();
-                // 根据设置启动或停止水印移除
-                if (this.watermarkRemover) {
-                    if (this.settings.watermarkRemoval) {
-                        this.watermarkRemover.start();
-                    } else {
-                        this.watermarkRemover.stop();
-                    }
-                }
-                showToast(this.settings.watermarkRemoval ? this.t('settingOn') : this.t('settingOff'));
+                this.createUI();
+                this.bindEvents();
+                this.switchTab('settings');
+                showToast(this.settings.manualAnchorEnabled ? this.t('settingOn') : this.t('settingOff'));
             });
-            watermarkRemovalItem.appendChild(watermarkRemovalInfo);
-            watermarkRemovalItem.appendChild(watermarkRemovalToggle);
-            panelSettingsContainer.appendChild(watermarkRemovalItem);
+            manualAnchorItem.appendChild(manualAnchorInfo);
+            manualAnchorItem.appendChild(manualAnchorToggle);
+            panelSettingsContainer.appendChild(manualAnchorItem);
 
             // 5.5.5 折叠面板按钮排序
             const collapsedBtnDesc = createElement(
@@ -12562,7 +13852,10 @@
                 const volumeInfo = createElement('div', { className: 'setting-item-info' });
                 volumeInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('notificationVolumeLabel')));
 
-                const volumeControls = createElement('div', { className: 'setting-controls', style: 'display: flex; align-items: center; gap: 8px;' });
+                const volumeControls = createElement('div', {
+                    className: 'setting-controls',
+                    style: 'display: flex; align-items: center; gap: 8px;',
+                });
                 const volumeSlider = createElement('input', {
                     type: 'range',
                     min: '0.1',
@@ -12721,29 +14014,168 @@
 
             const tabSettingsSection = this.createCollapsibleSection(this.t('tabSettingsTitle'), tabSettingsContainer, { defaultExpanded: false });
 
-            // 7. 其他设置 (折叠面板) - 仅保留站点特定功能
-            const otherSettingsContainer = createElement('div', {});
+            // 内容设置
+            const exportContainer = createElement('div', {});
 
-            // Gemini Business 专属设置
-            if (this.siteAdapter instanceof GeminiBusinessAdapter) {
-                const clearItem = createElement('div', { className: 'setting-item' });
-                const clearInfo = createElement('div', { className: 'setting-item-info' });
-                clearInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('clearOnSendLabel')));
-                clearInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('clearOnSendDesc')));
-                const toggle = createElement('div', {
-                    className: 'setting-toggle' + (this.settings.clearTextareaOnSend ? ' active' : ''),
-                    id: 'toggle-clear-on-send',
+            // 水印移除开关
+            const watermarkRemovalItem = createElement('div', { className: 'setting-item' });
+            const watermarkRemovalInfo = createElement('div', { className: 'setting-item-info' });
+            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('watermarkRemovalLabel')));
+            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('watermarkRemovalDesc')));
+
+            const watermarkRemovalToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.watermarkRemoval ? ' active' : ''),
+                id: 'toggle-watermark-removal',
+            });
+            watermarkRemovalToggle.addEventListener('click', () => {
+                this.settings.watermarkRemoval = !this.settings.watermarkRemoval;
+                watermarkRemovalToggle.classList.toggle('active', this.settings.watermarkRemoval);
+                this.saveSettings();
+                // 根据设置启动或停止水印移除
+                if (this.watermarkRemover) {
+                    if (this.settings.watermarkRemoval) {
+                        this.watermarkRemover.start();
+                    } else {
+                        this.watermarkRemover.stop();
+                    }
+                }
+                showToast(this.settings.watermarkRemoval ? this.t('settingOn') : this.t('settingOff'));
+            });
+            watermarkRemovalItem.appendChild(watermarkRemovalInfo);
+            watermarkRemovalItem.appendChild(watermarkRemovalToggle);
+            exportContainer.appendChild(watermarkRemovalItem);
+
+            // Base64 图片导出开关
+            const base64ExportItem = createElement('div', { className: 'setting-item' });
+            const base64ExportInfo = createElement('div', { className: 'setting-item-info' });
+            base64ExportInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('exportImagesToBase64Label')));
+            base64ExportInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('exportImagesToBase64Desc')));
+
+            const base64ExportToggle = createElement('div', {
+                // 默认为 false
+                className: 'setting-toggle' + (this.settings.conversations?.exportImagesToBase64 ? ' active' : ''),
+                id: 'toggle-export-base64',
+            });
+            base64ExportToggle.addEventListener('click', () => {
+                if (!this.settings.conversations) this.settings.conversations = {};
+                // Toggle logic
+                const currentVal = !!this.settings.conversations.exportImagesToBase64;
+                this.settings.conversations.exportImagesToBase64 = !currentVal;
+                base64ExportToggle.classList.toggle('active', this.settings.conversations.exportImagesToBase64);
+                this.saveSettings();
+                showToast(this.settings.conversations.exportImagesToBase64 ? this.t('settingOn') : this.t('settingOff'));
+            });
+
+            base64ExportItem.appendChild(base64ExportInfo);
+            base64ExportItem.appendChild(base64ExportToggle);
+            exportContainer.appendChild(base64ExportItem);
+
+            // 双击复制公式开关 (仅 Gemini 标准版显示)
+            const isNonBusinessGemini = !location.host.includes('business');
+            if (isNonBusinessGemini) {
+                // 初始化默认值（双击复制公式默认开启）
+                if (this.settings.formulaCopyEnabled === undefined) {
+                    this.settings.formulaCopyEnabled = true;
+                }
+                if (this.settings.formulaDelimiterEnabled === undefined) {
+                    this.settings.formulaDelimiterEnabled = true;
+                }
+
+                const formulaCopyItem = createElement('div', { className: 'setting-item' });
+                const formulaCopyInfo = createElement('div', { className: 'setting-item-info' });
+                formulaCopyInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('formulaCopyLabel')));
+                formulaCopyInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('formulaCopyDesc')));
+
+                const formulaCopyToggle = createElement('div', {
+                    className: 'setting-toggle' + (this.settings.formulaCopyEnabled ? ' active' : ''),
+                    id: 'toggle-formula-copy',
                 });
-                toggle.addEventListener('click', () => {
-                    this.settings.clearTextareaOnSend = !this.settings.clearTextareaOnSend;
-                    toggle.classList.toggle('active', this.settings.clearTextareaOnSend);
+
+                formulaCopyItem.appendChild(formulaCopyInfo);
+                formulaCopyItem.appendChild(formulaCopyToggle);
+                exportContainer.appendChild(formulaCopyItem);
+
+                // 分隔符开关
+                const delimiterItem = createElement('div', { className: 'setting-item' });
+                const delimiterInfo = createElement('div', { className: 'setting-item-info' });
+                delimiterInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('formulaDelimiterLabel')));
+                delimiterInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('formulaDelimiterDesc')));
+
+                const delimiterToggle = createElement('div', {
+                    className: 'setting-toggle' + (this.settings.formulaDelimiterEnabled ? ' active' : ''),
+                    id: 'toggle-formula-delimiter',
+                });
+
+                delimiterItem.appendChild(delimiterInfo);
+                delimiterItem.appendChild(delimiterToggle);
+                exportContainer.appendChild(delimiterItem);
+
+                // 联动逻辑：根据公式复制开关状态更新分隔符开关可用性
+                const updateDelimiterState = () => {
+                    const isEnabled = this.settings.formulaCopyEnabled;
+                    delimiterToggle.style.opacity = isEnabled ? '1' : '0.4';
+                    delimiterToggle.style.pointerEvents = isEnabled ? 'auto' : 'none';
+                    delimiterItem.style.opacity = isEnabled ? '1' : '0.5';
+                };
+                updateDelimiterState();
+
+                // 公式复制开关点击事件
+                formulaCopyToggle.addEventListener('click', () => {
+                    this.settings.formulaCopyEnabled = !this.settings.formulaCopyEnabled;
+                    formulaCopyToggle.classList.toggle('active', this.settings.formulaCopyEnabled);
                     this.saveSettings();
-                    showToast(this.settings.clearTextareaOnSend ? this.t('settingOn') : this.t('settingOff'));
+                    // 实时切换功能
+                    if (this.settings.formulaCopyEnabled) {
+                        this.copyManager.initFormulaCopy();
+                    } else {
+                        this.copyManager.destroyFormulaCopy();
+                    }
+                    // 更新分隔符开关状态
+                    updateDelimiterState();
+                    showToast(this.settings.formulaCopyEnabled ? this.t('settingOn') : this.t('settingOff'));
                 });
-                clearItem.appendChild(clearInfo);
-                clearItem.appendChild(toggle);
-                otherSettingsContainer.appendChild(clearItem);
+
+                // 分隔符开关点击事件
+                delimiterToggle.addEventListener('click', () => {
+                    if (!this.settings.formulaCopyEnabled) return; // 防止在禁用状态下点击
+                    this.settings.formulaDelimiterEnabled = !this.settings.formulaDelimiterEnabled;
+                    delimiterToggle.classList.toggle('active', this.settings.formulaDelimiterEnabled);
+                    this.saveSettings();
+                    showToast(this.settings.formulaDelimiterEnabled ? this.t('settingOn') : this.t('settingOff'));
+                });
             }
+
+            // 表格复制 Markdown 开关（通用功能，两个版本都支持）
+            // 初始化默认值
+            if (this.settings.tableCopyEnabled === undefined) {
+                this.settings.tableCopyEnabled = true;
+            }
+
+            const tableCopyItem = createElement('div', { className: 'setting-item' });
+            const tableCopyInfo = createElement('div', { className: 'setting-item-info' });
+            tableCopyInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('tableCopyLabel')));
+            tableCopyInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('tableCopyDesc')));
+
+            const tableCopyToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.tableCopyEnabled ? ' active' : ''),
+                id: 'toggle-table-copy',
+            });
+            tableCopyToggle.addEventListener('click', () => {
+                this.settings.tableCopyEnabled = !this.settings.tableCopyEnabled;
+                tableCopyToggle.classList.toggle('active', this.settings.tableCopyEnabled);
+                this.saveSettings();
+                // 实时切换功能
+                if (this.settings.tableCopyEnabled) {
+                    this.copyManager.initTableCopy();
+                } else {
+                    this.copyManager.destroyTableCopy();
+                }
+                showToast(this.settings.tableCopyEnabled ? this.t('settingOn') : this.t('settingOff'));
+            });
+
+            tableCopyItem.appendChild(tableCopyInfo);
+            tableCopyItem.appendChild(tableCopyToggle);
+            exportContainer.appendChild(tableCopyItem);
 
             // Gemini 专属设置
             const isStandardGemini = this.siteAdapter instanceof GeminiAdapter;
@@ -12780,18 +14212,36 @@
 
                 mdFixItem.appendChild(mdFixInfo);
                 mdFixItem.appendChild(mdFixToggle);
-                otherSettingsContainer.appendChild(mdFixItem);
+                exportContainer.appendChild(mdFixItem);
+            }
+
+            const contentAndExportSection = this.createCollapsibleSection(this.t('contentExportSettingsTitle'), exportContainer, { defaultExpanded: false });
+
+            //  其他设置
+            const otherSettingsContainer = createElement('div', {});
+
+            // Gemini Business 专属设置
+            if (this.siteAdapter instanceof GeminiBusinessAdapter) {
+                const clearItem = createElement('div', { className: 'setting-item' });
+                const clearInfo = createElement('div', { className: 'setting-item-info' });
+                clearInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('clearOnSendLabel')));
+                clearInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('clearOnSendDesc')));
+                const toggle = createElement('div', {
+                    className: 'setting-toggle' + (this.settings.clearTextareaOnSend ? ' active' : ''),
+                    id: 'toggle-clear-on-send',
+                });
+                toggle.addEventListener('click', () => {
+                    this.settings.clearTextareaOnSend = !this.settings.clearTextareaOnSend;
+                    toggle.classList.toggle('active', this.settings.clearTextareaOnSend);
+                    this.saveSettings();
+                    showToast(this.settings.clearTextareaOnSend ? this.t('settingOn') : this.t('settingOff'));
+                });
+                clearItem.appendChild(clearInfo);
+                clearItem.appendChild(toggle);
+                otherSettingsContainer.appendChild(clearItem);
             }
 
             const otherSettingsSection = this.createCollapsibleSection(this.t('otherSettingsTitle'), otherSettingsContainer, { defaultExpanded: false });
-
-            // 7.5. 面板可见性设置 (添加到通用设置/其他设置中，这里选择添加到"界面排版"更合适，或者单独的通用设置区域)
-            // 根据用户描述"在通用设置里"，我们找一个合适的位置。
-            // 之前的 otherSettingsSection 标题是 "其他设置"，我们可以把 面板可见性 加到这里，或者 layoutSection "界面排版"
-            // 考虑到这是界面行为，放在 layoutSection 或者一个新的 "通用设置" 区域比较好。
-            // 但现有的 layoutSection 是 Tab 顺序。
-            // 让我们把它加到 otherSettingsSection (其他设置) 作为一个子项，或者在 createSettingsContent 开头创建一个新的 General Section。
-            // 鉴于 otherSettingsSection 包含 "折叠面板显示锚点" 等，放在这里比较合适。
 
             // 1. 通用设置（语言）- 已在上方添加
             // 2. 面板设置 (New)
@@ -12800,6 +14250,8 @@
             content.appendChild(layoutSection);
             // 3.5. 会话设置
             content.appendChild(convSettingsSection);
+            // 内容设置
+            content.appendChild(contentAndExportSection);
             // 4. 标签页设置
             if (tabSettingsSection) content.appendChild(tabSettingsSection);
             // 5. 阅读导航
@@ -12810,7 +14262,8 @@
             content.appendChild(widthSection);
             // 8. 模型锁定
             if (lockSection) content.appendChild(lockSection);
-            // 9. 其他设置
+
+            // last: 其他设置
             content.appendChild(otherSettingsSection);
 
             container.appendChild(content);
@@ -13040,7 +14493,6 @@
                 }
             }
         }
-
 
         refreshCategories() {
             const container = document.getElementById('prompt-categories');
