@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.11.0
+// @version      1.11.1
 // @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:en Gemini Helper: Conversation management & export, outline navigation, prompt management, tab enhancements (status/privacy/notification), reading history & restore, bidirectional/manual anchor, image watermark removal, bold fix, formula/table copy, model lock, page beautification, theme toggle, smart dark mode (Gemini/Gemini Enterprise)
 // @author       urzeye
@@ -20,6 +20,7 @@
 // @connect      v0.app
 // @connect      googleusercontent.com
 // @run-at       document-idle
+// @noframes
 // @supportURL   https://github.com/urzeye/tampermonkey-scripts/issues
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
@@ -31,6 +32,11 @@
 
 (function () {
     'use strict';
+
+    // 防止在 iframe 中执行（图文并茂模式等场景）
+    if (window.top !== window.self) {
+        return;
+    }
 
     // 防止重复初始化
     if (window.geminiHelperInitialized) {
