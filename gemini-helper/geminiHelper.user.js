@@ -13457,35 +13457,7 @@
             edgeSnapHideItem.appendChild(edgeSnapHideToggle);
             panelSettingsContainer.appendChild(edgeSnapHideItem);
 
-            // 5.5.4 水印移除开关
-            const watermarkRemovalItem = createElement('div', { className: 'setting-item' });
-            const watermarkRemovalInfo = createElement('div', { className: 'setting-item-info' });
-            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('watermarkRemovalLabel')));
-            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('watermarkRemovalDesc')));
-
-            const watermarkRemovalToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.watermarkRemoval ? ' active' : ''),
-                id: 'toggle-watermark-removal',
-            });
-            watermarkRemovalToggle.addEventListener('click', () => {
-                this.settings.watermarkRemoval = !this.settings.watermarkRemoval;
-                watermarkRemovalToggle.classList.toggle('active', this.settings.watermarkRemoval);
-                this.saveSettings();
-                // 根据设置启动或停止水印移除
-                if (this.watermarkRemover) {
-                    if (this.settings.watermarkRemoval) {
-                        this.watermarkRemover.start();
-                    } else {
-                        this.watermarkRemover.stop();
-                    }
-                }
-                showToast(this.settings.watermarkRemoval ? this.t('settingOn') : this.t('settingOff'));
-            });
-            watermarkRemovalItem.appendChild(watermarkRemovalInfo);
-            watermarkRemovalItem.appendChild(watermarkRemovalToggle);
-            panelSettingsContainer.appendChild(watermarkRemovalItem);
-
-            // 5.5.5 折叠面板按钮排序
+            // 5.5.4 折叠面板按钮排序
             const collapsedBtnDesc = createElement(
                 'div',
                 {
@@ -13966,8 +13938,36 @@
 
             const tabSettingsSection = this.createCollapsibleSection(this.t('tabSettingsTitle'), tabSettingsContainer, { defaultExpanded: false });
 
-            // 内容与导出设置
+            // 内容设置
             const exportContainer = createElement('div', {});
+
+            // 水印移除开关
+            const watermarkRemovalItem = createElement('div', { className: 'setting-item' });
+            const watermarkRemovalInfo = createElement('div', { className: 'setting-item-info' });
+            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('watermarkRemovalLabel')));
+            watermarkRemovalInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('watermarkRemovalDesc')));
+
+            const watermarkRemovalToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.watermarkRemoval ? ' active' : ''),
+                id: 'toggle-watermark-removal',
+            });
+            watermarkRemovalToggle.addEventListener('click', () => {
+                this.settings.watermarkRemoval = !this.settings.watermarkRemoval;
+                watermarkRemovalToggle.classList.toggle('active', this.settings.watermarkRemoval);
+                this.saveSettings();
+                // 根据设置启动或停止水印移除
+                if (this.watermarkRemover) {
+                    if (this.settings.watermarkRemoval) {
+                        this.watermarkRemover.start();
+                    } else {
+                        this.watermarkRemover.stop();
+                    }
+                }
+                showToast(this.settings.watermarkRemoval ? this.t('settingOn') : this.t('settingOff'));
+            });
+            watermarkRemovalItem.appendChild(watermarkRemovalInfo);
+            watermarkRemovalItem.appendChild(watermarkRemovalToggle);
+            exportContainer.appendChild(watermarkRemovalItem);
 
             // Base64 图片导出开关
             const base64ExportItem = createElement('div', { className: 'setting-item' });
@@ -14174,6 +14174,8 @@
             content.appendChild(layoutSection);
             // 3.5. 会话设置
             content.appendChild(convSettingsSection);
+            // 内容设置
+            content.appendChild(contentAndExportSection);
             // 4. 标签页设置
             if (tabSettingsSection) content.appendChild(tabSettingsSection);
             // 5. 阅读导航
@@ -14185,10 +14187,7 @@
             // 8. 模型锁定
             if (lockSection) content.appendChild(lockSection);
 
-            // 9. 内容设置
-            content.appendChild(contentAndExportSection);
-
-            // 其他设置
+            // last: 其他设置
             content.appendChild(otherSettingsSection);
 
             container.appendChild(content);
