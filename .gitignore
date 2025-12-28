@@ -144,3 +144,4 @@ vite.config.ts.timestamp-*
 # 你的个人测试/备份文件
 *.bak
 test_script.js
+.DS_Store
