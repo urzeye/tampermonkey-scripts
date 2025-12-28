@@ -446,6 +446,8 @@
             noAnchor: '暂无锚点',
             clearAnchor: '清除锚点',
             clearAnchorToast: '已清除锚点',
+            manualAnchorLabel: '手动锚点',
+            manualAnchorDesc: '在快捷工具栏显示手动锚点按钮',
             // 水印移除
             watermarkRemovalLabel: '移除图片水印',
             watermarkRemovalDesc: '自动移除 Gemini AI 生成图像中的 NanoBanana 水印',
@@ -752,6 +754,8 @@
             noAnchor: '暫無錨點',
             clearAnchor: '清除錨點',
             clearAnchorToast: '已清除錨點',
+            manualAnchorLabel: '手動錨點',
+            manualAnchorDesc: '在快捷工具欄顯示手動錨點按鈕',
             // 浮水印移除
             watermarkRemovalLabel: '移除圖片浮水印',
             watermarkRemovalDesc: '自動移除 Gemini AI 生成圖像中的 NanoBanana 浮水印',
@@ -1056,6 +1060,8 @@
             noAnchor: 'No anchor',
             clearAnchor: 'Clear Anchor',
             clearAnchorToast: 'Anchor cleared',
+            manualAnchorLabel: 'Manual Anchor',
+            manualAnchorDesc: 'Show manual anchor buttons in quick toolbar',
             // Watermark Removal
             watermarkRemovalLabel: 'Remove Image Watermark',
             watermarkRemovalDesc: 'Automatically remove NanoBanana watermark from Gemini AI generated images',
@@ -12601,29 +12607,31 @@
             // 分隔线
             quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
 
-            // 3. 手动锚点按钮（始终显示）
-            const setAnchorBtn = createQuickButton('manual-anchor-set-btn', '📍', this.t('setAnchor'), 'manual-anchor-btn set-btn');
-            setAnchorBtn.addEventListener('click', () => this.setAnchorManually());
-            quickBtnGroup.appendChild(setAnchorBtn);
+            // 3. 手动锚点按钮（根据设置显示）
+            if (this.settings.manualAnchorEnabled !== false) {
+                const setAnchorBtn = createQuickButton('manual-anchor-set-btn', '📍', this.t('setAnchor'), 'manual-anchor-btn set-btn');
+                setAnchorBtn.addEventListener('click', () => this.setAnchorManually());
+                quickBtnGroup.appendChild(setAnchorBtn);
 
-            const backAnchorBtn = createQuickButton('manual-anchor-back-btn', '↩', this.t('noAnchor'), 'manual-anchor-btn back-btn');
-            backAnchorBtn.addEventListener('click', () => {
-                if (this.savedAnchorTop !== null) {
-                    this.backToManualAnchor();
-                }
-            });
-            quickBtnGroup.appendChild(backAnchorBtn);
+                const backAnchorBtn = createQuickButton('manual-anchor-back-btn', '↩', this.t('noAnchor'), 'manual-anchor-btn back-btn');
+                backAnchorBtn.addEventListener('click', () => {
+                    if (this.savedAnchorTop !== null) {
+                        this.backToManualAnchor();
+                    }
+                });
+                quickBtnGroup.appendChild(backAnchorBtn);
 
-            const clearAnchorBtn = createQuickButton('manual-anchor-clear-btn', '✕', this.t('clearAnchor'), 'manual-anchor-btn clear-btn');
-            clearAnchorBtn.addEventListener('click', () => {
-                if (this.savedAnchorTop !== null) {
-                    this.clearAnchorManually();
-                }
-            });
-            quickBtnGroup.appendChild(clearAnchorBtn);
+                const clearAnchorBtn = createQuickButton('manual-anchor-clear-btn', '✕', this.t('clearAnchor'), 'manual-anchor-btn clear-btn');
+                clearAnchorBtn.addEventListener('click', () => {
+                    if (this.savedAnchorTop !== null) {
+                        this.clearAnchorManually();
+                    }
+                });
+                quickBtnGroup.appendChild(clearAnchorBtn);
 
-            // 分隔线
-            quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
+                // 分隔线
+                quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
+            }
 
             // 4. 底部滚动按钮
             const scrollBottomBtn = createQuickButton('quick-scroll-bottom', '⬇', this.t('scrollBottom'));
@@ -13496,7 +13504,30 @@
             edgeSnapHideItem.appendChild(edgeSnapHideToggle);
             panelSettingsContainer.appendChild(edgeSnapHideItem);
 
-            // 5.5.4 折叠面板按钮排序
+            // 5.5.4 手动锚点开关
+            const manualAnchorItem = createElement('div', { className: 'setting-item' });
+            const manualAnchorInfo = createElement('div', { className: 'setting-item-info' });
+            manualAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('manualAnchorLabel')));
+            manualAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('manualAnchorDesc')));
+
+            const manualAnchorToggle = createElement('div', {
+                className: 'setting-toggle' + (this.settings.manualAnchorEnabled !== false ? ' active' : ''),
+                id: 'toggle-manual-anchor',
+            });
+            manualAnchorToggle.addEventListener('click', () => {
+                this.settings.manualAnchorEnabled = this.settings.manualAnchorEnabled === false;
+                manualAnchorToggle.classList.toggle('active', this.settings.manualAnchorEnabled);
+                this.saveSettings();
+                this.createUI();
+                this.bindEvents();
+                this.switchTab('settings');
+                showToast(this.settings.manualAnchorEnabled ? this.t('settingOn') : this.t('settingOff'));
+            });
+            manualAnchorItem.appendChild(manualAnchorInfo);
+            manualAnchorItem.appendChild(manualAnchorToggle);
+            panelSettingsContainer.appendChild(manualAnchorItem);
+
+            // 5.5.5 折叠面板按钮排序
             const collapsedBtnDesc = createElement(
                 'div',
                 {
