@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.11.0
+// @version      1.11.1
 // @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:en Gemini Helper: Conversation management & export, outline navigation, prompt management, tab enhancements (status/privacy/notification), reading history & restore, bidirectional/manual anchor, image watermark removal, bold fix, formula/table copy, model lock, page beautification, theme toggle, smart dark mode (Gemini/Gemini Enterprise)
 // @author       urzeye
@@ -138,18 +138,21 @@
     };
 
     // 折叠面板按钮定义
+    // isPanelOnly: true 表示仅在面板折叠时显示，false 表示常显
     const COLLAPSED_BUTTON_DEFS = {
-        scrollTop: { icon: '⬆', labelKey: 'scrollTop', canToggle: false },
-        panel: { icon: '✨', labelKey: 'panelTitle', canToggle: false },
-        anchor: { icon: '⚓', labelKey: 'showCollapsedAnchorLabel', canToggle: true },
-        theme: { icon: '☀', labelKey: 'showCollapsedThemeLabel', canToggle: true },
-        scrollBottom: { icon: '⬇', labelKey: 'scrollBottom', canToggle: false },
+        scrollTop: { icon: '⬆', labelKey: 'scrollTop', canToggle: false, isPanelOnly: false },
+        panel: { icon: '✨', labelKey: 'panelTitle', canToggle: false, isPanelOnly: true },
+        anchor: { icon: '⚓', labelKey: 'showCollapsedAnchorLabel', canToggle: true, isPanelOnly: true },
+        theme: { icon: '☀', labelKey: 'showCollapsedThemeLabel', canToggle: true, isPanelOnly: true },
+        manualAnchor: { icon: '📍', labelKey: 'manualAnchorLabel', canToggle: true, isPanelOnly: false, isGroup: true },
+        scrollBottom: { icon: '⬇', labelKey: 'scrollBottom', canToggle: false, isPanelOnly: false },
     };
     const DEFAULT_COLLAPSED_BUTTONS_ORDER = [
         { id: 'scrollTop', enabled: true },
         { id: 'panel', enabled: true },
         { id: 'anchor', enabled: true },
         { id: 'theme', enabled: true },
+        { id: 'manualAnchor', enabled: true },
         { id: 'scrollBottom', enabled: true },
     ];
 
@@ -7131,13 +7134,7 @@
                 return messages;
             }
 
-            const {
-                userQuerySelector,
-                assistantResponseSelector,
-                useShadowDOM,
-                extractUserText,
-                extractAssistantContent,
-            } = config;
+            const { userQuerySelector, assistantResponseSelector, useShadowDOM, extractUserText, extractAssistantContent } = config;
             const queryOpts = { all: true, shadow: useShadowDOM };
 
             // 方案：分别提取用户和 AI 消息
@@ -10058,6 +10055,47 @@
      */
     class SettingsManager {
         /**
+         * 兼容性处理：确保 collapsedButtonsOrder 包含所有默认按钮
+         * 新增的按钮会自动插入到 scrollBottom 之前
+         * @param {Array} savedOrder 保存的按钮顺序
+         * @returns {Array} 处理后的按钮顺序
+         */
+        _migrateCollapsedButtonsOrder(savedOrder) {
+            if (!savedOrder || savedOrder.length === 0) {
+                return DEFAULT_COLLAPSED_BUTTONS_ORDER;
+            }
+
+            const savedIds = savedOrder.map((b) => b.id);
+            const defaultIds = DEFAULT_COLLAPSED_BUTTONS_ORDER.map((b) => b.id);
+
+            // 找出缺失的按钮
+            const missingIds = defaultIds.filter((id) => !savedIds.includes(id));
+
+            if (missingIds.length === 0) {
+                return savedOrder;
+            }
+
+            // 复制一份，避免修改原数组
+            let result = [...savedOrder];
+
+            // 在 scrollBottom 之前插入缺失的按钮
+            const scrollBottomIndex = result.findIndex((b) => b.id === 'scrollBottom');
+            const insertIndex = scrollBottomIndex !== -1 ? scrollBottomIndex : result.length;
+
+            missingIds.forEach((id) => {
+                const defaultConfig = DEFAULT_COLLAPSED_BUTTONS_ORDER.find((b) => b.id === id);
+                if (defaultConfig) {
+                    result.splice(insertIndex, 0, { ...defaultConfig });
+                }
+            });
+
+            // 保存更新后的配置
+            GM_setValue(SETTING_KEYS.COLLAPSED_BUTTONS_ORDER, result);
+
+            return result;
+        }
+
+        /**
          * 加载设置
          * @param {SiteRegistry} registry 站点注册表
          * @param {SiteAdapter} currentAdapter 当前适配器
@@ -10115,7 +10153,7 @@
                 prompts: promptsSettings,
                 tabOrder: tabOrder,
                 preventAutoScroll: GM_getValue('gemini_prevent_auto_scroll', false),
-                collapsedButtonsOrder: GM_getValue(SETTING_KEYS.COLLAPSED_BUTTONS_ORDER, DEFAULT_COLLAPSED_BUTTONS_ORDER),
+                collapsedButtonsOrder: this._migrateCollapsedButtonsOrder(GM_getValue(SETTING_KEYS.COLLAPSED_BUTTONS_ORDER, DEFAULT_COLLAPSED_BUTTONS_ORDER)),
                 tabSettings: { ...DEFAULT_TAB_SETTINGS, ...GM_getValue(SETTING_KEYS.TAB_SETTINGS, {}) },
                 readingHistory: { ...DEFAULT_READING_HISTORY_SETTINGS, ...GM_getValue(SETTING_KEYS.READING_HISTORY, {}) },
                 conversations: {
@@ -11035,6 +11073,9 @@
                     opacity: 1;
                     cursor: pointer;
                 }
+                .quick-btn-group .quick-prompt-btn.manual-anchor-btn.btn-disabled {
+                    display: none !important;
+                }
                 .quick-btn-group .quick-prompt-btn.manual-anchor-btn.clear-btn:hover {
                     background: #ef4444 !important;
                 }
@@ -11042,6 +11083,12 @@
                     width: 24px; height: 1px;
                     background: rgba(255,255,255,0.3);
                     margin: 2px auto;
+                }
+                .quick-btn-group .divider.panel-only {
+                    display: none;
+                }
+                .quick-btn-group.collapsed .divider.panel-only {
+                    display: block;
                 }
 
                 /* ========== 边缘吸附隐藏功能样式 ========== */
@@ -12552,97 +12599,166 @@
             });
 
             // 按钮工厂函数
-            const createQuickButton = (id, icon, title, extraClass = '') => {
-                return createElement(
+            const createQuickButton = (id, def, enabled, extraClass = '') => {
+                // 禁用的按钮添加 btn-disabled 类（CSS 中设置 display: none !important）
+                const disabledClass = enabled ? '' : ' btn-disabled';
+                const btn = createElement(
                     'button',
                     {
-                        className: 'quick-prompt-btn' + (extraClass ? ' ' + extraClass : ''),
-                        id: id,
-                        title: title,
+                        className: 'quick-prompt-btn' + (extraClass ? ' ' + extraClass : '') + disabledClass,
+                        id: id === 'anchor' ? 'quick-anchor-btn' : id === 'theme' ? 'quick-theme-btn' : undefined,
+                        title: this.t(def.labelKey),
                     },
-                    icon,
+                    def.icon,
                 );
+
+                // 锚点按钮初始状态置灰
+                if (id === 'anchor') {
+                    btn.style.opacity = '0.4';
+                    btn.style.cursor = 'default';
+                    btn.title = '暂无锚点';
+                }
+
+                return btn;
             };
 
-            // 1. 顶部滚动按钮
-            const scrollTopBtn = createQuickButton('quick-scroll-top', '⬆', this.t('scrollTop'));
-            scrollTopBtn.addEventListener('click', () => this.scrollToTop());
-            quickBtnGroup.appendChild(scrollTopBtn);
+            // 创建手动锚点按钮组
+            const createManualAnchorGroup = (enabled) => {
+                const fragment = document.createDocumentFragment();
+                const disabledClass = enabled ? '' : ' btn-disabled';
 
-            // 分隔线
-            quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
-
-            // 2. 面板专属按钮（仅在面板收起时显示）
-            const btnOrder = this.settings.collapsedButtonsOrder || DEFAULT_COLLAPSED_BUTTONS_ORDER;
-            const panelOnlyButtons = {};
-
-            // 面板按钮
-            const panelBtnConfig = btnOrder.find((b) => b.id === 'panel');
-            if (panelBtnConfig) {
-                const panelBtn = createQuickButton('quick-panel-btn', '✨', this.t('panelTitle'), 'panel-only');
-                panelBtn.addEventListener('click', () => this.togglePanel());
-                panelOnlyButtons.panel = panelBtn;
-                quickBtnGroup.appendChild(panelBtn);
-            }
-
-            // 自动锚点按钮
-            const anchorBtnConfig = btnOrder.find((b) => b.id === 'anchor');
-            if (anchorBtnConfig) {
-                const anchorBtnClass = 'panel-only' + (anchorBtnConfig.enabled ? '' : ' btn-disabled');
-                const anchorBtn = createQuickButton('quick-anchor-btn', '⚓', this.t('noAnchor'), anchorBtnClass);
-                anchorBtn.style.opacity = '0.4';
-                anchorBtn.style.cursor = 'default';
-                anchorBtn.addEventListener('click', () => this.handleAnchorClick());
-                panelOnlyButtons.anchor = anchorBtn;
-                quickBtnGroup.appendChild(anchorBtn);
-            }
-
-            // 主题按钮
-            const themeBtnConfig = btnOrder.find((b) => b.id === 'theme');
-            if (themeBtnConfig) {
-                const themeBtnClass = 'panel-only' + (themeBtnConfig.enabled ? '' : ' btn-disabled');
-                const themeBtn = createQuickButton('quick-theme-btn', '☀', this.t('showCollapsedThemeLabel'), themeBtnClass);
-                themeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleTheme();
-                });
-                panelOnlyButtons.theme = themeBtn;
-                quickBtnGroup.appendChild(themeBtn);
-            }
-
-            // 分隔线
-            quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
-
-            // 3. 手动锚点按钮（根据设置显示）
-            if (this.settings.manualAnchorEnabled !== false) {
-                const setAnchorBtn = createQuickButton('manual-anchor-set-btn', '📍', this.t('setAnchor'), 'manual-anchor-btn set-btn');
+                const setAnchorBtn = createElement(
+                    'button',
+                    {
+                        className: 'quick-prompt-btn manual-anchor-btn set-btn' + disabledClass,
+                        id: 'manual-anchor-set-btn',
+                        title: this.t('setAnchor'),
+                    },
+                    '📍',
+                );
                 setAnchorBtn.addEventListener('click', () => this.setAnchorManually());
-                quickBtnGroup.appendChild(setAnchorBtn);
+                fragment.appendChild(setAnchorBtn);
 
-                const backAnchorBtn = createQuickButton('manual-anchor-back-btn', '↩', this.t('noAnchor'), 'manual-anchor-btn back-btn');
+                const backAnchorBtn = createElement(
+                    'button',
+                    {
+                        className: 'quick-prompt-btn manual-anchor-btn back-btn' + disabledClass,
+                        id: 'manual-anchor-back-btn',
+                        title: this.t('noAnchor'),
+                    },
+                    '↩',
+                );
                 backAnchorBtn.addEventListener('click', () => {
                     if (this.savedAnchorTop !== null) {
                         this.backToManualAnchor();
                     }
                 });
-                quickBtnGroup.appendChild(backAnchorBtn);
+                fragment.appendChild(backAnchorBtn);
 
-                const clearAnchorBtn = createQuickButton('manual-anchor-clear-btn', '✕', this.t('clearAnchor'), 'manual-anchor-btn clear-btn');
+                const clearAnchorBtn = createElement(
+                    'button',
+                    {
+                        className: 'quick-prompt-btn manual-anchor-btn clear-btn' + disabledClass,
+                        id: 'manual-anchor-clear-btn',
+                        title: this.t('clearAnchor'),
+                    },
+                    '✕',
+                );
                 clearAnchorBtn.addEventListener('click', () => {
                     if (this.savedAnchorTop !== null) {
                         this.clearAnchorManually();
                     }
                 });
-                quickBtnGroup.appendChild(clearAnchorBtn);
+                fragment.appendChild(clearAnchorBtn);
 
-                // 分隔线
-                quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
-            }
+                return fragment;
+            };
 
-            // 4. 底部滚动按钮
-            const scrollBottomBtn = createQuickButton('quick-scroll-bottom', '⬇', this.t('scrollBottom'));
-            scrollBottomBtn.addEventListener('click', () => this.scrollToBottom());
-            quickBtnGroup.appendChild(scrollBottomBtn);
+            // 事件处理器
+            const buttonActions = {
+                scrollTop: () => this.scrollToTop(),
+                scrollBottom: () => this.scrollToBottom(),
+                panel: () => this.togglePanel(),
+                anchor: () => this.handleAnchorClick(),
+                theme: (e) => {
+                    e.stopPropagation();
+                    this.toggleTheme();
+                },
+            };
+
+            // 保存按钮引用
+            const quickButtons = {};
+
+            // 根据配置动态创建按钮
+            const btnOrder = this.settings.collapsedButtonsOrder || DEFAULT_COLLAPSED_BUTTONS_ORDER;
+
+            // 智能分隔线逻辑
+            // 跟踪上一个实际渲染的按钮（禁用的按钮不计入）
+            let prevRenderedType = null; // 'panelOnly' | 'always' | null
+            let prevRenderedId = null;
+            let isFirstRendered = true;
+
+            btnOrder.forEach((btnConfig, index) => {
+                const def = COLLAPSED_BUTTON_DEFS[btnConfig.id];
+                if (!def) return;
+
+                const isEnabled = def.canToggle ? btnConfig.enabled : true;
+                const currentType = def.isPanelOnly ? 'panelOnly' : 'always';
+
+                // 如果按钮被禁用，跳过（不渲染，不更新状态）
+                if (!isEnabled) {
+                    return;
+                }
+
+                // === 智能分隔线插入 ===
+                // 规则1: 当类型从 always 切换到 panelOnly 时，插入 panel-only 分隔线
+                // 规则2: 当类型从 panelOnly 切换到 always 时，插入常显分隔线
+                // 规则3: manualAnchor 特殊处理 - 上面需要分隔线（除非是第一个渲染的按钮）
+                if (!isFirstRendered && prevRenderedType !== null) {
+                    // manualAnchor 上方需要分隔线（始终是常显的，因为 manualAnchor 本身是常显按钮）
+                    if (btnConfig.id === 'manualAnchor') {
+                        quickBtnGroup.appendChild(createElement('div', { className: 'divider' }));
+                    }
+                    // 上一个是 manualAnchor，需要分隔线
+                    else if (prevRenderedId === 'manualAnchor') {
+                        // 分隔线类型取决于当前按钮
+                        const dividerClass = currentType === 'panelOnly' ? 'divider panel-only' : 'divider';
+                        quickBtnGroup.appendChild(createElement('div', { className: dividerClass }));
+                    }
+                    // 类型切换时插入分隔线
+                    else if (prevRenderedType !== currentType) {
+                        // 分隔线类型：如果下一个是 panelOnly 区域，分隔线也是 panel-only
+                        const dividerClass = currentType === 'panelOnly' ? 'divider panel-only' : 'divider';
+                        quickBtnGroup.appendChild(createElement('div', { className: dividerClass }));
+                    }
+                }
+
+                // === 创建按钮 ===
+                if (btnConfig.id === 'manualAnchor') {
+                    // 手动锚点是一组按钮
+                    quickBtnGroup.appendChild(createManualAnchorGroup(isEnabled));
+                } else {
+                    // 普通按钮
+                    const extraClass = def.isPanelOnly ? 'panel-only' : '';
+                    const btn = createQuickButton(btnConfig.id, def, isEnabled, extraClass);
+                    quickButtons[btnConfig.id] = btn;
+                    quickBtnGroup.appendChild(btn);
+                }
+
+                // 更新状态（仅对实际渲染的按钮）
+                prevRenderedType = currentType;
+                prevRenderedId = btnConfig.id;
+                isFirstRendered = false;
+            });
+
+            // 绑定事件
+            Object.keys(quickButtons).forEach((id) => {
+                const btn = quickButtons[id];
+                const action = buttonActions[id];
+                if (action) {
+                    btn.addEventListener('click', action);
+                }
+            });
 
             document.body.appendChild(quickBtnGroup);
 
@@ -13510,30 +13626,7 @@
             edgeSnapHideItem.appendChild(edgeSnapHideToggle);
             panelSettingsContainer.appendChild(edgeSnapHideItem);
 
-            // 5.5.4 手动锚点开关
-            const manualAnchorItem = createElement('div', { className: 'setting-item' });
-            const manualAnchorInfo = createElement('div', { className: 'setting-item-info' });
-            manualAnchorInfo.appendChild(createElement('div', { className: 'setting-item-label' }, this.t('manualAnchorLabel')));
-            manualAnchorInfo.appendChild(createElement('div', { className: 'setting-item-desc' }, this.t('manualAnchorDesc')));
-
-            const manualAnchorToggle = createElement('div', {
-                className: 'setting-toggle' + (this.settings.manualAnchorEnabled !== false ? ' active' : ''),
-                id: 'toggle-manual-anchor',
-            });
-            manualAnchorToggle.addEventListener('click', () => {
-                this.settings.manualAnchorEnabled = this.settings.manualAnchorEnabled === false;
-                manualAnchorToggle.classList.toggle('active', this.settings.manualAnchorEnabled);
-                this.saveSettings();
-                this.createUI();
-                this.bindEvents();
-                this.switchTab('settings');
-                showToast(this.settings.manualAnchorEnabled ? this.t('settingOn') : this.t('settingOff'));
-            });
-            manualAnchorItem.appendChild(manualAnchorInfo);
-            manualAnchorItem.appendChild(manualAnchorToggle);
-            panelSettingsContainer.appendChild(manualAnchorItem);
-
-            // 5.5.5 折叠面板按钮排序
+            // 5.5.4 折叠面板按钮排序
             const collapsedBtnDesc = createElement(
                 'div',
                 {
@@ -14280,6 +14373,10 @@
                 if (quickBtnGroup) quickBtnGroup.classList.add('collapsed');
                 if (toggleBtn) toggleBtn.textContent = '+';
             } else {
+                // 展开面板时，如果处于边缘吸附状态，则取消吸附
+                if (this.edgeSnapState) {
+                    this.unsnap();
+                }
                 panel.classList.remove('collapsed');
                 if (quickBtnGroup) quickBtnGroup.classList.remove('collapsed');
                 if (toggleBtn) toggleBtn.textContent = '−';
