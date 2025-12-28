@@ -3930,6 +3930,10 @@
                     method: 'GET',
                     url,
                     responseType: 'blob',
+                    headers: {
+                        Referer: 'https://gemini.google.com/',
+                        Origin: 'https://gemini.google.com',
+                    },
                     onload: (response) => resolve(response.response),
                     onerror: reject,
                 });
@@ -10454,7 +10458,6 @@
             this.siteAdapter = siteRegistry.getCurrent();
             this.selectedPrompt = null;
             this.isScrolling = false; // 滚动状态锁
-            this.anchorScrollTop = null; // 阅读锚点位置
             this.lang = detectLanguage(); // 当前语言
             this.i18n = I18N[this.lang]; // 当前语言文本
             this.settingsManager = new SettingsManager();
@@ -10510,7 +10513,7 @@
             this.savedAnchorTop = null;
             // 水印移除器
             this.watermarkRemover = new WatermarkRemover();
-            if (this.settings.watermarkRemoval) {
+            if (this.settings.watermarkRemoval && this.siteAdapter instanceof GeminiAdapter) {
                 this.watermarkRemover.start();
             }
             this.init();
