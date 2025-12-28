@@ -2,14 +2,12 @@
 
 ## 🚀 优先级高 (短期)
 
--   [ ] gemini 对话导出
+-   [ ] gemini business 公式解析，增强导出
 -   [ ] 提示词功能增强：变量/占位符支持、导出提示词、预览提示词、提示词组合使用、插入位置选择、多标签
 
 ## 🔮 优先级中 (中期)
 
 -   [ ] 分享页面适配/share/
--   [ ] gemini 表格优化，复制 markdown 格式
--   [ ] gemini latex 公式双击复制
 -   [ ] 动态视图适配
 -   [ ] banana 图片去水印
 -   [ ] 快捷键操作：去顶部、底部、上/下一个对话、第 n 个对话、删除对话等等，参考 https: //greasyfork.org/zh-CN/scripts/498823-gemini-keyboard-shortcuts-power-tweaks
@@ -23,6 +21,9 @@
 
 ## ✅ 已完成
 
+-   [x] gemini 对话导出
+-   [x] gemini latex 公式双击复制
+-   [x] gemini 表格优化，复制 markdown 格式
 -   [x] 提示词清除悬浮条位置移动到输入框上方，避免遮挡视线
 -   [x] 一键定位到当前会话
 -   [x] 解决 gemini enterprise 抽取的标题文字不全问题

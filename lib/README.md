@@ -4,9 +4,9 @@
 
 ## 目录
 
-| 工具                                                           | 描述        |
-|--------------------------------------------------------------|-----------|
-| [backgroundKeepAlive.user.js](./backgroundKeepAlive.user.js) | 后台保活工具集   |
+| 工具                                                         | 描述           |
+| ------------------------------------------------------------ | -------------- |
+| [backgroundKeepAlive.user.js](./backgroundKeepAlive.user.js) | 后台保活工具集 |
 | [domToolkit.user.js](./domToolkit.user.js)                   | DOM 操作工具库 |
 
 ---
@@ -15,11 +15,11 @@
 
 专为 Tampermonkey 脚本设计的高性能 DOM 工具库，解决以下痛点：
 
-- **Shadow DOM 穿透查找** - 现代 Web 组件的难题
-- **异步等待元素出现** - 动态渲染页面必备
-- **持续监听新元素** - SPA 应用场景
-- **事件委托** - 减少事件绑定开销
-- **样式注入** - 支持 Shadow DOM
+-   **Shadow DOM 穿透查找** - 现代 Web 组件的难题
+-   **异步等待元素出现** - 动态渲染页面必备
+-   **持续监听新元素** - SPA 应用场景
+-   **事件委托** - 减少事件绑定开销
+-   **样式注入** - 支持 Shadow DOM
 
 ### 引入方式
 
@@ -37,33 +37,25 @@
 
 ```javascript
 // 查找单个元素
-const btn = DOMToolkit.query("button.submit");
+const btn = DOMToolkit.query('button.submit');
 
 // 查找所有匹配元素
-const items = DOMToolkit.query(".item", {all: true});
+const items = DOMToolkit.query('.item', { all: true });
 
 // 在 Shadow DOM 中查找（默认启用）
-const input = DOMToolkit.query("input.main", {shadow: true});
+const input = DOMToolkit.query('input.main', { shadow: true });
 
 // 多选择器支持（返回第一个匹配）
-const el = DOMToolkit.query(["button.submit", 'input[type="submit"]']);
+const el = DOMToolkit.query(['button.submit', 'input[type="submit"]']);
 
 // 使用自定义过滤函数
-const textarea = DOMToolkit.query("[contenteditable]", {
+const textarea = DOMToolkit.query('[contenteditable]', {
     shadow: true,
-    filter: (el) => el.offsetParent !== null && !el.closest("#my-panel"),
+    filter: (el) => el.offsetParent !== null && !el.closest('#my-panel'),
 });
 ```
 
-**参数**：
-| 选项 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `parent` | Node | document | 查询起点 |
-| `all` | boolean | false | 是否返回所有匹配 |
-| `shadow` | boolean | true | 是否穿透 Shadow DOM |
-| `maxDepth` | number | 15 | 最大递归深度 |
-| `useCache` | boolean | true | 是否使用缓存（有 filter 时自动禁用） |
-| `filter` | function | null | 自定义过滤函数 `(el) => boolean` |
+**参数**： | 选项 | 类型 | 默认值 | 说明 | |------|------|--------|------| | `parent` | Node | document | 查询起点 | | `all` | boolean | false | 是否返回所有匹配 | | `shadow` | boolean | true | 是否穿透 Shadow DOM | | `maxDepth` | number | 15 | 最大递归深度 | | `useCache` | boolean | true | 是否使用缓存（有 filter 时自动禁用） | | `filter` | function | null | 自定义过滤函数 `(el) => boolean` |
 
 ---
 
@@ -73,13 +65,13 @@ const textarea = DOMToolkit.query("[contenteditable]", {
 
 ```javascript
 // 等待元素出现（默认 5 秒超时）
-const modal = await DOMToolkit.get(".modal");
+const modal = await DOMToolkit.get('.modal');
 
 // 自定义超时时间
-const btn = await DOMToolkit.get("button.action", {timeout: 10000});
+const btn = await DOMToolkit.get('button.action', { timeout: 10000 });
 
 // 无限等待
-const el = await DOMToolkit.get(".dynamic", {timeout: 0});
+const el = await DOMToolkit.get('.dynamic', { timeout: 0 });
 ```
 
 ---
@@ -90,22 +82,24 @@ const el = await DOMToolkit.get(".dynamic", {timeout: 0});
 
 ```javascript
 // 处理所有（现有和未来的）按钮
-const stop = DOMToolkit.each("button.action", (btn, isNew) => {
-    btn.style.color = "blue";
-    if (isNew) console.log("New button added");
+const stop = DOMToolkit.each('button.action', (btn, isNew) => {
+    btn.style.color = 'blue';
+    if (isNew) console.log('New button added');
 });
 
 // 稍后停止监听
 stop();
 
 // 返回 false 可提前停止
-DOMToolkit.each(".item", (el) => {
-    if (el.id === "target") {
-        console.log("Found target");
+DOMToolkit.each('.item', (el) => {
+    if (el.id === 'target') {
+        console.log('Found target');
         return false; // 停止监听
     }
 });
 ```
+
+> **v1.1.4+**: 当 `shadow: true` 时，`each()` 会自动监听所有已存在的 Shadow DOM 内部变化，确保动态添加的匹配元素也能被处理。
 
 ---
 
@@ -115,15 +109,15 @@ DOMToolkit.each(".item", (el) => {
 
 ```javascript
 // 委托点击事件
-const remove = DOMToolkit.on("click", ".item", (event, target) => {
-    console.log("Item clicked:", target);
+const remove = DOMToolkit.on('click', '.item', (event, target) => {
+    console.log('Item clicked:', target);
 });
 
 // 稍后移除
 remove();
 
 // 捕获阶段
-DOMToolkit.on("click", ".btn", callback, {capture: true});
+DOMToolkit.on('click', '.btn', callback, { capture: true });
 ```
 
 ---
@@ -133,28 +127,28 @@ DOMToolkit.on("click", ".btn", callback, {capture: true});
 ```javascript
 // 创建元素
 const btn = DOMToolkit.create(
-    "button",
+    'button',
     {
-        className: "primary",
-        id: "submit",
-        style: {color: "white", background: "blue"},
-        onClick: () => console.log("clicked"),
+        className: 'primary',
+        id: 'submit',
+        style: { color: 'white', background: 'blue' },
+        onClick: () => console.log('clicked'),
     },
-    "Submit"
+    'Submit',
 );
 
 // 从 HTML 字符串创建
 const div = DOMToolkit.createFromHTML('<div class="card"><p>Hello</p></div>');
 
 // 获取 ID 映射
-const {root, title, content} = DOMToolkit.createFromHTML(
+const { root, title, content } = DOMToolkit.createFromHTML(
     `
     <div id="container">
         <h1 id="title">Title</h1>
         <p id="content">Content</p>
     </div>
 `,
-    {mapIds: true}
+    { mapIds: true },
 );
 ```
 
@@ -164,17 +158,17 @@ const {root, title, content} = DOMToolkit.createFromHTML(
 
 ```javascript
 // 全局样式
-DOMToolkit.css(".highlight { background: yellow; }", "my-styles");
+DOMToolkit.css('.highlight { background: yellow; }', 'my-styles');
 
 // 向单个 Shadow DOM 注入
-DOMToolkit.cssToShadow(shadowRoot, css, "shadow-styles");
+DOMToolkit.cssToShadow(shadowRoot, css, 'shadow-styles');
 
 // 向所有 Shadow DOM 注入
-DOMToolkit.cssToAllShadows(css, "all-shadow-styles");
+DOMToolkit.cssToAllShadows(css, 'all-shadow-styles');
 
 // 过滤特定 Shadow Host
-DOMToolkit.cssToAllShadows(css, "id", {
-    filter: (host) => !host.closest(".sidebar"),
+DOMToolkit.cssToAllShadows(css, 'id', {
+    filter: (host) => !host.closest('.sidebar'),
 });
 ```
 
@@ -184,7 +178,7 @@ DOMToolkit.cssToAllShadows(css, "id", {
 
 ```javascript
 DOMToolkit.walkShadowRoots((shadowRoot, host) => {
-    console.log("Found shadow root on:", host.tagName);
+    console.log('Found shadow root on:', host.tagName);
 });
 ```
 
@@ -198,7 +192,7 @@ const scroller = DOMToolkit.findScrollContainer();
 
 // 提供站点特定的选择器（优先匹配）
 const scroller = DOMToolkit.findScrollContainer({
-    selectors: [".chat-mode-scroller", ".conversation-container", "main"],
+    selectors: ['.chat-mode-scroller', '.conversation-container', 'main'],
 });
 ```
 
@@ -209,7 +203,7 @@ const scroller = DOMToolkit.findScrollContainer({
 ```javascript
 DOMToolkit.clear(element); // 清空元素内容
 DOMToolkit.clearCache(); // 清除缓存
-DOMToolkit.configCache({enabled: false}); // 禁用缓存
+DOMToolkit.configCache({ enabled: false }); // 禁用缓存
 DOMToolkit.destroy(); // 销毁实例
 ```
 
@@ -235,7 +229,7 @@ DOMToolkit.destroy(); // 销毁实例
 
 ```javascript
 const timer = new BackgroundTimer(() => {
-    console.log("心跳:", new Date().toTimeString());
+    console.log('心跳:', new Date().toTimeString());
 }, 1000);
 
 timer.start(); // 启动
@@ -257,7 +251,7 @@ timer.destroy(); // 销毁实例
 const audio = new AudioKeepAlive();
 
 // 需要在用户交互后启动
-document.addEventListener("click", () => audio.start(), {once: true});
+document.addEventListener('click', () => audio.start(), { once: true });
 
 audio.stop(); // 停止
 audio.isActive(); // 获取状态
@@ -274,27 +268,27 @@ Hook Fetch **和 XHR** 监控任务完成状态，使用**防抖 + 活跃计数�
 const monitor = new NetworkMonitor({
     // 监控的 URL 模式（包含匹配）
     // 注意：避免使用通用 RPC 方法如 batchexecute，会产生误判
-    urlPatterns: ["BardFrontendService", "StreamGenerate"],
+    urlPatterns: ['BardFrontendService', 'StreamGenerate'],
 
     // 静默判定时间（毫秒）
     silenceThreshold: 3000,
 
     // 任务完成回调
     onComplete: (ctx) => {
-        console.log("任务完成", ctx);
+        console.log('任务完成', ctx);
         // ctx = { activeCount, lastUrl, timestamp }
     },
 
     // 任务开始回调（可选）
     onStart: (ctx) => {
-        console.log("任务开始", ctx);
+        console.log('任务开始', ctx);
     },
 
     // DOM 二次验证（可选，自定义）
     domValidation: (ctx) => {
         // 返回 true 表示验证通过，触发 onComplete
         // 返回 false 表示还需等待
-        return !document.querySelector(".stop-button");
+        return !document.querySelector('.stop-button');
     },
 });
 
