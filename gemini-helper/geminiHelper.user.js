@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         gemini-helper
 // @namespace    http://tampermonkey.net/
-// @version      1.11.1
+// @version      1.11.2
 // @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:en Gemini Helper: Conversation management & export, outline navigation, prompt management, tab enhancements (status/privacy/notification), reading history & restore, bidirectional/manual anchor, image watermark removal, bold fix, formula/table copy, model lock, page beautification, theme toggle, smart dark mode (Gemini/Gemini Enterprise)
 // @author       urzeye
@@ -1444,9 +1444,38 @@
             for (const selector of selectors) {
                 const container = document.querySelector(selector);
                 if (container && container.scrollHeight > container.clientHeight) {
+                    // 如果找到普通容器，清除 Flutter 容器缓存
+                    this._cachedFlutterScrollContainer = null;
                     return container;
                 }
             }
+
+            // 检查缓存的 Flutter 容器是否仍然有效
+            if (this._cachedFlutterScrollContainer && this._cachedFlutterScrollContainer.isConnected) {
+                return this._cachedFlutterScrollContainer;
+            }
+
+            // 尝试在 iframe 中查找（Gemini 动态视图/图文交汇模式）
+            // iframe 有 allow-same-origin，可以跨域访问其内部 DOM
+            const iframes = document.querySelectorAll('iframe[sandbox*="allow-same-origin"]');
+            for (const iframe of iframes) {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                    if (iframeDoc) {
+                        // 在 flutter-view 内查找滚动容器
+                        const scrollContainer = iframeDoc.querySelector('flt-semantics[style*="overflow-y: scroll"]:not([style*="overflow-x: scroll"])');
+                        if (scrollContainer && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+                            // 缓存找到的 Flutter 容器
+                            this._cachedFlutterScrollContainer = scrollContainer;
+                            return scrollContainer;
+                        }
+                    }
+                } catch (e) {
+                    // 跨域 iframe 会抛出错误，忽略
+                    console.warn('[GeminiHelper] Failed to access iframe:', e.message);
+                }
+            }
+
             // 容器可能还未加载（SPA 动态渲染），返回 null 让调用者决定重试
             return null;
         }
@@ -14455,8 +14484,33 @@
         scrollToTop() {
             // 点击去顶部时，自动记录当前位置为锚点
             this.anchorManager.setAnchor(this.scrollManager.scrollTop);
-            // 加载全部历史记录并滚动到真正的顶部
-            this.historyLoader.loadAllAndScrollTop();
+
+            const container = this.scrollManager.container;
+            if (!container) {
+                // 容器不存在时，走原逻辑
+                this.historyLoader.loadAllAndScrollTop();
+                return;
+            }
+
+            // 检测是否在 Flutter 动态视图模式
+            const isFlutterView = container.tagName?.toLowerCase().startsWith('flt-');
+
+            if (isFlutterView) {
+                // Flutter 动态视图：使用循环滚动确保真正到达顶部
+                // transform: scale() 会导致 scrollTop 设置不准确
+                const scrollStep = () => {
+                    const before = container.scrollTop;
+                    container.scrollTop = 0;
+                    // 如果滚动位置还在变化，继续滚动
+                    if (container.scrollTop < before) {
+                        requestAnimationFrame(scrollStep);
+                    }
+                };
+                scrollStep();
+            } else {
+                // 普通模式：加载全部历史记录并滚动到真正的顶部
+                this.historyLoader.loadAllAndScrollTop();
+            }
         }
 
         // 滚动到页面底部
@@ -14465,7 +14519,30 @@
             this.historyLoader.abort();
             // 点击去底部时，自动记录当前位置为锚点
             this.anchorManager.setAnchor(this.scrollManager.scrollTop);
-            this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth' });
+
+            const container = this.scrollManager.container;
+            if (!container) return;
+
+            // 检测是否在 Flutter 动态视图模式（有 transform: scale 缩放）
+            // 在这种模式下，scrollHeight 报告的值可能不准确
+            const isFlutterView = container.tagName?.toLowerCase().startsWith('flt-');
+
+            if (isFlutterView) {
+                // Flutter 动态视图：使用循环滚动确保真正触底
+                // transform: scale() 会导致 scrollHeight 与实际滚动距离不匹配
+                const scrollStep = () => {
+                    const before = container.scrollTop;
+                    container.scrollTop = container.scrollHeight;
+                    // 如果滚动位置还在变化，继续滚动
+                    if (container.scrollTop > before) {
+                        requestAnimationFrame(scrollStep);
+                    }
+                };
+                scrollStep();
+            } else {
+                // 普通模式：直接滚动
+                this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth' });
+            }
         }
 
         // ========== 边缘吸附功能方法 ==========
@@ -14537,7 +14614,20 @@
         // 返回手动锚点
         backToManualAnchor() {
             if (this.savedAnchorTop !== null) {
-                this.scrollManager.scrollTo({ top: this.savedAnchorTop, behavior: 'smooth' });
+                const container = this.scrollManager.container;
+                const targetTop = this.savedAnchorTop;
+
+                // 检测是否在 Flutter 动态视图模式
+                const isFlutterView = container?.tagName?.toLowerCase().startsWith('flt-');
+
+                if (isFlutterView && container) {
+                    // Flutter 动态视图：直接设置 scrollTop
+                    // 由于锚点保存和恢复使用的是相同的坐标系，直接设置即可
+                    container.scrollTop = targetTop;
+                } else {
+                    // 普通模式：平滑滚动
+                    this.scrollManager.scrollTo({ top: targetTop, behavior: 'smooth' });
+                }
                 showToast(this.t('backToAnchor'));
             } else {
                 showToast(this.t('noAnchor'));
@@ -15077,7 +15167,7 @@
                 // Alt+Z 回到之前的锚点
                 if (e.altKey && (e.key === 'z' || e.key === 'Z')) {
                     e.preventDefault();
-                    this.handleAnchorClick(); 
+                    this.handleAnchorClick();
                 }
                 // Alt+T (Top) 回顶部
                 if (e.altKey && (e.key === 't' || e.key === 'T')) {

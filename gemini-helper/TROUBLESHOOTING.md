@@ -12,6 +12,7 @@
 4. [面板拖拽跳动问题](#4-面板拖拽跳动问题)
 5. [同步滚动初始化失败](#5-同步滚动初始化失败)
 6. [Shadow DOM 内动态元素监听失效](#6-shadow-dom-内动态元素监听失效)
+7. [Flutter 动态视图滚动失效](#7-flutter-动态视图滚动失效)
 
 ---
 
@@ -638,6 +639,139 @@ each(selector, callback, options = {}) {
 | **API 语义一致性**                       | `each(selector, { shadow: true })` 应该在整个生命周期都穿透 Shadow DOM，而不仅仅是初始查询 |
 | **复用共享 Observer 管理器**               | `SharedObserverManager` 可以复用，以 Shadow Root 作为 rootNode               |
 | **简单验证法**                           | "重新开关设置能修复" 说明问题出在持续监听而非初始查询                                         |
+
+---
+
+## 7. Flutter 动态视图滚动失效
+
+**日期**: 2025-12-29
+
+### 症状
+
+- 在 Gemini Business 的「动态视图/图文交汇模式」中，点击「去底部」按钮只滚动几像素，无法真正到达底部
+- 「去顶部」按钮同样无效
+- 「返回锚点」跳转到错误位置
+- 有时第一次点击提示「未找到滚动容器」，第二次才正常
+
+### 背景
+
+Gemini 的「动态视图/图文交汇模式」使用 Flutter 渲染引擎，内容通过 `<iframe>` 嵌入。滚动容器是 `<flt-semantics>` 元素，而非普通的 DOM 元素。
+
+关键 HTML 结构：
+
+```html
+<iframe sandbox="allow-same-origin ...">
+  <flt-semantics-host style="transform: scale(0.519481);">
+    <flt-semantics style="overflow-y: scroll;">
+      <!-- 内容 -->
+    </flt-semantics>
+  </flt-semantics-host>
+</iframe>
+```
+
+### 根因
+
+**问题 1：滚动容器在 iframe 内找不到**
+
+原来的 `getScrollContainer()` 方法只在主文档中查找选择器，无法穿透 iframe 边界。
+
+**问题 2：scrollHeight 因 scale 变换失真**
+
+Flutter 的 `flt-semantics-host` 有 `transform: scale(0.519481)` 缩放。这导致：
+
+- `scrollHeight` 报告的值只有实际高度的约 52%
+- `scrollTo({ top: scrollHeight })` 只能滚动「视觉上」的一半距离
+
+**问题 3：iframe 访问不稳定**
+
+每次调用 `getScrollContainer()` 都重新在 iframe 中查找容器，这依赖于 `iframe.contentDocument` 访问成功。有时会因为时序问题导致第一次访问失败。
+
+### 修复方案
+
+**1. 扩展 `getScrollContainer` 支持 iframe 内查找**
+
+```javascript
+getScrollContainer() {
+    // ... 普通选择器查找 ...
+
+    // 检查缓存的 Flutter 容器是否仍然有效
+    if (this._cachedFlutterScrollContainer && this._cachedFlutterScrollContainer.isConnected) {
+        return this._cachedFlutterScrollContainer;
+    }
+
+    // 尝试在 iframe 中查找
+    const iframes = document.querySelectorAll('iframe[sandbox*="allow-same-origin"]');
+    for (const iframe of iframes) {
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (iframeDoc) {
+                const scrollContainer = iframeDoc.querySelector(
+                    'flt-semantics[style*="overflow-y: scroll"]:not([style*="overflow-x: scroll"])'
+                );
+                if (scrollContainer && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+                    // 缓存找到的 Flutter 容器
+                    this._cachedFlutterScrollContainer = scrollContainer;
+                    return scrollContainer;
+                }
+            }
+        } catch (e) {
+            // 跨域 iframe 会抛出错误，忽略
+        }
+    }
+    return null;
+}
+```
+
+**2. 循环滚动机制处理 scale 变换**
+
+对于「去底部」，使用 `requestAnimationFrame` 循环设置 `scrollTop = scrollHeight`，直到位置不再变化：
+
+```javascript
+scrollToBottom() {
+    const container = this.scrollManager.container;
+    const isFlutterView = container?.tagName?.toLowerCase().startsWith('flt-');
+
+    if (isFlutterView) {
+        const scrollStep = () => {
+            const before = container.scrollTop;
+            container.scrollTop = container.scrollHeight;
+            if (container.scrollTop > before) {
+                requestAnimationFrame(scrollStep);
+            }
+        };
+        scrollStep();
+    } else {
+        this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth' });
+    }
+}
+```
+
+**3. 锚点保存/恢复使用相同坐标系**
+
+由于锚点值保存和恢复都使用 `container.scrollTop`，即使有 scale 变换，坐标系是一致的，因此直接设置一次即可：
+
+```javascript
+backToManualAnchor() {
+    const container = this.scrollManager.container;
+    const isFlutterView = container?.tagName?.toLowerCase().startsWith('flt-');
+
+    if (isFlutterView && container) {
+        container.scrollTop = targetTop; // 直接设置一次
+    } else {
+        this.scrollManager.scrollTo({ top: targetTop, behavior: 'smooth' });
+    }
+}
+```
+
+### 经验总结
+
+| 教训                        | 说明                                                   |
+|-----------------------------|------------------------------------------------------|
+| **iframe 内容需要特殊处理**   | 主文档的选择器无法穿透 iframe，需要通过 contentDocument 访问  |
+| **缓存不稳定的 DOM 引用**     | iframe 内的元素访问可能失败，缓存有效引用可提高稳定性          |
+| **CSS transform 影响滚动**    | scale 变换会导致 scrollHeight 与实际滚动距离不匹配          |
+| **循环滚动应对异常滚动行为**  | 当单次 scrollTo 不能到达目标时，循环设置直到稳定              |
+| **坐标系一致性**             | 保存和恢复使用相同坐标系时，不需要额外转换                    |
 
 ---
 
