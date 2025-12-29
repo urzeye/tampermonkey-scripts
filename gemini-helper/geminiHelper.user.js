@@ -15061,7 +15061,24 @@
                     }
                 });
             }
-
+            // 全局快捷键监听
+            document.addEventListener('keydown', (e) => {
+                // Alt + B: 滚动到底部
+                if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+                    e.preventDefault(); // 阻止浏览器默认行为
+                    this.scrollToBottom();
+                }
+                // Alt+Z 回到之前的锚点
+                if (e.altKey && (e.key === 'z' || e.key === 'Z')) {
+                    e.preventDefault();
+                    this.handleAnchorClick(); 
+                }
+                // Alt+T (Top) 回顶部
+                if (e.altKey && (e.key === 't' || e.key === 'T')) {
+                    e.preventDefault();
+                    this.scrollToTop();
+                }
+            });
             document.getElementById('add-prompt')?.addEventListener('click', () => this.showEditModal());
             document.getElementById('prompt-list')?.addEventListener('click', (e) => {
                 if (e.target.classList.contains('edit-prompt')) {
