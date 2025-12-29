@@ -1440,6 +1440,7 @@
                 '[role="main"]',
                 '.conversation-container',
                 '.chat-container',
+                'div.content-container', // Gemini 分享页面滚动容器
             ];
             for (const selector of selectors) {
                 const container = document.querySelector(selector);
@@ -1886,6 +1887,14 @@
         }
 
         /**
+         * 检测是否为分享页面（只读）
+         * @returns {boolean}
+         */
+        isSharePage() {
+            return window.location.pathname.startsWith('/share/');
+        }
+
+        /**
          * 从侧边栏提取会话列表
          * @returns {Array<{id: string, title: string, url: string, isActive: boolean}>}
          */
@@ -2047,6 +2056,10 @@
         }
 
         getResponseContainerSelector() {
+            // 分享页面使用不同的容器
+            if (this.isSharePage()) {
+                return 'div.content-container';
+            }
             return 'infinite-scroller.chat-history';
         }
 
