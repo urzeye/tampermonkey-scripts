@@ -3461,10 +3461,6 @@
 
     /**
      * 页面宽度样式管理器
-     * 负责动态注入和移除页面宽度样式
-     */
-    /**
-     * 页面宽度样式管理器
      * 负责动态注入和移除页面宽度样式，支持 Shadow DOM
      */
     class WidthStyleManager {
@@ -14404,13 +14400,16 @@
             this.isCollapsed = !this.isCollapsed;
 
             if (this.isCollapsed) {
+                // 折叠时隐藏触发条（如果有的话）
+                this.hideEdgeTrigger();
                 panel.classList.add('collapsed');
                 if (quickBtnGroup) quickBtnGroup.classList.add('collapsed');
                 if (toggleBtn) toggleBtn.textContent = '+';
             } else {
-                // 展开面板时，如果处于边缘吸附状态，则取消吸附
+                // 展开面板时，如果处于边缘吸附状态，临时显示面板（保持 edgeSnapState 用于 mouseleave 恢复）
                 if (this.edgeSnapState) {
-                    this.unsnap();
+                    panel.classList.remove('edge-snapped-left', 'edge-snapped-right');
+                    this.hideEdgeTrigger();
                 }
                 panel.classList.remove('collapsed');
                 if (quickBtnGroup) quickBtnGroup.classList.remove('collapsed');
@@ -14585,9 +14584,13 @@
                 id: 'edge-snap-trigger',
             });
 
-            // 点击触发条恢复面板
+            // 点击触发条临时显示面板（保持 edgeSnapState 用于 mouseleave 恢复）
             trigger.addEventListener('click', () => {
-                this.unsnap();
+                const panel = document.getElementById('gemini-helper-panel');
+                if (panel) {
+                    panel.classList.remove('edge-snapped-left', 'edge-snapped-right');
+                }
+                this.hideEdgeTrigger();
             });
 
             document.body.appendChild(trigger);
@@ -15508,6 +15511,20 @@
             };
 
             window.addEventListener('resize', clampToViewport);
+
+            // 边缘吸附自动恢复：鼠标移出面板时，如果有记忆的吸附状态，恢复吸附
+            panel.addEventListener('mouseleave', (e) => {
+                // 条件检查：有吸附状态 + 面板未折叠 + 边缘吸附功能开启
+                if (!this.edgeSnapState || this.isCollapsed || !this.settings.edgeSnapHide) return;
+
+                // 排除：鼠标移到快捷按钮组
+                const quickBtnGroup = document.getElementById('quick-btn-group');
+                if (quickBtnGroup?.contains(e.relatedTarget)) return;
+
+                // 恢复吸附 CSS 类和触发条
+                panel.classList.add(`edge-snapped-${this.edgeSnapState}`);
+                this.showEdgeTrigger(this.edgeSnapState);
+            });
         }
     }
 
