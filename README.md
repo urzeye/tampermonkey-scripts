@@ -7,8 +7,6 @@
  <a href="https://greasyfork.org/zh-CN/users/1545808-urzeye"><img src="https://img.shields.io/badge/GreasyFork-urzeye-red?style=flat-square" alt="GreasyFork"></a>
 </p>
 
-个人油猴脚本合集 | Personal Tampermonkey Scripts Collection
-
 ## 📦 脚本列表
 
 ### <img src="https://raw.githubusercontent.com/gist/urzeye/8d1d3afbbcd0193dbc8a2019b1ba54d3/raw/f7113d329a259963ed1b1ab8cb981e8f635d4cea/gemini.svg" height="24" alt="Gemini" /> [Gemini Helper](./gemini-helper/README.md)
@@ -61,10 +59,6 @@
 ## 🐛 反馈问题
 
 如有问题或建议，请在 [GitHub Issues](https://github.com/urzeye/tampermonkey-scripts/issues) 反馈
-
-## 📄 开源协议
-
-MIT License
 
 ## ⭐ Star History
 

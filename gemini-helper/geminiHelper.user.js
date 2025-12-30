@@ -44,7 +44,7 @@
 // @homepageURL  https://github.com/urzeye/tampermonkey-scripts
 // @require      https://update.greasyfork.org/scripts/559089/1714656/background-keep-alive.js
 // @require      https://update.greasyfork.org/scripts/559176/1722655/domToolkit.js
-// @license      MIT
+// @license      GPL-3.0-or-later
 // @downloadURL https://update.greasyfork.org/scripts/558318/gemini-helper.user.js
 // @updateURL https://update.greasyfork.org/scripts/558318/gemini-helper.meta.js
 // ==/UserScript==

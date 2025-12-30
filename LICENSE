@@ -1,21 +1,106 @@
-MIT License
+# Dual License
+
+This project is available under a dual license. You may choose either license according to your needs.
+
+---
+
+## Open Source License - GNU GPL v3
+
+For non-commercial use or open-source projects, this software is licensed under the [GNU General Public License v3.0 (GPL v3)](https://www.gnu.org/licenses/gpl-3.0.html).
+
+### Key Terms
+
+- ✅ **Free to use**: Run, study, modify, and distribute freely
+- ✅ **Open source**: Derivative works must be open-sourced under the same license
+- ✅ **Attribution**: Must retain original copyright and license notices
+- ⚠️ **Copyleft**: Derivative works must use the same GPL v3 license
+
+Full license text: [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html)
+
+---
+
+## Commercial License
+
+Please contact the author for a commercial license if you wish to:
+
+- 🏢 Integrate into commercial products or services
+- 🔒 Not comply with GPL v3 Copyleft requirements
+- 📦 Distribute derivative works as closed-source
+- 🤝 Need commercial support or customization
+
+### Contact
+
+- **GitHub**: [@urzeye](https://github.com/urzeye)
+- **Email**: Please contact via GitHub Issues
+
+---
+
+## License Selection Guide
+
+| Use Case | Recommended License |
+|----------|---------------------|
+| Personal learning & research | GPL v3 ✅ |
+| Open-source project integration | GPL v3 ✅ |
+| Commercial products/services | Commercial License 💼 |
+| Closed-source distribution | Commercial License 💼 |
+
+---
 
 Copyright (c) 2025 urzeye
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+---
+---
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+# 双重许可协议
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+本项目采用双重许可协议，您可以根据需求选择以下任一协议。
+
+---
+
+## 开源许可证 - GNU GPL v3
+
+对于非商业用途或开源项目，本软件按照 [GNU 通用公共许可证第 3 版 (GPL v3)](https://www.gnu.org/licenses/gpl-3.0.html) 进行授权。
+
+### 主要条款
+
+- ✅ **自由使用**：可自由运行、学习、修改和分发本软件
+- ✅ **源代码开放**：衍生作品必须以相同许可证开放源代码
+- ✅ **保留声明**：分发时须保留原始版权和许可证声明
+- ⚠️ **Copyleft**：衍生作品必须采用相同的 GPL v3 许可证
+
+完整协议文本：[GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html)
+
+---
+
+## 商业许可证
+
+如果您希望进行以下用途，请联系作者获取商业许可：
+
+- 🏢 将本软件整合到商业产品或服务中
+- 🔒 不遵循 GPL v3 的 Copyleft 条款
+- 📦 闭源分发衍生作品
+- 🤝 需要商业技术支持或定制开发
+
+### 联系方式
+
+- **GitHub**: [@urzeye](https://github.com/urzeye)
+- **Email**: 请通过 GitHub Issues 联系
+
+---
+
+## 许可证选择指南
+
+| 使用场景 | 推荐许可证 |
+|---------|-----------|
+| 个人学习、研究 | GPL v3 ✅ |
+| 开源项目集成 | GPL v3 ✅ |
+| 商业产品或服务 | 商业许可证 💼 |
+| 闭源分发 | 商业许可证 💼 |
+
+---
+
+Copyright (c) 2025 urzeye
+
+This project is dual-licensed under the GNU General Public License v3.0 (GPL-3.0) and a commercial license.
+
+本项目采用 GNU 通用公共许可证 v3.0 (GPL-3.0) 和商业许可证双重授权。
