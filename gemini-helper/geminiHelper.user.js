@@ -6,7 +6,7 @@
 // @name:de      Gemini Helfer
 // @name:fr      Gemini Helper
 // @name:es      Gemini Helper
-// @name:pt-BR   Gemini Helper
+// @name:pt      Gemini Helper
 // @name:ru      Gemini Помощник
 // @name:zh-CN   Gemini 助手
 // @name:zh-TW   Gemini 助手
@@ -19,7 +19,7 @@
 // @description:de Gemini Helfer: Konversationsverwaltung & Export, Gliederungsnavigation, Prompt-Verwaltung, Tab-Erweiterungen (Status/Datenschutz/Benachrichtigung), Leseverlauf & Wiederherstellung, bidirektionaler/manueller Anker, Bildwasserzeichen-Entfernung, Fettschrift-Fix, Formel/Tabellen-Kopie, Modellsperre, Seitenverschönerung, Theme-Wechsel, Smart Dark Mode (Gemini/Gemini Enterprise)
 // @description:fr Gemini Helper : Gestion et export des conversations, navigation par plan, gestion des prompts, améliorations des onglets (statut/confidentialité/notification), historique de lecture et restauration, ancre bidirectionnelle/manuelle, suppression du filigrane, correction du gras, copie formule/tableau, verrouillage de modèle, embellissement de page, changement de thème, mode sombre intelligent (Gemini/Gemini Enterprise)
 // @description:es Gemini Helper: Gestión y exportación de conversaciones, navegación por esquema, gestión de prompts, mejoras de pestañas (estado/privacidad/notificación), historial de lectura y restauración, ancla bidireccional/manual, eliminación de marca de agua, corrección de negritas, copia de fórmulas/tablas, bloqueo de modelo, embellecimiento de página, cambio de tema, modo oscuro inteligente (Gemini/Gemini Enterprise)
-// @description:pt-BR Gemini Helper: Gerenciamento e exportação de conversas, navegação por esboço, gerenciamento de prompts, melhorias de abas (status/privacidade/notificação), histórico de leitura e restauração, âncora bidirecional/manual, remoção de marca d'água, correção de negrito, cópia de fórmulas/tabelas, bloqueio de modelo, embelezamento de página, alternância de tema, modo escuro inteligente (Gemini/Gemini Enterprise)
+// @description:pt Gemini Helper: Gerenciamento e exportação de conversas, navegação por esboço, gerenciamento de prompts, melhorias de abas (status/privacidade/notificação), histórico de leitura e restauração, âncora bidirecional/manual, remoção de marca d'água, correção de negrito, cópia de fórmulas/tabelas, bloqueio de modelo, embelezamento de página, alternância de tema, modo escuro inteligente (Gemini/Gemini Enterprise)
 // @description:ru Gemini Помощник: Управление и экспорт диалогов, навигация по структуре, управление промптами, улучшения вкладок (статус/конфиденциальность/уведомления), история чтения и восстановление, двунаправленный/ручной якорь, удаление водяных знаков, исправление жирного текста, копирование формул/таблиц, блокировка модели, украшение страницы, переключение темы, умный тёмный режим (Gemini/Gemini Enterprise)
 // @author       urzeye
 // @homepage     https://github.com/urzeye
