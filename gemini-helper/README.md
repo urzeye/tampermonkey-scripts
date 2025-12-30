@@ -1,7 +1,12 @@
 # Gemini-helper
 
-> Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配
-> Gemini 标准版/企业版）
+<p align="center">
+  <strong>✨ Your Gemini, Your Way. ✨</strong><br/>
+  <em>打造你的专属 Gemini</em>
+</p>
+
+> [!TIP]
+> **Gemini 助手**：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 
 🌐 **语言**: **简体中文** | [English](README_EN.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Deutsch](README_DE.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Русский](README_RU.md)
 
@@ -94,11 +99,13 @@
 - **边缘吸附隐藏**：拖动面板到屏幕边缘时自动隐藏，悬停恢复，感谢 @Entropy-Xu 贡献
 - **手动锚点**：快捷工具栏一键设置/返回/清除锚点位置，感谢 @Entropy-Xu 贡献
 
-## �📸 功能预览
+## 📸 功能预览
 
-- 右侧悬浮面板，支持拖拽移动（优化拖动体验，不会误选文本）
-- 渐变色主题，美观大方
-- 悬浮条显示当前提示词，支持一键清除
+**📹 视频演示**：
+
+| 大纲 Outline | 会话 Conversations | 功能 Features |
+|:---:|:---:|:---:|
+| <video src="https://github.com/user-attachments/assets/a40eb655-295e-4f9c-b432-9313c9242c9d" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/a249baeb-2e82-4677-847c-2ff584c3f56b" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/c704463c-1ca9-4ab1-937d-7ce638a4f4bb" width="280" controls></video> |
 
 ![会话](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png) ![会话](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-7.png) ![会话](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-8.png) ![大纲](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-2.png) ![提示词](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-1.png) ![阅读导航](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-3.png) ![标签页增强](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-4.png) ![主题切换](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-theme.gif) ![深色模式](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-9.png) ![深色模式](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-10.png) ![深色模式](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-11.png) ![深色模式](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-12.png) ![其他设置](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-5.png)
 

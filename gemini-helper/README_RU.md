@@ -1,6 +1,12 @@
 # Gemini-helper
 
-> Gemini Помощник: Управление и экспорт диалогов, навигация по структуре, управление промптами, улучшения вкладок (статус/конфиденциальность/уведомления), история чтения и восстановление, двунаправленный/ручной якорь, удаление водяных знаков, исправление жирного текста, копирование формул/таблиц, блокировка модели, украшение страницы, переключение темы, умный тёмный режим (Gemini/Gemini Enterprise)
+<p align="center">
+  <strong>✨ Your Gemini, Your Way. ✨</strong><br/>
+  <em>Создайте свой идеальный Gemini</em>
+</p>
+
+> [!TIP]
+> **Gemini Помощник**: Управление и экспорт диалогов, навигация по структуре, управление промптами, улучшения вкладок (статус/конфиденциальность/уведомления), история чтения и восстановление, двунаправленный/ручной якорь, удаление водяных знаков, исправление жирного текста, копирование формул/таблиц, блокировка модели, украшение страницы, переключение темы, умный тёмный режим (Gemini/Gemini Enterprise)
 
 🌐 **Язык**: [简体中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Deutsch](README_DE.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Português](README_PT.md) | **Русский**
 
@@ -94,11 +100,13 @@
 
 ## 📸 Предпросмотр
 
-- Плавающая панель справа, поддержка перетаскивания (оптимизированный опыт, без случайного выделения текста)
-- Градиентная тема, красивый внешний вид
-- Плавающая панель показывает текущий промпт, поддержка очистки одним кликом
+**📹 Видео-демонстрация**:
 
-![Диалоги](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png)
+| Структура | Диалоги | Функции |
+|:---:|:---:|:---:|
+| <video src="https://github.com/user-attachments/assets/a40eb655-295e-4f9c-b432-9313c9242c9d" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/a249baeb-2e82-4677-847c-2ff584c3f56b" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/c704463c-1ca9-4ab1-937d-7ce638a4f4bb" width="280" controls></video> |
+
+![Диалоги](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png) ![Диалоги](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-7.png) ![Диалоги](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-8.png) ![Структура](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-2.png) ![Промпты](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-1.png) ![Навигация чтения](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-3.png) ![Улучшение вкладок](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-4.png) ![Смена темы](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-theme.gif) ![Тёмный режим](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-9.png) ![Тёмный режим](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-10.png) ![Тёмный режим](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-11.png) ![Тёмный режим](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-12.png) ![Другие настройки](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-5.png)
 
 ## 🔧 Использование
 

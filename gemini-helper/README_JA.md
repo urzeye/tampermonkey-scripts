@@ -1,6 +1,12 @@
 # Gemini-helper
 
-> Gemini ヘルパー：会話管理とエクスポート、アウトラインナビゲーション、プロンプト管理、タブ拡張（ステータス/プライバシー/通知）、閲覧履歴と復元、双方向/手動アンカー、画像透かし除去、太字修正、数式/テーブルコピー、モデルロック、ページ美化、テーマ切替、スマートダークモード（Gemini/Gemini Enterprise対応）
+<p align="center">
+  <strong>✨ Your Gemini, Your Way. ✨</strong><br/>
+  <em>あなただけの Gemini を作ろう</em>
+</p>
+
+> [!TIP]
+> **Gemini ヘルパー**：会話管理とエクスポート、アウトラインナビゲーション、プロンプト管理、タブ拡張（ステータス/プライバシー/通知）、閲覧履歴と復元、双方向/手動アンカー、画像透かし除去、太字修正、数式/テーブルコピー、モデルロック、ページ美化、テーマ切替、スマートダークモード（Gemini/Gemini Enterprise対応）
 
 🌐 **言語**: [简体中文](README.md) | [English](README_EN.md) | **日本語** | [한국어](README_KO.md) | [Deutsch](README_DE.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Русский](README_RU.md)
 
@@ -94,11 +100,13 @@
 
 ## 📸 プレビュー
 
-- 右側にフローティングパネル、ドラッグ＆移動に対応（最適化された体験、誤ったテキスト選択なし）
-- グラデーションテーマ、美しい外観
-- フローティングバーに現在のプロンプトを表示、ワンクリッククリアに対応
+**📹 デモ動画**:
 
-![会話](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png)
+| アウトライン | 会話 | 機能 |
+|:---:|:---:|:---:|
+| <video src="https://github.com/user-attachments/assets/a40eb655-295e-4f9c-b432-9313c9242c9d" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/a249baeb-2e82-4677-847c-2ff584c3f56b" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/c704463c-1ca9-4ab1-937d-7ce638a4f4bb" width="280" controls></video> |
+
+![会話](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png) ![会話](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-7.png) ![会話](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-8.png) ![アウトライン](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-2.png) ![プロンプト](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-1.png) ![閲覧ナビゲーション](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-3.png) ![タブ拡張](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-4.png) ![テーマ切替](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-theme.gif) ![ダークモード](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-9.png) ![ダークモード](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-10.png) ![ダークモード](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-11.png) ![ダークモード](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-12.png) ![その他の設定](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-5.png)
 
 ## 🔧 使い方
 

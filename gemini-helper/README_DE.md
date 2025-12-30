@@ -1,6 +1,12 @@
 # Gemini-helper
 
-> Gemini Helfer: Konversationsverwaltung & Export, Gliederungsnavigation, Prompt-Verwaltung, Tab-Erweiterungen (Status/Datenschutz/Benachrichtigung), Leseverlauf & Wiederherstellung, bidirektionaler/manueller Anker, Bildwasserzeichen-Entfernung, Fettschrift-Fix, Formel/Tabellen-Kopie, Modellsperre, Seitenverschönerung, Theme-Wechsel, Smart Dark Mode (Gemini/Gemini Enterprise)
+<p align="center">
+  <strong>✨ Your Gemini, Your Way. ✨</strong><br/>
+  <em>Gestalte dein eigenes Gemini</em>
+</p>
+
+> [!TIP]
+> **Gemini Helfer**: Konversationsverwaltung & Export, Gliederungsnavigation, Prompt-Verwaltung, Tab-Erweiterungen (Status/Datenschutz/Benachrichtigung), Leseverlauf & Wiederherstellung, bidirektionaler/manueller Anker, Bildwasserzeichen-Entfernung, Fettschrift-Fix, Formel/Tabellen-Kopie, Modellsperre, Seitenverschönerung, Theme-Wechsel, Smart Dark Mode (Gemini/Gemini Enterprise)
 
 🌐 **Sprache**: [简体中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | **Deutsch** | [Français](README_FR.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Русский](README_RU.md)
 
@@ -94,11 +100,13 @@ Zwei unabhängige Positionsaufzeichnungssysteme:
 
 ## 📸 Vorschau
 
-- Schwebendes Panel auf der rechten Seite, unterstützt Drag & Verschieben (optimierte Erfahrung, kein versehentliches Textauswählen)
-- Verlaufsthema, schöne Erscheinung
-- Schwebende Leiste zeigt aktuellen Prompt, unterstützt Ein-Klick-Löschen
+**📹 Video-Demo**:
 
-![Konversationen](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png)
+| Gliederung | Konversationen | Funktionen |
+|:---:|:---:|:---:|
+| <video src="https://github.com/user-attachments/assets/a40eb655-295e-4f9c-b432-9313c9242c9d" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/a249baeb-2e82-4677-847c-2ff584c3f56b" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/c704463c-1ca9-4ab1-937d-7ce638a4f4bb" width="280" controls></video> |
+
+![Konversationen](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png) ![Konversationen](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-7.png) ![Konversationen](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-8.png) ![Gliederung](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-2.png) ![Prompts](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-1.png) ![Lesenavigation](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-3.png) ![Tab-Erweiterung](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-4.png) ![Theme-Wechsel](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-theme.gif) ![Dunkelmodus](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-9.png) ![Dunkelmodus](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-10.png) ![Dunkelmodus](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-11.png) ![Dunkelmodus](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-12.png) ![Andere Einstellungen](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-5.png)
 
 ## 🔧 Verwendung
 

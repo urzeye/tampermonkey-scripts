@@ -1,6 +1,12 @@
 # Gemini-helper
 
-> Gemini 도우미: 대화 관리 및 내보내기, 개요 탐색, 프롬프트 관리, 탭 향상(상태/개인정보/알림), 읽기 기록 및 복원, 양방향/수동 앵커, 이미지 워터마크 제거, 굵게 수정, 수식/표 복사, 모델 잠금, 페이지 미화, 테마 전환, 스마트 다크 모드(Gemini/Gemini Enterprise 지원)
+<p align="center">
+  <strong>✨ Your Gemini, Your Way. ✨</strong><br/>
+  <em>나만의 Gemini를 만들어보세요</em>
+</p>
+
+> [!TIP]
+> **Gemini 도우미**: 대화 관리 및 내보내기, 개요 탐색, 프롬프트 관리, 탭 향상(상태/개인정보/알림), 읽기 기록 및 복원, 양방향/수동 앵커, 이미지 워터마크 제거, 굵게 수정, 수식/표 복사, 모델 잠금, 페이지 미화, 테마 전환, 스마트 다크 모드(Gemini/Gemini Enterprise 지원)
 
 🌐 **언어**: [简体中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md) | **한국어** | [Deutsch](README_DE.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Русский](README_RU.md)
 
@@ -94,11 +100,13 @@
 
 ## 📸 미리보기
 
-- 오른쪽에 플로팅 패널, 드래그 앤 이동 지원(최적화된 경험, 실수로 텍스트 선택 없음)
-- 그라데이션 테마, 아름다운 외관
-- 플로팅 바에 현재 프롬프트 표시, 원클릭 지우기 지원
+**📹 데모 영상**:
 
-![대화](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png)
+| 개요 | 대화 | 기능 |
+|:---:|:---:|:---:|
+| <video src="https://github.com/user-attachments/assets/a40eb655-295e-4f9c-b432-9313c9242c9d" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/a249baeb-2e82-4677-847c-2ff584c3f56b" width="280" controls></video> | <video src="https://github.com/user-attachments/assets/c704463c-1ca9-4ab1-937d-7ce638a4f4bb" width="280" controls></video> |
+
+![대화](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-6.png) ![대화](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-7.png) ![대화](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-8.png) ![개요](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-2.png) ![프롬프트](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-1.png) ![읽기 네비게이션](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-3.png) ![탭 향상](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-4.png) ![테마 전환](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-theme.gif) ![다크 모드](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-9.png) ![다크 모드](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-10.png) ![다크 모드](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-11.png) ![다크 모드](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-12.png) ![기타 설정](https://raw.githubusercontent.com/urzeye/tampermonkey-scripts/refs/heads/main/gemini-helper/images/gemini-helper-5.png)
 
 ## 🔧 사용법
 

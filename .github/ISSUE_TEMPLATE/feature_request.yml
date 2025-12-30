@@ -21,6 +21,26 @@ body:
           required: true
 
     - type: dropdown
+      id: site
+      attributes:
+          label: 目标站点
+          description: 请选择希望支持的站点
+          options:
+              - gemini.google.com（Gemini）
+              - business.gemini.google（Gemini Enterprise）
+              - 其他（请在下方说明）
+              - 不适用 / 通用功能
+      validations:
+          required: true
+
+    - type: input
+      id: site_other
+      attributes:
+          label: 其他站点（可选）
+          description: 如选择"其他"，请在此填写站点地址
+          placeholder: '例如: https://example.com'
+
+    - type: dropdown
       id: request_type
       attributes:
           label: 请求类型
