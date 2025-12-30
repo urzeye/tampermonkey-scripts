@@ -3,9 +3,7 @@
 > Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配
 > Gemini 标准版/企业版）
 
-> Gemini Helper: Conversation management & export, outline navigation, prompt management, tab enhancements (
-> status/privacy/notification), reading history & restore, bidirectional/manual anchor, image watermark removal, bold fix,
-> formula/table copy, model lock, page beautification, theme toggle, smart dark mode (Gemini/Gemini Enterprise)
+🌐 **语言**: **简体中文** | [English](README_EN.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Deutsch](README_DE.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Русский](README_RU.md)
 
 ## ✨ 功能特性
 

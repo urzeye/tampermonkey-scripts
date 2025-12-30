@@ -1,6 +1,13 @@
 # Tampermonkey Scripts
 
-个人油猴脚本合集
+<p align="center">
+  <a href="https://github.com/urzeye/tampermonkey-scripts/blob/main/LICENSE"><img src="https://img.shields.io/github/license/urzeye/tampermonkey-scripts?style=flat-square&color=blue" alt="License"></a>
+  <a href="https://github.com/urzeye/tampermonkey-scripts/stargazers"><img src="https://img.shields.io/github/stars/urzeye/tampermonkey-scripts?style=flat-square&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/urzeye/tampermonkey-scripts/network/members"><img src="https://img.shields.io/github/forks/urzeye/tampermonkey-scripts?style=flat-square&color=green" alt="Forks"></a>
+  <a href="https://greasyfork.org/zh-CN/scripts/558318-gemini-helper"><img src="https://img.shields.io/badge/GreasyFork-Gemini%20Helper-red?style=flat-square" alt="GreasyFork"></a>
+</p>
+
+个人油猴脚本合集 | Personal Tampermonkey Scripts Collection
 
 ## 📦 脚本列表
 
@@ -26,11 +33,11 @@
 - ✅ 设置面板（面板状态控制、Tab 管理、排序自定义）
 - ✅ 多站点支持（Gemini 标准版/企业版）
 
-**最新版本**: v1.11.2
+**最新版本**: v1.11.3
 
-[查看详细文档](./gemini-helper/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper)
+[文档 Docs](./gemini-helper/README.md) | [安装 Install](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper) | [路线图 Roadmap](./gemini-helper/TODO.md)
 
-[开发计划](./gemini-helper/TODO.md)
+🌐 [EN](./gemini-helper/README_EN.md) [JA](./gemini-helper/README_JA.md) [KO](./gemini-helper/README_KO.md) [DE](./gemini-helper/README_DE.md) [FR](./gemini-helper/README_FR.md) [ES](./gemini-helper/README_ES.md) [PT](./gemini-helper/README_PT.md) [RU](./gemini-helper/README_RU.md)
 
 ### <img src="https://thumbs.onlyfans.com/public/files/thumbs/c50/m/mk/mka/mkamcrf6rjmcwo0jj4zoavhmalzohe5a1640180203/avatar.jpg" height="24" alt="Coomer" /> coomer 佬友严选
 
@@ -38,7 +45,7 @@
 
 **最新版本**: v1.0.4
 
-[查看详细文档](./coomer/README.md) | [安装脚本](https://greasyfork.org/zh-CN/scripts/559828-coomer-%E4%BD%AC%E5%8F%8B%E4%B8%A5%E9%80%89)
+[文档 Docs](./coomer/README.md) | [安装 Install](https://greasyfork.org/zh-CN/scripts/559828-coomer-%E4%BD%AC%E5%8F%8B%E4%B8%A5%E9%80%89)
 
 ## 🐛 反馈问题
 
@@ -47,3 +54,13 @@
 ## 📄 开源协议
 
 MIT License
+
+## ⭐ Star History
+
+<a href="https://star-history.com/#urzeye/tampermonkey-scripts&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=urzeye/tampermonkey-scripts&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=urzeye/tampermonkey-scripts&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=urzeye/tampermonkey-scripts&type=Date" />
+ </picture>
+</a>
