@@ -1,5 +1,15 @@
 // ==UserScript==
 // @name         gemini-helper
+// @name:en      Gemini Helper
+// @name:ja      Gemini ヘルパー
+// @name:ko      Gemini 도우미
+// @name:de      Gemini Helfer
+// @name:fr      Gemini Helper
+// @name:es      Gemini Helper
+// @name:pt-BR   Gemini Helper
+// @name:ru      Gemini Помощник
+// @name:zh-CN   Gemini 助手
+// @name:zh-TW   Gemini 助手
 // @namespace    http://tampermonkey.net/
 // @version      1.11.3
 // @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
