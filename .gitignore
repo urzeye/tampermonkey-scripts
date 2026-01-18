@@ -145,3 +145,4 @@ vite.config.ts.timestamp-*
 *.bak
 test_script.js
 .DS_Store
+.dev/
