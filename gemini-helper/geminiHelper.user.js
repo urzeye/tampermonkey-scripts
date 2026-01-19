@@ -1445,6 +1445,23 @@
             }
         }
 
+        shouldPreventAutoScroll() {
+            return !!(window.geminiHelper && window.geminiHelper.scrollLockManager && window.geminiHelper.scrollLockManager.enabled);
+        }
+
+        focusElement(element) {
+            if (!element) return;
+            if (this.shouldPreventAutoScroll()) {
+                try {
+                    element.focus({ preventScroll: true });
+                    return;
+                } catch (e) {
+                    // Fallback to default focus behavior.
+                }
+            }
+            element.focus();
+        }
+
         /**
          * 获取滚动容器
          * @returns {HTMLElement}
@@ -1597,7 +1614,7 @@
 
             if (targetElement) {
                 const targetTop = targetElement.offsetTop + (anchorData.offset || 0);
-                container.scrollTo({ top: targetTop, behavior: 'instant' });
+                container.scrollTo({ top: targetTop, behavior: 'instant', __bypassLock: true });
                 return true;
             }
             return false;
@@ -2054,7 +2071,7 @@
                 return false;
             }
 
-            editor.focus();
+            this.focusElement(editor);
             // 验证 focus 是否成功（防止在 textarea 失效时 selectAll 选中整个文档）
             if (document.activeElement !== editor && !editor.contains(document.activeElement)) {
                 console.warn('[GeminiHelper] insertPrompt: focus failed, skipping execCommand');
@@ -2087,7 +2104,7 @@
                 return;
             }
 
-            this.textarea.focus();
+            this.focusElement(this.textarea);
             // 验证 focus 是否成功（防止在 textarea 失效时 selectAll 选中整个文档）
             if (document.activeElement !== this.textarea && !this.textarea.contains(document.activeElement)) {
                 console.warn('[GeminiHelper] clearTextarea: focus failed, skipping execCommand');
@@ -2130,6 +2147,10 @@
                 turnSelector: '.conversation-turn',
                 useShadowDOM: false,
             };
+        }
+
+        supportsScrollLock() {
+            return true;
         }
 
         extractOutline(maxLevel = 6, includeUserQueries = false) {
@@ -2298,6 +2319,10 @@
         }
 
         supportsTabRename() {
+            return true;
+        }
+
+        supportsScrollLock() {
             return true;
         }
 
@@ -2590,7 +2615,7 @@
 
                     this.textarea = editor; // 更新引用
                     editor.click();
-                    editor.focus();
+                    this.focusElement(editor);
 
                     // 等待一小段时间后尝试插入
                     setTimeout(() => {
@@ -2657,7 +2682,7 @@
                 return;
             }
 
-            this.textarea.focus();
+            this.focusElement(this.textarea);
             // Shadow DOM 场景：不做严格的焦点检查，只检查元素是否仍在 DOM 中
             // isConnected 已经检查过，直接执行
 
@@ -4410,7 +4435,48 @@
             this.originalApis = null;
             this.observer = null;
             this.cleanupInterval = null;
-            this.lastScrollY = window.scrollY;
+            this.lastScrollTop = this.getCurrentScrollTop();
+            this.listeningContainer = null;
+        }
+
+        getScrollContainer() {
+            const container = this.siteAdapter?.getScrollContainer?.();
+            if (container && container.isConnected) return container;
+            return document.scrollingElement || document.documentElement || document.body;
+        }
+
+        getCurrentScrollTop() {
+            const container = this.getScrollContainer();
+            if (!container) return window.scrollY || 0;
+            return container.scrollTop || 0;
+        }
+
+        isMainScrollElement(element) {
+            const container = this.getScrollContainer();
+            if (!container || !element) return false;
+            if (element === container) return true;
+            if (container === document.scrollingElement && (element === document.documentElement || element === document.body)) return true;
+            return false;
+        }
+
+        shouldBypassLock(options, element) {
+            if (options && typeof options === 'object' && options.__bypassLock) return true;
+            if (element && element.__ghBypassLock) return true;
+            return false;
+        }
+
+        refreshContainerListener() {
+            if (!this.onScrollHandler) return;
+            const container = this.getScrollContainer();
+            if (this.listeningContainer === container) return;
+            if (this.listeningContainer) {
+                this.listeningContainer.removeEventListener('scroll', this.onScrollHandler);
+            }
+            if (container) {
+                container.addEventListener('scroll', this.onScrollHandler, { passive: true });
+            }
+            this.listeningContainer = container;
+            this.lastScrollTop = this.getCurrentScrollTop();
         }
 
         setEnabled(enabled) {
@@ -4426,6 +4492,7 @@
 
         enable() {
             console.log('Gemini Helper: Enabling Scroll Lock System');
+            this.lastScrollTop = this.getCurrentScrollTop();
             this.hijackApis();
             this.startObserver();
             this.startScrollListener();
@@ -4445,6 +4512,10 @@
             this.originalApis = {
                 scrollIntoView: Element.prototype.scrollIntoView,
                 scrollTo: window.scrollTo,
+                scrollBy: window.scrollBy,
+                elementScrollTo: Element.prototype.scrollTo,
+                elementScrollBy: Element.prototype.scrollBy,
+                elementScroll: Element.prototype.scroll,
                 // 保存属性描述符以便恢复
                 scrollTopDescriptor: Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop') || Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop'),
             };
@@ -4454,7 +4525,7 @@
             // 1. 劫持 Element.prototype.scrollIntoView
             Element.prototype.scrollIntoView = function (options) {
                 // 检查是否包含绕过锁定的标志 (即使是 boolean or object)
-                const shouldBypass = options && typeof options === 'object' && options.__bypassLock;
+                const shouldBypass = self.shouldBypassLock(options, this);
 
                 if (self.enabled && self.shouldBlockScroll() && !shouldBypass) {
                     // console.log('Gemini Helper: Blocked scrollIntoView');
@@ -4472,27 +4543,94 @@
             window.scrollTo = function (x, y) {
                 // 有时 y 可能是 options 对象
                 let targetY = y;
+                let options = null;
                 if (typeof x === 'object' && x !== null) {
+                    options = x;
                     targetY = x.top;
                 }
 
                 // 只有当向下大幅滚动时才拦截 (防止系统自动拉到底)
                 // 阈值设为 50px，避免误杀微小调整
-                if (self.enabled && self.shouldBlockScroll() && typeof targetY === 'number' && targetY > window.scrollY + 50) {
+                const isWindowScroll = self.isMainScrollElement(document.scrollingElement);
+                if (self.enabled && self.shouldBlockScroll() && isWindowScroll && !self.shouldBypassLock(options, null) && typeof targetY === 'number' && targetY > window.scrollY + 50) {
                     // console.log('Gemini Helper: Blocked window.scrollTo (Auto-scroll attempt)');
                     return;
                 }
                 return self.originalApis.scrollTo.apply(this, arguments);
             };
 
-            // 3. 劫持 scrollTop setter (许多框架通过设置 scrollTop 来滚动)
+            // 3. 劫持 window.scrollBy
+            if (this.originalApis.scrollBy) {
+                window.scrollBy = function (x, y) {
+                    let deltaY = y;
+                    let options = null;
+                    if (typeof x === 'object' && x !== null) {
+                        options = x;
+                        deltaY = x.top;
+                    }
+                    const isWindowScroll = self.isMainScrollElement(document.scrollingElement);
+                    if (self.enabled && self.shouldBlockScroll() && isWindowScroll && !self.shouldBypassLock(options, null) && typeof deltaY === 'number' && deltaY > 50) {
+                        return;
+                    }
+                    return self.originalApis.scrollBy.apply(this, arguments);
+                };
+            }
+
+            // 4. 劫持 Element.prototype.scrollTo / scroll
+            if (this.originalApis.elementScrollTo) {
+                Element.prototype.scrollTo = function (x, y) {
+                    let targetY = y;
+                    let options = null;
+                    if (typeof x === 'object' && x !== null) {
+                        options = x;
+                        targetY = x.top;
+                    }
+                    if (self.enabled && self.shouldBlockScroll() && self.isMainScrollElement(this) && !self.shouldBypassLock(options, this) && typeof targetY === 'number' && targetY > this.scrollTop + 50) {
+                        return;
+                    }
+                    return self.originalApis.elementScrollTo.apply(this, arguments);
+                };
+            }
+
+            if (this.originalApis.elementScroll) {
+                Element.prototype.scroll = function (x, y) {
+                    let targetY = y;
+                    let options = null;
+                    if (typeof x === 'object' && x !== null) {
+                        options = x;
+                        targetY = x.top;
+                    }
+                    if (self.enabled && self.shouldBlockScroll() && self.isMainScrollElement(this) && !self.shouldBypassLock(options, this) && typeof targetY === 'number' && targetY > this.scrollTop + 50) {
+                        return;
+                    }
+                    return self.originalApis.elementScroll.apply(this, arguments);
+                };
+            }
+
+            // 5. 劫持 Element.prototype.scrollBy
+            if (this.originalApis.elementScrollBy) {
+                Element.prototype.scrollBy = function (x, y) {
+                    let deltaY = y;
+                    let options = null;
+                    if (typeof x === 'object' && x !== null) {
+                        options = x;
+                        deltaY = x.top;
+                    }
+                    if (self.enabled && self.shouldBlockScroll() && self.isMainScrollElement(this) && !self.shouldBypassLock(options, this) && typeof deltaY === 'number' && deltaY > 50) {
+                        return;
+                    }
+                    return self.originalApis.elementScrollBy.apply(this, arguments);
+                };
+            }
+
+            // 6. 劫持 scrollTop setter (许多框架通过设置 scrollTop 来滚动)
             if (this.originalApis.scrollTopDescriptor) {
                 Object.defineProperty(Element.prototype, 'scrollTop', {
                     get: function () {
                         return self.originalApis.scrollTopDescriptor.get ? self.originalApis.scrollTopDescriptor.get.call(this) : this.files; // fallback (impossible normally)
                     },
                     set: function (value) {
-                        if (self.enabled && self.shouldBlockScroll() && value > this.scrollTop + 50) {
+                        if (self.enabled && self.shouldBlockScroll() && self.isMainScrollElement(this) && !self.shouldBypassLock(null, this) && value > this.scrollTop + 50) {
                             // console.log('Gemini Helper: Blocked scrollTop setter');
                             return;
                         }
@@ -4510,6 +4648,10 @@
 
             Element.prototype.scrollIntoView = this.originalApis.scrollIntoView;
             window.scrollTo = this.originalApis.scrollTo;
+            if (this.originalApis.scrollBy) window.scrollBy = this.originalApis.scrollBy;
+            if (this.originalApis.elementScrollTo) Element.prototype.scrollTo = this.originalApis.elementScrollTo;
+            if (this.originalApis.elementScrollBy) Element.prototype.scrollBy = this.originalApis.elementScrollBy;
+            if (this.originalApis.elementScroll) Element.prototype.scroll = this.originalApis.elementScroll;
 
             if (this.originalApis.scrollTopDescriptor) {
                 Object.defineProperty(Element.prototype, 'scrollTop', this.originalApis.scrollTopDescriptor);
@@ -4536,18 +4678,25 @@
                 if (this.enabled) {
                     // 只有在未被拦截的情况下，我们才认为这是"合法"的位置更新
                     // 在 scroll 事件中很难拦截，只能事后修正
-                    // 这里我们只更新 lastScrollY，具体修正在 Observer 中
-                    this.lastScrollY = window.scrollY;
+                    // 这里我们只更新 lastScrollTop，具体修正在 Observer 中
+                    this.lastScrollTop = this.getCurrentScrollTop();
                 }
             };
-            window.addEventListener('scroll', onScroll, { passive: true });
+            this.onScrollHandlerOptions = { passive: true, capture: true };
+            window.addEventListener('scroll', onScroll, this.onScrollHandlerOptions);
             this.onScrollHandler = onScroll;
+            this.refreshContainerListener();
         }
 
         stopScrollListener() {
             if (this.onScrollHandler) {
-                window.removeEventListener('scroll', this.onScrollHandler);
+                window.removeEventListener('scroll', this.onScrollHandler, this.onScrollHandlerOptions || { capture: true });
+                if (this.listeningContainer) {
+                    this.listeningContainer.removeEventListener('scroll', this.onScrollHandler);
+                    this.listeningContainer = null;
+                }
                 this.onScrollHandler = null;
+                this.onScrollHandlerOptions = null;
             }
         }
 
@@ -4581,17 +4730,17 @@
 
                 if (hasNewContent) {
                     // 如果有新内容插入，立刻检查滚动位置是否发生了非预期的改变
-                    // 这里的逻辑是：如果当前位置比记录的 lastScrollY 大了很多，说明发生了自动滚动
+                    // 这里的逻辑是：如果当前位置比记录的 lastScrollTop 大了很多，说明发生了自动滚动
                     // 我们强制滚回去
-                    const currentScroll = window.scrollY;
+                    const container = this.getScrollContainer();
+                    if (!container) return;
+                    const currentScroll = container.scrollTop;
                     // 阈值 100px
-                    if (currentScroll > this.lastScrollY + 100) {
+                    if (currentScroll > this.lastScrollTop + 100) {
                         // console.log('Gemini Helper: Detected unblocked auto-scroll, changing back.');
-                        window.scrollTo(this.lastScrollY, 0); // 使用原始 API 已经被劫持，这里需要 bypass 吗？
-                        // 实际上我们的劫持逻辑里 window.scrollTo 会调用 apply(this, arguments)，
-                        // 但我们的劫持逻辑是阻止"向下"滚动。如果是"向上"回滚 (current > last, so set to last is moving up)，是被允许的。
-                        // 稍微解释：lastScrollY 是 1000，current 是 2000。window.scrollTo(1000) 是向上，允许。
-                        // 所以直接调用 window.scrollTo 即可。
+                        container.scrollTop = this.lastScrollTop;
+                        // 我们的劫持逻辑是阻止"向下"滚动。如果是"向上"回滚 (current > last, so set to last is moving up)，是被允许的。
+                        // 稍微解释：lastScrollTop 是 1000，current 是 2000。滚动回 1000 是向上，允许。
                     }
                 }
             });
@@ -4604,13 +4753,16 @@
             // 定时器保底
             this.cleanupInterval = setInterval(() => {
                 if (this.enabled) {
-                    const current = window.scrollY;
-                    if (current > this.lastScrollY + 200) {
+                    this.refreshContainerListener();
+                    const container = this.getScrollContainer();
+                    if (!container) return;
+                    const current = container.scrollTop;
+                    if (current > this.lastScrollTop + 200) {
                         // 大幅跳变，回滚
-                        window.scrollTo(this.lastScrollY, 0);
+                        container.scrollTop = this.lastScrollTop;
                     } else {
                         // 小幅变动，认为是合法阅读，更新基准（防止页面慢慢变长后滚不下去）
-                        this.lastScrollY = current;
+                        this.lastScrollTop = current;
                     }
                 }
             }, 500);
@@ -4661,14 +4813,19 @@
         }
 
         scrollTo(options) {
-            if (this.container) {
+            const container = this.container;
+            if (container) {
+                const shouldBypass = options && options.__bypassLock;
+                if (shouldBypass) container.__ghBypassLock = true;
                 try {
-                    this.container.scrollTo(options);
+                    container.scrollTo(options);
                 } catch (e) {
                     // 兼容部分旧浏览器不支持 options 对象
                     if (options.top !== undefined) {
-                        this.container.scrollTop = options.top;
+                        container.scrollTop = options.top;
                     }
+                } finally {
+                    if (shouldBypass) delete container.__ghBypassLock;
                 }
             }
         }
@@ -5012,7 +5169,7 @@
                     if (attempts > 30) {
                         // 超过最大尝试次数，使用像素位置作为最终降级
                         if (data.top !== undefined && scrollContainer.scrollHeight >= data.top) {
-                            this.scrollManager.scrollTo({ top: data.top, behavior: 'instant' });
+                            this.scrollManager.scrollTo({ top: data.top, behavior: 'instant', __bypassLock: true });
                             this.restoredTop = data.top;
                             resolve(true);
                         } else {
@@ -5053,14 +5210,14 @@
                         if (showToastFunc) showToastFunc(`正在加载历史会话 (${historyLoadAttempts + 1}/${maxHistoryLoadAttempts})...`);
 
                         // 滚动到顶部触发懒加载
-                        this.scrollManager.scrollTo({ top: 0, behavior: 'instant' });
+                        this.scrollManager.scrollTo({ top: 0, behavior: 'instant', __bypassLock: true });
 
                         historyLoadAttempts++;
                         // 等待页面加载新内容
                         setTimeout(() => tryScroll(attempts + 1), 2000);
                     } else if (data.top !== undefined && currentScrollHeight >= data.top) {
                         // 没有内容锚点或已用尽回溯机会，但像素位置可用
-                        this.scrollManager.scrollTo({ top: data.top, behavior: 'instant' });
+                        this.scrollManager.scrollTo({ top: data.top, behavior: 'instant', __bypassLock: true });
                         this.restoredTop = data.top;
                         resolve(true);
                     } else if (!canLoadMore && hasContentAnchor) {
@@ -5183,7 +5340,7 @@
 
             // 2.2 降级：像素位置
             if (!jumped && this.previousAnchor.top !== undefined) {
-                this.scrollManager.scrollTo({ top: this.previousAnchor.top, behavior: 'instant' });
+                this.scrollManager.scrollTo({ top: this.previousAnchor.top, behavior: 'instant', __bypassLock: true });
                 jumped = true;
             }
 
@@ -14869,7 +15026,10 @@
                 // transform: scale() 会导致 scrollHeight 与实际滚动距离不匹配
                 const scrollStep = () => {
                     const before = container.scrollTop;
+                    const hadBypass = container.__ghBypassLock;
+                    container.__ghBypassLock = true;
                     container.scrollTop = container.scrollHeight;
+                    if (!hadBypass) delete container.__ghBypassLock;
                     // 如果滚动位置还在变化，继续滚动
                     if (container.scrollTop > before) {
                         requestAnimationFrame(scrollStep);
@@ -14878,7 +15038,7 @@
                 scrollStep();
             } else {
                 // 普通模式：直接滚动
-                this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth' });
+                this.scrollManager.scrollTo({ top: this.scrollManager.scrollHeight, behavior: 'smooth', __bypassLock: true });
             }
         }
 
@@ -14964,10 +15124,13 @@
                 if (isFlutterView && container) {
                     // Flutter 图文并茂：直接设置 scrollTop
                     // 由于锚点保存和恢复使用的是相同的坐标系，直接设置即可
+                    const hadBypass = container.__ghBypassLock;
+                    container.__ghBypassLock = true;
                     container.scrollTop = targetTop;
+                    if (!hadBypass) delete container.__ghBypassLock;
                 } else {
                     // 普通模式：平滑滚动
-                    this.scrollManager.scrollTo({ top: targetTop, behavior: 'smooth' });
+                    this.scrollManager.scrollTo({ top: targetTop, behavior: 'smooth', __bypassLock: true });
                 }
                 showToast(this.t('backToAnchor'));
             } else {
