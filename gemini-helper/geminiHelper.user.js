@@ -11,7 +11,7 @@
 // @name:pt      Gemini Helper
 // @name:ru      Gemini Помощник
 // @namespace    http://tampermonkey.net/
-// @version      1.11.3
+// @version      999.0.0
 // @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:zh-cn Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:zh-tw Gemini 助手：會話管理與匯出、對話大綱、提示詞管理、標籤頁增強（狀態/隱私模式/通知）、閱讀歷史記錄與恢復、雙向/手動錨點、圖片浮水印移除、粗體修復、公式/表格複製、模型鎖定、頁面美化、主題切換、智慧暗色模式（適配 Gemini 標準版/企業版）
@@ -4585,7 +4585,14 @@
                         options = x;
                         targetY = x.top;
                     }
-                    if (self.enabled && self.shouldBlockScroll() && self.isMainScrollElement(this) && !self.shouldBypassLock(options, this) && typeof targetY === 'number' && targetY > this.scrollTop + 50) {
+                    if (
+                        self.enabled &&
+                        self.shouldBlockScroll() &&
+                        self.isMainScrollElement(this) &&
+                        !self.shouldBypassLock(options, this) &&
+                        typeof targetY === 'number' &&
+                        targetY > this.scrollTop + 50
+                    ) {
                         return;
                     }
                     return self.originalApis.elementScrollTo.apply(this, arguments);
@@ -4600,7 +4607,14 @@
                         options = x;
                         targetY = x.top;
                     }
-                    if (self.enabled && self.shouldBlockScroll() && self.isMainScrollElement(this) && !self.shouldBypassLock(options, this) && typeof targetY === 'number' && targetY > this.scrollTop + 50) {
+                    if (
+                        self.enabled &&
+                        self.shouldBlockScroll() &&
+                        self.isMainScrollElement(this) &&
+                        !self.shouldBypassLock(options, this) &&
+                        typeof targetY === 'number' &&
+                        targetY > this.scrollTop + 50
+                    ) {
                         return;
                     }
                     return self.originalApis.elementScroll.apply(this, arguments);
@@ -11430,6 +11444,27 @@
                     background: var(--gh-bg);
                 }
 
+                /* 迁移通知样式 */
+                .gh-migration-notice {
+                    background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #9a3412;
+                    padding: 10px 14px; font-size: 13px; line-height: 1.5;
+                    display: flex; align-items: start; gap: 8px;
+                    animation: fadeIn 0.3s;
+                    flex-shrink: 0;
+                }
+                body[data-gh-mode="dark"] .gh-migration-notice {
+                    background: rgba(67, 20, 7, 0.5); border-bottom-color: #7c2d12; color: #ffedd5;
+                }
+                .gh-notice-content { flex: 1; }
+                .gh-notice-link { color: #ea580c; text-decoration: underline; font-weight: 600; margin-left: 4px; }
+                body[data-gh-mode="dark"] .gh-notice-link { color: #fb923c; }
+                .gh-notice-close {
+                    cursor: pointer; opacity: 0.6; font-size: 18px; line-height: 1;
+                    background: none; border: none; padding: 0 4px; color: inherit;
+                    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+                }
+                .gh-notice-close:hover { opacity: 1; background: rgba(0,0,0,0.05); border-radius: 4px; }
+
                 /* 主面板样式 */
                 #gemini-helper-panel {
                     position: fixed;
@@ -13024,6 +13059,64 @@
             });
 
             panel.appendChild(header);
+
+            // ============================================================
+            // ⚠️ MIGRATION NOTICE (Version 999.0.0)
+            // ============================================================
+            if (!GM_getValue('gemini_migration_notice_dismissed', false)) {
+                const notice = createElement('div', { className: 'gh-migration-notice' });
+                const isZh = this.lang.startsWith('zh');
+
+                const contentDiv = createElement('div', { className: 'gh-notice-content' });
+
+                contentDiv.appendChild(document.createTextNode('⚠️ '));
+                const boldText = createElement('b', {}, isZh ? 'Gemini Helper 已停止更新' : 'Gemini Helper is discontinued');
+                contentDiv.appendChild(boldText);
+                contentDiv.appendChild(document.createTextNode(isZh ? '，建议迁移至新版 ' : '. Please migrate to '));
+
+                // Ophel Link
+                const ophelLink = createElement('a', {
+                    href: 'https://github.com/urzeye/ophel',
+                    target: '_blank',
+                    className: 'gh-notice-link',
+                });
+                const boldOphel = createElement('b', {}, 'Ophel');
+                ophelLink.appendChild(boldOphel);
+                contentDiv.appendChild(ophelLink);
+
+                contentDiv.appendChild(document.createTextNode(isZh ? ' 以获得最佳体验。' : ' for the best experience.'));
+
+                const actionLink = createElement(
+                    'a',
+                    {
+                        href: 'https://github.com/urzeye/ophel',
+                        target: '_blank',
+                        className: 'gh-notice-link',
+                    },
+                    isZh ? '去看看 →' : 'Check it out →',
+                );
+                contentDiv.appendChild(actionLink);
+
+                // Close Button
+                const closeBtn = createElement(
+                    'button',
+                    {
+                        className: 'gh-notice-close',
+                        title: isZh ? '不再提醒' : 'Dismiss',
+                    },
+                    '×',
+                );
+
+                closeBtn.addEventListener('click', () => {
+                    GM_setValue('gemini_migration_notice_dismissed', true);
+                    notice.remove();
+                });
+
+                notice.appendChild(contentDiv);
+                notice.appendChild(closeBtn);
+                panel.appendChild(notice);
+            }
+            // ============================================================
             panel.appendChild(tabs);
 
             // 内容容器需按固定顺序创建（DOM 结构不受 Tab 顺序影响，只影响 Tab 按钮顺序）

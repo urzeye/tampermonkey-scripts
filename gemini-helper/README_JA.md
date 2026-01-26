@@ -1,5 +1,19 @@
 # Gemini-helper
 
+> [!CAUTION]
+> **Gemini Helper 機能更新終了のお知らせ**
+>
+> 本プロジェクトは **[Ophel](https://github.com/urzeye/ophel)** として生まれ変わりました。最新の技術スタックで完全に書き直され、パフォーマンスと機能が大幅に向上しています。ブラウザ拡張機能とユーザースクリプトの両方に対応しています。
+>
+> 最高の体験を得るために、**Ophel** への移行を強くお勧めします：
+>
+> - [GitHub リポジトリ](https://github.com/urzeye/ophel)
+> - [Chrome](https://chromewebstore.google.com/detail/ophel-ai-%E5%AF%B9%E8%AF%9D%E5%A2%9E%E5%BC%BA%E5%B7%A5%E5%85%B7/lpcohdfbomkgepfladogodgeoppclakd)
+> - [Firefox](https://addons.mozilla.org/zh-CN/firefox/addon/ophel-ai-chat-enhancer)
+> - [GreasyFork インストール](https://greasyfork.org/zh-CN/scripts/563646-ophel)
+>
+> 本スクリプトは、今後基本的なメンテナンスのみ行います。
+
 <p align="center">
   <strong>✨ Your Gemini, Your Way. ✨</strong><br/>
   <em>あなただけの Gemini を作ろう</em>

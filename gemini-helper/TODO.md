@@ -1,45 +1,59 @@
 # 开发计划 (TODO)
 
+> [!CAUTION]
+> **Gemini Helper 现已停止功能性更新**
+>
+> 本项目已重构为 **[Ophel](https://github.com/urzeye/ophel)** —— 采用现代技术栈重写，性能更强，功能更丰富，支持 Browser Extension 与 Userscript 双端。
+>
+> 强烈建议迁移至 **Ophel** 以获得最佳体验：
+>
+> - [GitHub 仓库](https://github.com/urzeye/ophel)
+> - [GreasyFork 安装](https://greasyfork.org/zh-CN/scripts/563646-ophel)
+>
+> 本脚本仅保留基础维护。
+
+---
+
 ## 🚀 优先级高 (短期)
 
--   [ ] 统一emoji/svg风格、大小，解决在各平台、系统显示效果不统一问题
--   [ ] 图片导出
--   [ ] 批量导出
--   [ ] 提示词功能增强：变量/占位符支持、导出提示词、预览提示词、提示词组合使用、插入位置选择、多标签
+- [ ] 统一emoji/svg风格、大小，解决在各平台、系统显示效果不统一问题
+- [ ] 图片导出
+- [ ] 批量导出
+- [ ] 提示词功能增强：变量/占位符支持、导出提示词、预览提示词、提示词组合使用、插入位置选择、多标签
 
 ## 🔮 优先级中 (中期)
 
--   [ ] 分享页面大纲适配
--   [ ] 分享页面导出适配，调整导出逻辑，可能需要导出与自己的会话解耦，设计交互
--   [ ] 图文并茂导出适配
--   [ ] gemini business 公式导出方案研究
--   [ ] 快捷键操作：去顶部、底部、上/下一个对话、第 n 个对话、删除对话等等，参考 https: //greasyfork.org/zh-CN/scripts/498823-gemini-keyboard-shortcuts-power-tweaks
--   [ ] 代码 canvas 文件列表优化
+- [ ] 分享页面大纲适配
+- [ ] 分享页面导出适配，调整导出逻辑，可能需要导出与自己的会话解耦，设计交互
+- [ ] 图文并茂导出适配
+- [ ] gemini business 公式导出方案研究
+- [ ] 快捷键操作：去顶部、底部、上/下一个对话、第 n 个对话、删除对话等等，参考 https: //greasyfork.org/zh-CN/scripts/498823-gemini-keyboard-shortcuts-power-tweaks
+- [ ] 代码 canvas 文件列表优化
 
 ## 💡 想法 / 低优先级 (长期)
 
--   [ ] 页面美化，字体、代码块、latex、表格、引用美化，添加多种风格
--   [ ] 适配 AI Studio
--   [ ] 适配 GROK
+- [ ] 页面美化，字体、代码块、latex、表格、引用美化，添加多种风格
+- [ ] 适配 AI Studio
+- [ ] 适配 GROK
 
 ## ✅ 已完成
 
--   [x] 图文并茂导航适配
--   [x] banana 图片去水印
--   [x] gemini 对话导出
--   [x] gemini latex 公式双击复制
--   [x] gemini 表格优化，复制 markdown 格式
--   [x] 提示词清除悬浮条位置移动到输入框上方，避免遮挡视线
--   [x] 一键定位到当前会话
--   [x] 解决 gemini enterprise 抽取的标题文字不全问题
--   [x] ~~解决中文输入候选下，按回车提示词清空却没有发送出去的问题，待复现验证~~ 无法复现
--   [x] 用户问题大纲前添加序号
--   [x] 大纲定位，同步滚动高亮
--   [x] 大纲 tab 添加用户提问
--   [x] 任务完成后通知增强
--   [x] 会话 tab，文件夹彩虹色支持关闭
--   [x] 修复生成完成通知失效问题：// @grant GM_notification
--   [x] 去顶部加载全部历史
--   [x] gemini 加粗修复
--   [x] 云端 pinned 会话同步置顶（Gemini 标准版）
--   [x] 优化深色模式配色
+- [x] 图文并茂导航适配
+- [x] banana 图片去水印
+- [x] gemini 对话导出
+- [x] gemini latex 公式双击复制
+- [x] gemini 表格优化，复制 markdown 格式
+- [x] 提示词清除悬浮条位置移动到输入框上方，避免遮挡视线
+- [x] 一键定位到当前会话
+- [x] 解决 gemini enterprise 抽取的标题文字不全问题
+- [x] ~~解决中文输入候选下，按回车提示词清空却没有发送出去的问题，待复现验证~~ 无法复现
+- [x] 用户问题大纲前添加序号
+- [x] 大纲定位，同步滚动高亮
+- [x] 大纲 tab 添加用户提问
+- [x] 任务完成后通知增强
+- [x] 会话 tab，文件夹彩虹色支持关闭
+- [x] 修复生成完成通知失效问题：// @grant GM_notification
+- [x] 去顶部加载全部历史
+- [x] gemini 加粗修复
+- [x] 云端 pinned 会话同步置顶（Gemini 标准版）
+- [x] 优化深色模式配色
