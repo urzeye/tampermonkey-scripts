@@ -1,7 +1,7 @@
 # Ophel 🚀
 
 <p align="center">
-  <img src="https://gist.github.com/user-attachments/assets/cdd08324-3962-4270-87a3-474b5d240f03" width="120" height="120" alt="Ophel Logo">
+  <img src="./assets/logo.png" width="120" height="120" alt="Ophel Logo">
 </p>
 
 <p align="center">

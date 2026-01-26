@@ -11,7 +11,7 @@ Current Language: English | [中文](./README.md)
 
 ## 📦 Script List
 
-### <img src="https://gist.github.com/user-attachments/assets/cdd08324-3962-4270-87a3-474b5d240f03" height="24" alt="Ophel Logo"> [Ophel](./ophel/README.md)
+### <img src="./ophel/assets/logo.png" height="24" alt="Ophel Logo"> [Ophel](./ophel/README.md)
 
 <p align="center">
   <strong>✨ AI's Benefit, Within Reach ✨</strong><br/>
