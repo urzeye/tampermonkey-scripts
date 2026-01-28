@@ -11,7 +11,7 @@
 // @name:pt      Gemini Helper
 // @name:ru      Gemini Помощник
 // @namespace    http://tampermonkey.net/
-// @version      999.0.0
+// @version      999.0.1
 // @description  Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:zh-cn Gemini 助手：会话管理与导出、对话大纲、提示词管理、标签页增强（状态/隐私模式/通知）、阅读历史记录与恢复、双向/手动锚点、图片水印移除、加粗修复、公式/表格复制、模型锁定、页面美化、主题切换、智能暗色模式（适配 Gemini 标准版/企业版）
 // @description:zh-tw Gemini 助手：會話管理與匯出、對話大綱、提示詞管理、標籤頁增強（狀態/隱私模式/通知）、閱讀歷史記錄與恢復、雙向/手動錨點、圖片浮水印移除、粗體修復、公式/表格複製、模型鎖定、頁面美化、主題切換、智慧暗色模式（適配 Gemini 標準版/企業版）
@@ -221,7 +221,20 @@
             inserted: '已插入提示词',
             scrolling: '页面正在滚动，请稍后...',
             noTextarea: '未找到输入框，请点击输入框后重试',
+
             confirmDelete: '确定删除?',
+            scrollContainerNotFound: '未找到滚动容器',
+            noPrompts: '暂无提示词',
+            inboxName: '收件箱',
+            imageProcessingFailed: '图片处理失败，将使用原始链接导出',
+            copyFailed: '复制失败',
+            autoThemeFailed: '自动切换主题失败，请尝试在网页设置中手动切换',
+            noReadingAnchor: '暂无阅读锚点 (点击顶部/底部按钮可自动生成)',
+            promptScrolling: '页面正在滚动，请稍后再选择提示词',
+            batchMoveSuccess: '已移动 {count} 个会话到 {folder}',
+            batchDeleteSuccess: '已删除 {count} 个会话',
+            categoryRenamedSuccess: '分类已重命名为"{newName}"',
+            categoryDeletedSuccess: '分类"{name}"已删除',
             // 设置面板
             settingsTitle: '通用设置',
             panelSettingsTitle: '面板设置',
@@ -532,7 +545,20 @@
             inserted: '已插入提示詞',
             scrolling: '頁面正在捲動，請稍後...',
             noTextarea: '未找到輸入框，請點擊輸入框後重試',
+
             confirmDelete: '確定刪除?',
+            scrollContainerNotFound: '未找到捲動容器',
+            noPrompts: '暫無提示詞',
+            inboxName: '收件箱',
+            imageProcessingFailed: '圖片處理失敗，將使用原始連結導出',
+            copyFailed: '複製失敗',
+            autoThemeFailed: '自動切換主題失敗，請嘗試在網頁設定中手動切換',
+            noReadingAnchor: '暫無閱讀錨點 (點擊頂部/底部按鈕可自動生成)',
+            promptScrolling: '頁面正在捲動，請稍後再選擇提示詞',
+            batchMoveSuccess: '已移動 {count} 個會話到 {folder}',
+            batchDeleteSuccess: '已刪除 {count} 個會話',
+            categoryRenamedSuccess: '分類已重新命名為"{newName}"',
+            categoryDeletedSuccess: '分類"{name}"已刪除',
             // 設置面板
             settingsTitle: '通用設置',
             panelSettingsTitle: '面板設置',
@@ -1108,6 +1134,18 @@
             tableCopyLabel: 'Table Copy Markdown',
             tableCopyDesc: 'Add copy button to tables for direct Markdown copy',
             tableCopied: 'Table copied',
+            scrollContainerNotFound: 'Scroll container not found',
+            noPrompts: 'No prompts',
+            inboxName: 'Inbox',
+            imageProcessingFailed: 'Image processing failed, exporting with original link',
+            copyFailed: 'Copy failed',
+            autoThemeFailed: 'Auto theme switch failed, please switch manually in settings',
+            noReadingAnchor: 'No reading anchor (click Top/Bottom button to generate)',
+            promptScrolling: 'Page scrolling, please select prompt later',
+            batchMoveSuccess: 'Moved {count} conversations to {folder}',
+            batchDeleteSuccess: 'Deleted {count} conversations',
+            categoryRenamedSuccess: 'Category renamed to "{newName}"',
+            categoryDeletedSuccess: 'Category "{name}" deleted',
         },
     };
 
@@ -1166,11 +1204,19 @@
     // 缓存语言检测结果，避免每次调用都重新检测
     let _cachedLang = null;
 
-    function t(key) {
+    function t(key, params = {}) {
         if (!_cachedLang) {
             _cachedLang = detectLanguage();
         }
-        return I18N[_cachedLang]?.[key] || I18N['en']?.[key] || key;
+        let text = I18N[_cachedLang]?.[key] || I18N['en']?.[key] || key;
+
+        // 替换参数
+        if (params) {
+            Object.keys(params).forEach((k) => {
+                text = text.replace(new RegExp(`{${k}}`, 'g'), params[k]);
+            });
+        }
+        return text;
     }
 
     // 语言变更时需要调用此函数清除缓存
@@ -4878,7 +4924,7 @@
 
             const container = this.scrollManager.container;
             if (!container) {
-                showToast('未找到滚动容器');
+                showToast(this.t('scrollContainerNotFound'));
                 return;
             }
 
@@ -6637,7 +6683,10 @@
             });
 
             // 文件夹信息（图标 + 名称）
-            const folderName = folder.name.replace(folder.icon, '').trim();
+            let folderName = folder.name.replace(folder.icon, '').trim();
+            if (folder.id === 'inbox') {
+                folderName = this.t('inboxName');
+            }
             const info = createElement('div', { className: 'conversations-folder-info' });
 
             // 全选复选框（仅批量模式下显示）
@@ -7420,7 +7469,7 @@
                         });
                         this.saveData();
                         overlay.remove();
-                        showToast(`已移动 ${this.selectedIds.size} 个会话到 ${folder.name}`);
+                        showToast(this.t('batchMoveSuccess', { count: this.selectedIds.size, folder: folder.name }));
                         this.clearSelection();
                         this.createUI();
                     });
@@ -7459,10 +7508,12 @@
             this.showConfirmDialog('批量删除', `确定删除选中的 ${this.selectedIds.size} 个会话吗？`, () => {
                 const count = this.selectedIds.size;
                 this.selectedIds.forEach((convId) => {
-                    delete this.data.conversations[convId];
+                    if (this.data.conversations[convId]) {
+                        delete this.data.conversations[convId];
+                    }
                 });
                 this.saveData();
-                showToast(`已删除 ${count} 个会话`);
+                showToast(this.t('batchDeleteSuccess', { count }));
                 this.clearSelection();
                 this.createUI();
             });
@@ -7636,7 +7687,7 @@
                             content = await this.processMarkdownImages(content);
                         } catch (e) {
                             console.error('Base64 image processing failed:', e);
-                            showToast('图片处理失败，将使用原始链接导出');
+                            showToast(this.t('imageProcessingFailed'));
                         }
                     }
 
@@ -10832,7 +10883,7 @@
                     .then(() => showToast(t('formulaCopied') || '公式已复制'))
                     .catch((err) => {
                         console.error('[FormulaCopy] Copy failed:', err);
-                        showToast('复制失败');
+                        showToast(this.t('copyFailed'));
                     });
 
                 e.preventDefault();
@@ -10976,7 +11027,7 @@
                             })
                             .catch((err) => {
                                 console.error('[TableCopy] Copy failed:', err);
-                                showToast('复制失败');
+                                showToast(this.t('copyFailed'));
                             });
                     });
 
@@ -12807,7 +12858,7 @@
                 if (typeof this.siteAdapter.toggleTheme === 'function') {
                     return this.siteAdapter.toggleTheme(nextMode).then((success) => {
                         if (!success) {
-                            showToast('自动切换主题失败，请尝试在网页设置中手动切换');
+                            showToast(this.t('autoThemeFailed'));
                         }
                     });
                 }
@@ -15046,7 +15097,7 @@
                 this.anchorManager.backToAnchor();
                 showToast(this.t('jumpToAnchor'));
             } else {
-                showToast('暂无阅读锚点 (点击顶部/底部按钮可自动生成)');
+                showToast(this.t('noReadingAnchor'));
             }
         }
 
@@ -15394,7 +15445,7 @@
             this.savePrompts();
             this.refreshCategories();
             this.refreshPromptList();
-            showToast(`分类已重命名为"${newName}"`);
+            showToast(this.t('categoryRenamedSuccess', { newName }));
         }
 
         // 删除分类（将关联提示词移至"未分类"）
@@ -15407,7 +15458,7 @@
             this.savePrompts();
             this.refreshCategories();
             this.refreshPromptList();
-            showToast(`分类"${name}"已删除`);
+            showToast(this.t('categoryDeletedSuccess', { name }));
         }
 
         refreshPromptList(filter = '') {
@@ -15422,7 +15473,7 @@
             clearElement(container);
 
             if (filteredPrompts.length === 0) {
-                container.appendChild(createElement('div', { style: 'text-align: center; padding: 20px; color: #9ca3af;' }, '暂无提示词'));
+                container.appendChild(createElement('div', { style: 'text-align: center; padding: 20px; color: #9ca3af;' }, this.t('noPrompts')));
                 return;
             }
 
@@ -15589,7 +15640,7 @@
 
         insertPromptToTextarea(promptContent) {
             if (this.isScrolling) {
-                showToast('页面正在滚动，请稍后再选择提示词');
+                showToast(this.t('promptScrolling'));
                 return;
             }
             const promiseOrResult = this.siteAdapter.insertPrompt(promptContent);
@@ -15598,13 +15649,13 @@
             if (promiseOrResult instanceof Promise) {
                 promiseOrResult.then((success) => {
                     if (!success) {
-                        showToast('未找到输入框，请点击输入框后重试');
+                        showToast(this.t('noTextarea'));
                         // 再次尝试查找
                         this.siteAdapter.findTextarea();
                     }
                 });
             } else if (!promiseOrResult) {
-                showToast('未找到输入框，请点击输入框后重试');
+                showToast(this.t('noTextarea'));
                 this.siteAdapter.findTextarea();
             }
         }
