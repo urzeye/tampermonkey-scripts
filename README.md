@@ -11,6 +11,12 @@ Current Language: 中文 | [English](./README_EN.md)
 
 ## 📦 脚本列表
 
+| 名称 | 版本 | 简介 | 总安装量 | 评分 | 发布页 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| [Ophel](./ophel/README.md) | ![](https://img.shields.io/greasyfork/v/563646?style=flat-square&color=orange&label=V&logo=greasyfork) | 全能 AI 助手，支持 Gemini/ChatGPT/Claude/Grok/AI Studio | ![](https://img.shields.io/greasyfork/dt/563646?style=flat-square&label=INSTALLS&color=blue&logo=greasyfork) | ![](https://img.shields.io/greasyfork/rating-count/563646?style=flat-square&label=RATING&color=brightgreen&logo=greasyfork) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/563646-ophel) |
+| [Gemini Helper](./gemini-helper/README.md) | ![](https://img.shields.io/greasyfork/v/558318?style=flat-square&color=orange&label=V&logo=greasyfork) | Gemini 体验增强（大纲、会话管理、宽屏等） | ![](https://img.shields.io/greasyfork/dt/558318?style=flat-square&label=INSTALLS&color=blue&logo=greasyfork) | ![](https://img.shields.io/greasyfork/rating-count/558318?style=flat-square&label=RATING&color=brightgreen&logo=greasyfork) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper) |
+| [Coomer 佬友严选](./coomer/README.md) | ![](https://img.shields.io/greasyfork/v/559828?style=flat-square&color=orange&label=V&logo=greasyfork) | OnlyFans/Coomer 体验增强（极简 UI、视频播放器、批量下载） | ![](https://img.shields.io/greasyfork/dt/559828?style=flat-square&label=INSTALLS&color=blue&logo=greasyfork) | ![](https://img.shields.io/greasyfork/rating-count/559828?style=flat-square&label=RATING&color=brightgreen&logo=greasyfork) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/559828-coomer) |
+
 ### <img src="./ophel/assets/logo.png" height="24" alt="Ophel Logo"> [Ophel](./ophel/README.md)
 
 <p align="center">

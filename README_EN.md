@@ -11,6 +11,12 @@ Current Language: English | [中文](./README.md)
 
 ## 📦 Script List
 
+| Name | Version | Description | Installs | Rating | Homepage |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| [Ophel](./ophel/README.md) | ![](https://img.shields.io/greasyfork/v/563646?style=flat-square&color=orange&label=V&logo=greasyfork) | All-in-one AI assistant for Gemini, ChatGPT, Claude, Grok & AI Studio | ![](https://img.shields.io/greasyfork/dt/563646?style=flat-square&label=INSTALLS&color=blue&logo=greasyfork) | ![](https://img.shields.io/greasyfork/rating-count/563646?style=flat-square&label=RATING&color=brightgreen&logo=greasyfork) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/563646-ophel) |
+| [Gemini Helper](./gemini-helper/README.md) | ![](https://img.shields.io/greasyfork/v/558318?style=flat-square&color=orange&label=V&logo=greasyfork) | Enhance Gemini with outlines, session management, widescreen & more | ![](https://img.shields.io/greasyfork/dt/558318?style=flat-square&label=INSTALLS&color=blue&logo=greasyfork) | ![](https://img.shields.io/greasyfork/rating-count/558318?style=flat-square&label=RATING&color=brightgreen&logo=greasyfork) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/558318-gemini-helper) |
+| [Coomer Picks](./coomer/README.md) | ![](https://img.shields.io/greasyfork/v/559828?style=flat-square&color=orange&label=V&logo=greasyfork) | Enhance Coomer with modern UI, video player & batch download | ![](https://img.shields.io/greasyfork/dt/559828?style=flat-square&label=INSTALLS&color=blue&logo=greasyfork) | ![](https://img.shields.io/greasyfork/rating-count/559828?style=flat-square&label=RATING&color=brightgreen&logo=greasyfork) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/559828-coomer) |
+
 ### <img src="./ophel/assets/logo.png" height="24" alt="Ophel Logo"> [Ophel](./ophel/README.md)
 
 <p align="center">
