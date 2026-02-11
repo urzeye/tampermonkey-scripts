@@ -7,7 +7,7 @@
  <a href="https://greasyfork.org/zh-CN/users/1545808-urzeye"><img src="https://img.shields.io/badge/GreasyFork-urzeye-red?style=flat-square" alt="GreasyFork"></a>
 </p>
 
-Current Language: 中文 | [English](./README_EN.md)
+<p align="center"><strong>中文</strong> | <a href="./README_EN.md">English</a></p>
 
 ## 📦 脚本列表
 
